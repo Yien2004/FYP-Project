@@ -1,0 +1,48 @@
+{
+  "Pantai Hospital Staff": {
+    "doctorName": "Pantai Hospital Staff",
+    "shifts": {
+      "Monday": {
+        "start": "09:00 AM",
+        "end": "05:00 PM",
+        "enabled": true
+      },
+      "Tuesday": {
+        "start": "09:00 AM",
+        "end": "05:00 PM",
+        "enabled": true
+      },
+      "Wednesday": {
+        "start": "09:00 AM",
+        "end": "05:00 PM",
+        "enabled": true
+      },
+      "Thursday": {
+        "start": "09:00 AM",
+        "end": "05:00 PM",
+        "enabled": true
+      },
+      "Friday": {
+        "start": "09:00 AM",
+        "end": "05:00 PM",
+        "enabled": true
+      },
+      "Saturday": {
+        "start": "09:00 AM",
+        "end": "01:00 PM",
+        "enabled": false
+      },
+      "Sunday": {
+        "start": "09:00 AM",
+        "end": "01:00 PM",
+        "enabled": false
+      }
+    },
+    "blockedDates": [],
+    "globalBreak": {
+      "start": "12:00 PM",
+      "end": "01:00 PM"
+    },
+    "customBreaks": {}
+  }
+}
