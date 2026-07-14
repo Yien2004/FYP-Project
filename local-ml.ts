@@ -110,6 +110,13 @@ export function initClassifier() {
     // Intent: symptoms
     intentClassifier.addDocument('i have chest pain coughing wheezing asthma trouble breathing sore throat runny nose stomach ache', 'symptoms');
     intentClassifier.addDocument('symptom triage assess this symptom fever headache joint pain what is wrong with me diagnoses', 'symptoms');
+    intentClassifier.addDocument('heart discomfort need go what department which clinic should i visit specialist doctor', 'symptoms');
+    intentClassifier.addDocument('what department deals with stomach pain chest tightness breathing difficulty', 'symptoms');
+    intentClassifier.addDocument('who should i see for joint swelling broken bone sports injury fracture', 'symptoms');
+    intentClassifier.addDocument('need medical recommendation for migraine vertigo numbness stroke nerve issues', 'symptoms');
+    intentClassifier.addDocument('child fever baby crying toddler vomiting what pediatric clinic is best', 'symptoms');
+    intentClassifier.addDocument('appendix surgery hernia removal gallbladder pain which surgeon should i consult', 'symptoms');
+    intentClassifier.addDocument('acid reflux gerd gastric ulcer stomach ache gastroenterology specialist', 'symptoms');
 
     // Intent: fallback
     intentClassifier.addDocument('tell me a joke weather report what is the time random questions system index information general query', 'fallback');
@@ -130,12 +137,98 @@ export function triageSymptom(text: string): string {
   const cleanText = preprocessText(text);
   if (!cleanText) return 'General Practice & Family Medicine';
 
+  const lowercase = text.toLowerCase();
+  
+  // Rule-based Clinical Overrides matching the exact triage routing specification table
+  
+  // 1. Pediatric Safeguard for children/infants
+  if (lowercase.includes("child") || lowercase.includes("baby") || lowercase.includes("infant") || lowercase.includes("pediatric")) {
+    return "Pediatrics";
+  }
+
+  // 2. Trauma / Severe Accidents -> Emergency Medicine (ER)
+  if (lowercase.includes("trauma") || lowercase.includes("accident") || lowercase.includes("crash") || 
+      lowercase.includes("collision") || lowercase.includes("unconscious") || lowercase.includes("bleeding heavily") ||
+      lowercase.includes("severe accident")) {
+    return "Emergency Medicine";
+  }
+
+  // 3. Sudden Chest Pain (Severe) -> Emergency Medicine (ER)
+  if (lowercase.includes("sudden chest pain") || 
+      (lowercase.includes("chest pain") && (lowercase.includes("severe") || lowercase.includes("sudden") || lowercase.includes("teruk")))) {
+    return "Emergency Medicine";
+  }
+
+  // 4. Chronic Heart Palpitations -> Cardiology
+  if (lowercase.includes("palpitations") || lowercase.includes("heart racing") || lowercase.includes("arrhythmia") || 
+      lowercase.includes("heart discomfort") || lowercase.includes("palpitation")) {
+    return "Cardiology";
+  }
+
+  // 5. Fever / Dengue / Viral Infection -> Internal Medicine & Infectious Diseases
+  if (lowercase.includes("fever") || lowercase.includes("demam") || lowercase.includes("发烧") ||
+      lowercase.includes("dengue") || lowercase.includes("malaria") || lowercase.includes("viral") || 
+      lowercase.includes("infection") || lowercase.includes("infectious")) {
+    return "Internal Medicine & Infectious Diseases";
+  }
+
+  // 6. Hernia (Diagnosed / Visible bulge) -> General Surgery
+  if (lowercase.includes("hernia") || lowercase.includes("bulge")) {
+    return "General Surgery";
+  }
+
+  // 7. Acid Reflux / Abdominal Pain / Stomach Issues / Kidney Stones -> Gastroenterology & Urology
+  if (lowercase.includes("reflux") || lowercase.includes("gerd") || lowercase.includes("heartburn") ||
+      lowercase.includes("stomach") || lowercase.includes("abdominal pain") || lowercase.includes("diarrhea") || 
+      lowercase.includes("vomiting") || lowercase.includes("gastric") || lowercase.includes("kidney stone") || 
+      lowercase.includes("urinary") || lowercase.includes("urine") || lowercase.includes("bladder")) {
+    return "Gastroenterology & Urology";
+  }
+
+  // 8. Joint Pain / Fractures / Strains -> Orthopedics & Sports Medicine
+  if (lowercase.includes("joint") || lowercase.includes("fracture") || lowercase.includes("bone") || 
+      lowercase.includes("sprain") || lowercase.includes("strain") || lowercase.includes("ligament") || 
+      lowercase.includes("acl")) {
+    return "Orthopedics & Sports Medicine";
+  }
+
   try {
     return triageClassifier.classify(cleanText);
   } catch (err) {
     console.error("Classifier triage error, fallback to GP:", err);
     return 'General Practice & Family Medicine';
   }
+}
+
+function overrideIntentIfNeeded(message: string, predictedIntent: string): string {
+  const lowercase = message.toLowerCase();
+  
+  // High-accuracy symptom override keywords
+  const symptomKeywords = [
+    "discomfort", "pain", "sakit", "ache", "fever", "demam", "发烧", "cough", 
+    "batuk", "sore", "dizzy", "pening", "vomit", "muntah", "breath", "asthma", 
+    "injury", "accident", "wound", "bleeding", "rash", "allergy", "constipation",
+    "diarrhea", "nausea", "headache"
+  ];
+  
+  if (symptomKeywords.some(keyword => lowercase.includes(keyword))) {
+    return "symptoms";
+  }
+  
+  return predictedIntent;
+}
+
+export function getLocalIntent(message: string): string {
+  if (!intentClassifier) {
+    initClassifier();
+  }
+  let intent = "fallback";
+  try {
+    intent = intentClassifier.classify(preprocessText(message));
+  } catch (err) {
+    intent = "fallback";
+  }
+  return overrideIntentIfNeeded(message, intent);
 }
 
 // ============================================================
@@ -156,6 +249,7 @@ export async function localConsult(message: string, history: any[], patientInfo:
   } catch (err) {
     console.error("Intent classifier error, fallback to regex/keyword rules:", err);
   }
+  intent = overrideIntentIfNeeded(message, intent);
 
   // 2. Fetch reviews and vitals needed for response compilation
   let allReviews = [];
@@ -249,13 +343,106 @@ export async function localConsult(message: string, history: any[], patientInfo:
     // Dynamic symptom matching utilizing the triage classifier
     const matchedDept = triageSymptom(lowercaseMessage);
     
+    // Facility and doctor recommendation directory
+    const facilityRecommendations: Record<string, { facility: string; doctor: string; specialty: string; why: string; }[]> = {
+      "Cardiology": [
+        {
+          facility: "Pantai Hospital Penang",
+          doctor: "Dr. Sarah Jenkins",
+          specialty: "Cardiology",
+          why: "Pantai Hospital features a state-of-the-art 24/7 Coronary Care Unit (CCU) and cardiac catheterization lab. Dr. Jenkins has extensive clinical experience in hypertension and cardiac arrhythmia management."
+        },
+        {
+          facility: "Pantai Hospital Penang",
+          doctor: "Dr. Adrian Rahman",
+          specialty: "Cardiology",
+          why: "Pantai Hospital is highly rated for cardiac telemetry. Dr. Rahman is highly recommended (5.0 Stars) for non-invasive ECG monitoring and blood pressure management."
+        }
+      ],
+      "Pediatrics": [
+        {
+          facility: "Loh Guan Lye Specialists Centre",
+          doctor: "Dr. Ling Wey Shuan",
+          specialty: "Pediatrics",
+          why: "Loh Guan Lye Specialists Centre has a dedicated neonatal intensive care unit (NICU). Dr. Ling specializes in children's immunization schedules, growth tracking, and pediatric checkups."
+        }
+      ],
+      "General Surgery": [
+        {
+          facility: "Lam Wah Eee Hospital",
+          doctor: "Dr. Simon Lo",
+          specialty: "General Surgery",
+          why: "Lam Wah Eee Hospital features advanced operating theatres for minimally invasive procedures. Dr. Simon Lo specializes in laparoscopic appendectomies and hernia repairs."
+        }
+      ],
+      "Internal Medicine & Infectious Diseases": [
+        {
+          facility: "KPJ Penang Specialist Hospital",
+          doctor: "Dr. Ainol Shareha",
+          specialty: "Internal Medicine",
+          why: "KPJ Penang features comprehensive isolation screening facilities for viral diseases. Dr. Shareha is highly rated for managing diabetes, endocrinology, and chronic infections."
+        }
+      ],
+      "Orthopedics & Sports Medicine": [
+        {
+          facility: "Island Hospital",
+          doctor: "Dr. Adrian Mitchell",
+          specialty: "Orthopedic Surgery",
+          why: "Island Hospital is a regional hub for musculoskeletal rehabilitation. Dr. Mitchell is highly recommended for joint replacements, ACL reconstructions, and sports injury settings."
+        }
+      ],
+      "Neurology": [
+        {
+          facility: "Gleneagles Penang",
+          doctor: "Dr. Tan Mei Ling",
+          specialty: "Neurology",
+          why: "Gleneagles Penang features a certified Stroke Center with round-the-clock MRI/CT imaging support. Dr. Tan specializes in vertigo, chronic migraines, and neuromuscular disorders."
+        }
+      ],
+      "Gastroenterology & Urology": [
+        {
+          facility: "Penang Adventist Hospital",
+          doctor: "Dr. Gary Yusuf",
+          specialty: "Gastroenterology",
+          why: "Penang Adventist Hospital has a specialized Endoscopy Suite. Dr. Gary Yusuf has extensive experience in diagnosing GERD, peptic ulcers, and bowel disorders."
+        }
+      ],
+      "General Practice & Family Medicine": [
+        {
+          facility: "O2 Klinik (Bayan Baru)",
+          doctor: "Dr. Lisa Wong",
+          specialty: "Family Medicine",
+          why: "O2 Klinik is excellent for primary care screening and common colds/flu. Dr. Lisa Wong offers comprehensive health checkups and seasonal vaccinations."
+        }
+      ],
+      "Emergency Medicine": [
+        {
+          facility: "Hospital Pulau Pinang (General Hospital)",
+          doctor: "Emergency Duty Medical Officer",
+          specialty: "Emergency Medicine",
+          why: "Hospital Pulau Pinang has the state's largest level-1 trauma emergency department with immediate surgical access and critical life support systems."
+        }
+      ]
+    };
+
     responseText = `### 🩺 Symptom Triage Assessment\nBased on your query: **"${message}"**\n\n- **ML Primary Routing**: Your symptoms are most closely matched with **${matchedDept}**.\n- **Allergen Verification**: Ensure you do not consume penicillin or peanut-derived substances, matching your active allergy registry profile (Allergies: ${patientInfo?.allergies?.join(", ") || "Penicillin, Peanuts"}).\n`;
     
     if (patientInfo?.chronicConditions?.some((c: string) => c.toLowerCase().includes("asthma"))) {
       responseText += `- **Chronic Conditions Check**: Since you have a history of **Asthma**, keep your Ventolin Inhaler close by. If you feel tightness in your chest or wheezing, take 1-2 puffs as required.\n`;
     }
 
-    responseText += `\n> [!WARNING]\n> **AI Diagnosis Disclaimer**: I am Carey, an AI assistant. In case of emergency shortness of breath, heavy chest pressure, or severe symptoms, please immediately go to the nearest emergency room or contact clinic staff.`;
+    // Dynamic facility recommendation based on matched department
+    const recs = facilityRecommendations[matchedDept] || facilityRecommendations["General Practice & Family Medicine"];
+    responseText += `\n### 🏢 Recommended Clinic & Practitioner\nBased on your triaged department, I recommend booking with the following specialist:\n\n`;
+    recs.forEach(r => {
+      responseText += `- **Facility**: **[${r.facility}](file:///c:/Users/Asus/Downloads/fyp%20code/fyp/src/screens/ClinicSearch.tsx)**\n`;
+      responseText += `- **Physician**: **${r.doctor}** (${r.specialty})\n`;
+      responseText += `- **Clinical Fit**: ${r.why}\n\n`;
+    });
+    
+    responseText += `*You can use the **Clinic Locator** screen to locate this facility on the map and request direct fetching transit driver dispatch to your consultation.*`;
+
+    responseText += `\n\n> [!WARNING]\n> **AI Diagnosis Disclaimer**: I am Carey, an AI assistant. In case of emergency shortness of breath, heavy chest pressure, or severe symptoms, please immediately go to the nearest emergency room or contact clinic staff.`;
   
   } else {
     // Fallback instruction response

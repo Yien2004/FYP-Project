@@ -30,6 +30,7 @@ export interface Attachment {
   size: string;
   uploadedAt: string;
   type: string;
+  data?: string;
 }
 
 export interface Appointment {
@@ -40,13 +41,15 @@ export interface Appointment {
   dateTime: string;
   specialty: string;
   doctorName: string;
-  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected';
+  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected' | 'Done' | 'Missing';
   remarks: string;
   checked?: boolean;
   clinic?: string;
   hospital?: string;
   date?: string;
   timeSlot?: string;
+  shareHistory?: boolean;
+  requestRide?: boolean;
 }
 
 export interface SystemLog {

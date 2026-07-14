@@ -38,7 +38,25 @@ function MockQRCode() {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 9h4v2H3zM17 17h2v2h-2zM13 17h2v2h-2zM9 17h2v2H9z" />
     </svg>
   );
-}
+}const getClinicTravelTime = (clinicName: string): number => {
+  const name = clinicName.toLowerCase();
+  if (name.includes("pantai")) return 14;
+  if (name.includes("pulau pinang")) return 18;
+  if (name.includes("seberang jaya")) return 25;
+  if (name.includes("jalan perak")) return 10;
+  if (name.includes("bayan baru")) return 12;
+  if (name.includes("bukit mertajam")) return 28;
+  if (name.includes("lam wah ee")) return 15;
+  if (name.includes("gleneagles")) return 16;
+  if (name.includes("island")) return 11;
+  if (name.includes("adventist")) return 13;
+  if (name.includes("loh guan lye")) return 12;
+  if (name.includes("kpj")) return 22;
+  if (name.includes("o2")) return 9;
+  if (name.includes("singapore")) return 15;
+  if (name.includes("perdana")) return 8;
+  return 15; // default fallback
+};
 
 export default function Dashboard({ 
   patientProfile, 
@@ -50,17 +68,17 @@ export default function Dashboard({
 }: DashboardProps) {
   // Find next upcoming appointment
   const nextUpcoming = useMemo(() => {
-    return appointments.find(a => a.status === "Upcoming") || null;
+    return appointments.find(a => ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status)) || null;
   }, [appointments]);
 
   // List of upcoming appointments
   const upcomingList = useMemo(() => {
-    return appointments.filter(a => a.status === "Upcoming");
+    return appointments.filter(a => ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status));
   }, [appointments]);
 
   // List of completed/cancelled appointments
   const completedList = useMemo(() => {
-    return appointments.filter(a => a.status === "Completed" || a.status === "Cancelled");
+    return appointments.filter(a => ["Completed", "Cancelled", "Done", "Missing"].includes(a.status));
   }, [appointments]);
 
   const todayStr = useMemo(() => {
@@ -93,7 +111,7 @@ export default function Dashboard({
   };
 
   const checkQueueActivation = (apt: Appointment) => {
-    if (apt.status !== "Upcoming") return { active: false, startsAtStr: "" };
+    if (!["Upcoming", "Approved", "Pending", "Rescheduled"].includes(apt.status)) return { active: false, startsAtStr: "" };
     
     const aptTime = getAptDateTime(apt);
     if (!aptTime) return { active: false, startsAtStr: "" };
@@ -218,7 +236,7 @@ export default function Dashboard({
     return Array.from(
       new Set(
         appointments
-          .filter(a => a.status === "Upcoming")
+          .filter(a => ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status))
           .map(a => a.clinic)
           .filter((c): c is string => !!c)
       )
@@ -240,7 +258,7 @@ export default function Dashboard({
 
   // Find the selected upcoming appointment
   const activeApt = useMemo(() => {
-    return appointments.find(a => a.status === "Upcoming" && a.clinic === selectedQueueClinic) || null;
+    return appointments.find(a => ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status) && a.clinic === selectedQueueClinic) || null;
   }, [selectedQueueClinic, appointments]);
 
   const [presenceConfirmed, setPresenceConfirmed] = useState<boolean>(false);
@@ -264,6 +282,13 @@ export default function Dashboard({
         "Content-Type": "application/json"
       };
       if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      // Update appointment status to confirm check-in in DB metadata
+      await fetch(`/api/appointments/${activeApt.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ checkedIn: true })
+      });
 
       await fetch("/api/logs", {
         method: "POST",
@@ -470,16 +495,25 @@ export default function Dashboard({
   };
 
   const handleDownloadAttachment = (file: any) => {
-    const contents = `CarePoint MOH Health Ledger System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt || "June 15, 2026"}\nPatient Name: ${patientProfile.fullName}\nPatient DOB: ${patientProfile.dateOfBirth}\nGender: ${patientProfile.gender}\nEmail: ${patientProfile.email}\n---------------------------------------\n[COMPILER SUCCESS] This is a simulated clinical record file parsed from CarePoint central database.\n`;
-    const blob = new Blob([contents], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = file.name.includes('.') ? file.name : `${file.name}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (file.data && file.data.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = file.data;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const contents = `CarePoint MOH Health Ledger System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt || "June 15, 2026"}\nPatient Name: ${patientProfile.fullName}\nPatient DOB: ${patientProfile.dateOfBirth}\nGender: ${patientProfile.gender}\nEmail: ${patientProfile.email}\n---------------------------------------\n[COMPILER SUCCESS] This is a simulated clinical record file parsed from CarePoint central database.\n`;
+      const blob = new Blob([contents], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name.includes('.') ? file.name : `${file.name}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
@@ -510,6 +544,38 @@ export default function Dashboard({
           <HeartHandshake className="w-48 h-48" />
         </div>
       </div>
+
+      {/* Grab Fetching Ride Panel */}
+      {nextUpcoming && nextUpcoming.requestRide && (
+        <div className="bg-white border border-teal-100 rounded-3xl p-6 shadow-md shadow-teal-600/5 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-l-4 border-l-teal-600">
+          <div className="flex items-center gap-4.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0 text-xl animate-pulse">
+              🚗
+            </div>
+            <div className="space-y-1">
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full inline-block">
+                LifeLink Fetching Transit (Grab Service)
+              </span>
+              <h3 className="text-sm font-extrabold text-slate-800">
+                Driver is on the way to pick you up
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Driver <span className="font-bold text-slate-700">Danish</span> (Proton Saga Grey - <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] font-bold">WEE 2026</span>) is arriving. Destination strictly locked to <span className="font-bold text-teal-700">{nextUpcoming.clinic}</span>.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end shrink-0 w-full md:w-auto">
+            <div className="text-right space-y-0.5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Estimated Arrival</span>
+              <span className="text-2xl font-black text-teal-650 tracking-tight block">{getClinicTravelTime(nextUpcoming.clinic)} Mins</span>
+            </div>
+            {/* Simple Transit Progress Bar */}
+            <div className="w-full md:w-48 bg-slate-100 h-2 rounded-full mt-2.5 overflow-hidden relative">
+              <div className="bg-teal-600 h-full rounded-full animate-pulse" style={{ width: '65%' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
@@ -626,7 +692,7 @@ export default function Dashboard({
                   </div>
 
                   {/* Presence Check-in Card */}
-                  {((secondsLeft !== null && secondsLeft <= 600) || estimatedWait <= 10) && (
+                  {((secondsLeft !== null && secondsLeft <= 1200) || estimatedWait <= 10) && (
                     <div className={`p-4 rounded-2xl border transition-all duration-300 ${
                       presenceConfirmed
                         ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-200'

@@ -305,10 +305,10 @@ export default function PatientManagementSection() {
                         </button>
                         <button
                           onClick={() => handleDeleteAccount(p.id)}
-                          className="p-1.5 text-neutral-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                          title="Delete Account"
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                          title="Terminate Account"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <UserX className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>

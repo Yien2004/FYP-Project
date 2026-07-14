@@ -29,7 +29,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import * as db from "./db";
-import { localConsult, triageSymptom, initClassifier } from "./local-ml";
+import { localConsult, triageSymptom, initClassifier, getLocalIntent } from "./local-ml";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import bcryptjs from "bcryptjs";
@@ -39,7 +39,8 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ============================================================
 // CORS headers (useful when frontend dev port differs)
@@ -230,7 +231,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     return res.json({
-      user: { id: authUser.id, email: authUser.email, role, name },
+      user: { id: authUser.id, email: authUser.email, role, name, hospital: authProfile.hospital },
       profile,
       accessToken: authData?.session?.access_token ?? null,
     });
@@ -478,7 +479,7 @@ app.get("/api/auth/current", async (req, res) => {
  */
 app.post("/api/staff/requests", async (req, res) => {
   try {
-    const { email, fullName, role, password } = req.body;
+    const { email, fullName, role, password, hospital } = req.body;
     if (!email || !fullName || !role || !password) {
       return res.status(400).json({ error: "email, fullName, role, and password are required." });
     }
@@ -488,6 +489,7 @@ app.post("/api/staff/requests", async (req, res) => {
       fullName,
       role,
       approved: false,
+      hospital: hospital || "",
     });
 
     return res.status(201).json({ success: true, message: "Staff registration request submitted successfully." });
@@ -758,7 +760,8 @@ app.get("/api/logs", async (req, res) => {
 app.post("/api/patients/:patientId/attachments", async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { name, size, type } = req.body;
+    const { name, size, type, data } = req.body;
+    console.log("📥 [EHR Ingress API] POST attachment - Name:", name, "Size:", size, "Data length:", data ? data.length : "null/undefined");
 
     if (!name || !size || !type) {
       return res.status(400).json({ error: "name, size, and type are required." });
@@ -775,6 +778,8 @@ app.post("/api/patients/:patientId/attachments", async (req, res) => {
       size,
       type,
       uploadedAt: new Date().toISOString().substring(0, 10),
+      clinic: req.body.clinic || null,
+      data: data || null
     };
 
     const currentAttachments = matched.attachments || [];
@@ -1068,6 +1073,41 @@ async function sendBookingConfirmationEmail(email: string, appointment: any) {
   }
 }
 
+async function notifyPatientAndStaff(
+  patientId: string,
+  patientNotif: { title: string; message: string; },
+  staffMessage: string
+) {
+  try {
+    // 1. Patient Notification
+    const patient = await db.getPatientProfileById(patientId);
+    if (patient && patient.email) {
+      const patientEmail = patient.email;
+      const existingNotifs = patient.notifications || [];
+      const newNotif = {
+        id: "notif-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+        title: patientNotif.title,
+        body: patientNotif.message,
+        message: patientNotif.message,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+      await db.updatePatientProfile(patientEmail, {
+        notifications: [newNotif, ...existingNotifs]
+      });
+    }
+
+    // 2. Staff Broadcast Log
+    await db.addSystemLog({
+      message: `[Broadcast]: (All Staff) [📢 HEALTH NOTICE] ${staffMessage}`,
+      level: "info"
+    });
+  } catch (err: any) {
+    console.error("Error in notifyPatientAndStaff:", err.message);
+  }
+}
+
 /**
  * POST /api/appointments
  * Body: appointment object (camelCase)
@@ -1083,6 +1123,20 @@ app.post("/api/appointments", async (req, res) => {
       sendBookingConfirmationEmail(patientEmail, created).catch(err => {
         console.error("Error in sendBookingConfirmationEmail async helper:", err);
       });
+
+      // Send notifications to Patient and Staff
+      const patient = await db.getPatientProfileByEmail(patientEmail);
+      if (patient) {
+        const patientName = patient.fullName || "Ahmad";
+        notifyPatientAndStaff(
+          patient.id,
+          {
+            title: "Booking Confirmed",
+            message: `Booking confirmed, ${created.timeSlot} ${created.clinic}`
+          },
+          `New booking by ${patientName}: ${created.clinic} - ${created.doctorName || 'Specialist'} on ${created.date} at ${created.timeSlot}.`
+        ).catch(err => console.error("Notification sync error:", err));
+      }
     }
 
     return res.status(201).json(created);
@@ -1100,6 +1154,21 @@ app.put("/api/appointments/:id", async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const updated = await db.updateAppointment(id, updates);
+    
+    // Send notifications to Patient and Staff
+    if (updated && updated.patientId) {
+      const patient = await db.getPatientProfileById(updated.patientId);
+      const patientName = patient?.fullName || "Ahmad";
+      notifyPatientAndStaff(
+        updated.patientId,
+        {
+          title: "Appointment Rescheduled",
+          message: `Booking rescheduled, ${updated.timeSlot} ${updated.clinic}`
+        },
+        `Appointment Updated: Patient ${patientName} updated slot at ${updated.clinic} to ${updated.date} at ${updated.timeSlot} (${updated.status || 'Pending'}).`
+      ).catch(err => console.error("Notification sync error:", err));
+    }
+
     return res.json(updated);
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
@@ -1112,7 +1181,23 @@ app.put("/api/appointments/:id", async (req, res) => {
 app.delete("/api/appointments/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const apt = await db.getAppointmentById(id);
     const result = await db.deleteAppointment(id);
+    
+    // Send notifications to Patient and Staff
+    if (apt && apt.patientId) {
+      const patient = await db.getPatientProfileById(apt.patientId);
+      const patientName = patient?.fullName || "Ahmad";
+      notifyPatientAndStaff(
+        apt.patientId,
+        {
+          title: "Appointment Cancelled",
+          message: `Booking cancelled, ${apt.timeSlot} ${apt.clinic}`
+        },
+        `Appointment Cancelled: Patient ${patientName} cancelled their slot at ${apt.clinic} on ${apt.date} at ${apt.timeSlot}.`
+      ).catch(err => console.error("Notification sync error:", err));
+    }
+
     return res.json(result);
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
@@ -1400,7 +1485,8 @@ app.get("/api/admin/users", async (_req, res) => {
         role,
         approved: meta.approved !== false,
         status: meta.status || 'Active', // 'Active' | 'Suspended'
-        createdAt: u.created_at || new Date().toISOString()
+        createdAt: u.created_at || new Date().toISOString(),
+        hospital: meta.hospital || ''
       };
     });
     return res.json(mapped);
@@ -1541,6 +1627,345 @@ app.post("/api/admin/broadcast", async (req, res) => {
   }
 });
 
+app.post("/api/translate", async (req, res) => {
+  try {
+    const { text, targetLanguage } = req.body;
+    if (!text) return res.status(400).json({ error: "Text is required." });
+
+    const target = (targetLanguage || "English").toLowerCase();
+    const isMalay = target.includes("malay") || target.includes("bahasa");
+    const isChinese = target.includes("chin");
+    const lowercase = text.toLowerCase();
+
+    // Helper to extract and translate times
+    const extractAndTranslateTime = (str: string, toZh: boolean): string => {
+      const timeRegex = /(\d{1,2}(?:\.\d{2}|:\d{2})?\s*(?:am|pm|pagi|petang|malam))/i;
+      const match = str.match(timeRegex);
+      if (!match) return "";
+      const rawTime = match[1];
+      if (!toZh) return rawTime;
+      const isPm = /pm/i.test(rawTime) || /petang|malam/i.test(rawTime);
+      const numMatch = rawTime.match(/\d{1,2}(?:\.\d{2}|:\d{2})?/);
+      const numStr = numMatch ? numMatch[0].replace(".", ":") : "";
+      const period = isPm ? "下午" : "上午";
+      return `${period} ${numStr}`;
+    };
+
+    // 1. Smart Intent-Based Semantic Sentence Translation Heuristic (Local NLP Model)
+    // Intent: What time do you want to change to?
+    if ((lowercase.includes("what time") || lowercase.includes("what 时间") || lowercase.includes("what masa") || lowercase.includes("pukul berapa") || lowercase.includes("什么时间") || (lowercase.includes("what") && lowercase.includes("time"))) &&
+        (lowercase.includes("change") || lowercase.includes("ubah") || lowercase.includes("更改") || lowercase.includes("换") || lowercase.includes("reschedule") || lowercase.includes("tukar"))) {
+      const isYesSure = lowercase.includes("yes") || lowercase.includes("sure") || lowercase.includes("ya") || lowercase.includes("当然") || lowercase.includes("是") || lowercase.includes("sure");
+      const prefixEn = isYesSure ? "Yes sure, " : "";
+      const prefixZh = isYesSure ? "好的，" : "";
+      const prefixMs = isYesSure ? "Ya baik, " : "";
+
+      const translation = isMalay 
+        ? `${prefixMs}pukul berapa anda mahu ubah?` 
+        : isChinese 
+          ? `${prefixZh}请问您想更改到什么时间？` 
+          : `${prefixEn}what time would you like to change it to?`;
+      return res.json({ translation });
+    }
+
+    // Intent: Change Appointment Time
+    if ((lowercase.includes("change") || lowercase.includes("ubah") || lowercase.includes("更改") || lowercase.includes("换")) && 
+        (lowercase.includes("appointment") || lowercase.includes("temujanji") || lowercase.includes("预约") || lowercase.includes("booking")) &&
+        (lowercase.includes("time") || lowercase.includes("masa") || lowercase.includes("时间"))) {
+      
+      const timeStr = extractAndTranslateTime(text, isChinese);
+      let translation = "";
+      if (timeStr) {
+        translation = isMalay 
+          ? `Hi, saya mahu ubah masa temujanji ke ${timeStr}.` 
+          : isChinese 
+            ? `你好，我想将预约时间更改为 ${timeStr}。` 
+            : `Hi, I want to change the appointment time to ${timeStr}.`;
+      } else {
+        translation = isMalay 
+          ? "Boleh saya ubah masa temujanji?" 
+          : isChinese 
+            ? "我可以更改预约时间吗？" 
+            : "Can I change the appointment time?";
+      }
+      return res.json({ translation });
+    }
+
+    // Intent: Cancel Appointment
+    if ((lowercase.includes("cancel") || lowercase.includes("batal") || lowercase.includes("取消")) && 
+        (lowercase.includes("appointment") || lowercase.includes("temujanji") || lowercase.includes("预约") || lowercase.includes("booking"))) {
+      const translation = isMalay 
+        ? "Boleh saya batalkan temujanji saya?" 
+        : isChinese 
+          ? "我可以取消我的预约吗？" 
+          : "Can I cancel my appointment?";
+      return res.json({ translation });
+    }
+
+    // Intent: Severe Fever
+    if ((lowercase.includes("fever") || lowercase.includes("demam") || lowercase.includes("发烧")) && 
+        (lowercase.includes("severe") || lowercase.includes("teruk") || lowercase.includes("严重"))) {
+      const translation = isMalay 
+        ? "Saya mengalami demam yang sangat teruk." 
+        : isChinese 
+          ? "我发高烧得非常严重。" 
+          : "I am having a severe fever.";
+      return res.json({ translation });
+    }
+
+    // Intent: Chest Pain
+    if (lowercase.includes("chest pain") || lowercase.includes("sakit dada") || lowercase.includes("胸痛") || lowercase.includes("胸口痛")) {
+      const translation = isMalay 
+        ? "Saya mengalami sakit dada yang teruk." 
+        : isChinese 
+          ? "我感到严重的胸痛。" 
+          : "I am experiencing severe chest pain.";
+      return res.json({ translation });
+    }
+
+    // Intent: Need Doctor/Help
+    if ((lowercase.includes("doctor") || lowercase.includes("doktor") || lowercase.includes("医生")) && 
+        (lowercase.includes("need") || lowercase.includes("help") || lowercase.includes("perlu") || lowercase.includes("bantu") || lowercase.includes("帮助") || lowercase.includes("需要"))) {
+      const translation = isMalay 
+        ? "Saya memerlukan bantuan doktor." 
+        : isChinese 
+          ? "我需要医生的帮助。" 
+          : "I need a doctor's assistance.";
+      return res.json({ translation });
+    }
+
+    // Intent: Hello Greeting
+    if (lowercase.includes("hello") || lowercase.includes("hi") || lowercase.includes("hey") || lowercase.includes("apa khabar") || lowercase.includes("你好")) {
+      if (text.trim().length <= 6) {
+        const translation = isMalay ? "Hello / Apa khabar" : isChinese ? "你好" : "Hello / Hi";
+        return res.json({ translation });
+      }
+      const translation = isMalay 
+        ? "Hello, bagaimanakah saya boleh membantu anda hari ini?" 
+        : isChinese 
+          ? "你好，请问有什么可以帮到您？" 
+          : "Hello, how can I assist you today?";
+      return res.json({ translation });
+    }
+
+    // Intent: Thank you
+    if (lowercase.includes("thank") || lowercase.includes("terima kasih") || lowercase.includes("谢谢")) {
+      if (text.trim().length <= 12) {
+        const translation = isMalay ? "Terima kasih" : isChinese ? "谢谢" : "Thank you";
+        return res.json({ translation });
+      }
+      const translation = isMalay 
+        ? "Terima kasih banyak-banyak atas bantuan anda." 
+        : isChinese 
+          ? "非常感谢您的帮助。" 
+          : "Thank you very much for your assistance.";
+      return res.json({ translation });
+    }
+
+    // Intent: Delay
+    if (lowercase.includes("delay") || lowercase.includes("ditangguhkan") || lowercase.includes("延迟")) {
+      const translation = isMalay 
+        ? "Jadual perundingan ditangguhkan seketika." 
+        : isChinese 
+          ? "时间表已暂时延迟。" 
+          : "The schedule is temporarily delayed.";
+      return res.json({ translation });
+    }
+
+    // 2. Tokenized word-by-word vocabulary fallback (for custom words / sentence structures)
+    const langKey = isMalay ? "ms" : isChinese ? "zh" : "en";
+    const vocab = [
+      // Multi-word phrases checked first (greedy match)
+      { en: "chest pain", ms: "sakit dada", zh: "胸痛" },
+      { en: "sore throat", ms: "sakit tekak", zh: "喉咙痛" },
+      { en: "blood pressure", ms: "tekanan darah", zh: "血压" },
+      { en: "heart rate", ms: "kadar nadi", zh: "心率" },
+      { en: "thank you", ms: "terima kasih", zh: "谢谢" },
+      { en: "terima kasih", ms: "terima kasih", zh: "谢谢" },
+      { en: "apa khabar", ms: "apa khabar", zh: "你好" },
+      { en: "sakit kepala", ms: "sakit kepala", zh: "头痛" },
+      { en: "sakit dada", ms: "sakit dada", zh: "胸痛" },
+      { en: "sakit tekak", ms: "sakit tekak", zh: "喉咙痛" },
+      { en: "sakit perut", ms: "sakit perut", zh: "胃痛/肚子痛" },
+      { en: "running nose", ms: "selesema/hidung berair", zh: "流鼻涕" },
+      { en: "excuse me", ms: "maafkan saya", zh: "打扰一下" },
+      // Pronouns & Common verbs
+      { en: "yes", ms: "ya", zh: "是" },
+      { en: "sure", ms: "tentu/ya", zh: "当然" },
+      { en: "what", ms: "apa", zh: "什么" },
+      { en: "time", ms: "masa", zh: "时间" },
+      { en: "change", ms: "ubah", zh: "更改" },
+      { en: "to", ms: "ke/untuk", zh: "到" },
+      { en: "the", ms: "itu", zh: "的" },
+      
+      // Pronouns & Common verbs
+      { en: "i", ms: "saya", zh: "我" },
+      { en: "me", ms: "saya", zh: "我" },
+      { en: "you", ms: "anda", zh: "你" },
+      { en: "we", ms: "kami", zh: "我们" },
+      { en: "they", ms: "mereka", zh: "他们" },
+      { en: "he", ms: "dia", zh: "他" },
+      { en: "she", ms: "dia", zh: "她" },
+      { en: "my", ms: "saya punya", zh: "我的" },
+      { en: "your", ms: "anda punya", zh: "你的" },
+      { en: "his", ms: "dia punya", zh: "他的" },
+      { en: "her", ms: "dia punya", zh: "她的" },
+      { en: "our", ms: "kami punya", zh: "我们的" },
+      { en: "their", ms: "mereka punya", zh: "他们的" },
+      { en: "us", ms: "kami", zh: "我们" },
+      { en: "them", ms: "mereka", zh: "他们" },
+      { en: "have", ms: "ada", zh: "有" },
+      { en: "has", ms: "ada", zh: "有" },
+      { en: "had", ms: "ada", zh: "有" },
+      { en: "want", ms: "mahu", zh: "想要" },
+      { en: "need", ms: "perlu", zh: "需要" },
+      { en: "go", ms: "pergi", zh: "去" },
+      { en: "come", ms: "datang", zh: "来" },
+      { en: "is", ms: "adalah", zh: "是" },
+      { en: "am", ms: "adalah", zh: "是" },
+      { en: "are", ms: "adalah", zh: "是" },
+      { en: "can", ms: "boleh", zh: "可以" },
+      { en: "feel", ms: "rasa", zh: "感觉" },
+      { en: "feeling", ms: "rasa", zh: "感觉" },
+      { en: "take", ms: "ambil", zh: "拿/服药" },
+      { en: "eat", ms: "makan", zh: "吃" },
+      { en: "drink", ms: "minum", zh: "喝" },
+      { en: "sleep", ms: "tidur", zh: "睡觉" },
+      { en: "rest", ms: "rehat", zh: "休息" },
+      { en: "work", ms: "kerja", zh: "工作" },
+      { en: "wait", ms: "tunggu", zh: "等" },
+      
+      // Medical Symptoms
+      { en: "fever", ms: "demam", zh: "发烧" },
+      { en: "demam", ms: "demam", zh: "发烧" },
+      { en: "headache", ms: "sakit kepala", zh: "头痛" },
+      { en: "cough", ms: "batuk", zh: "咳嗽" },
+      { en: "batuk", ms: "batuk", zh: "咳嗽" },
+      { en: "pain", ms: "sakit", zh: "痛" },
+      { en: "sakit", ms: "sakit", zh: "痛" },
+      { en: "stomach", ms: "perut", zh: "胃" },
+      { en: "throat", ms: "tekak", zh: "喉咙" },
+      { en: "dizzy", ms: "pening", zh: "头晕" },
+      { en: "flu", ms: "selesema", zh: "感冒" },
+      { en: "cold", ms: "sejuk/selesema", zh: "冷/感冒" },
+      { en: "hot", ms: "panas", zh: "热" },
+      { en: "vomit", ms: "muntah", zh: "呕吐" },
+      { en: "diarrhea", ms: "cirit-birit", zh: "拉肚子" },
+      { en: "nausea", ms: "loya", zh: "恶心" },
+      { en: "allergy", ms: "alergi", zh: "过敏" },
+      { en: "sick", ms: "sakit", zh: "生病" },
+      { en: "hurt", ms: "sakit", zh: "痛" },
+      { en: "injury", ms: "kecederaan", zh: "受伤" },
+      { en: "accident", ms: "kemalangan", zh: "车祸" },
+      { en: "emergency", ms: "kecemasan", zh: "紧急" },
+      { en: "itching", ms: "gatal", zh: "痒" },
+      { en: "rash", ms: "ruam", zh: "皮疹" },
+      { en: "swelling", ms: "bengkak", zh: "肿胀" },
+      
+      // Anatomy
+      { en: "head", ms: "kepala", zh: "头" },
+      { en: "chest", ms: "dada", zh: "胸" },
+      { en: "heart", ms: "jantung", zh: "心脏" },
+      { en: "stomach", ms: "perut", zh: "胃" },
+      { en: "leg", ms: "kaki", zh: "腿" },
+      { en: "hand", ms: "tangan", zh: "手" },
+      { en: "eye", ms: "mata", zh: "眼睛" },
+      { en: "ear", ms: "telinga", zh: "耳朵" },
+      { en: "throat", ms: "tekak", zh: "喉咙" },
+      { en: "body", ms: "badan", zh: "身体" },
+      { en: "blood", ms: "darah", zh: "血液" },
+      
+      // Medical Entities
+      { en: "doctor", ms: "doktor", zh: "医生" },
+      { en: "nurse", ms: "jururawat", zh: "护士" },
+      { en: "hospital", ms: "hospital", zh: "医院" },
+      { en: "clinic", ms: "klinik", zh: "诊所" },
+      { en: "medicine", ms: "ubat", zh: "药" },
+      { en: "vitals", ms: "vital", zh: "生命体征" },
+      { en: "sugar", ms: "gula", zh: "糖" },
+      { en: "pressure", ms: "tekanan", zh: "压力" },
+      { en: "scan", ms: "imbasan", zh: "扫描" },
+      { en: "test", ms: "ujian", zh: "测试" },
+      { en: "result", ms: "keputusan", zh: "结果" },
+      
+      // Greetings
+      { en: "hello", ms: "hello", zh: "你好" },
+      { en: "hi", ms: "hi", zh: "你好" },
+      { en: "hey", ms: "hey", zh: "嗨" },
+      { en: "welcome", ms: "sama-sama", zh: "不客气" },
+      
+      // Scheduling & Operations
+      { en: "appointment", ms: "temujanji", zh: "预约" },
+      { en: "booking", ms: "tempahan", zh: "预订" },
+      { en: "cancel", ms: "batal", zh: "取消" },
+      { en: "delay", ms: "lambat", zh: "延迟" },
+      { en: "delayed", ms: "ditangguhkan", zh: "延迟" },
+      { en: "today", ms: "hari ini", zh: "今天" },
+      { en: "tomorrow", ms: "esok", zh: "明天" },
+      { en: "time", ms: "masa", zh: "时间" },
+      { en: "sorry", ms: "maaf", zh: "抱歉" },
+      { en: "please", ms: "tolong", zh: "请" },
+      { en: "help", ms: "bantu", zh: "帮助" },
+      { en: "change", ms: "ubah", zh: "change/更改" },
+      { en: "the", ms: "itu", zh: "the/的" },
+      { en: "yes", ms: "ya", zh: "是" },
+      { en: "no", ms: "tidak", zh: "不" },
+      
+      // Adjectives
+      { en: "good", ms: "baik", zh: "好" },
+      { en: "fine", ms: "baik", zh: "好" },
+      { en: "great", ms: "hebat", zh: "棒" },
+      { en: "bad", ms: "buruk", zh: "坏" },
+      { en: "severe", ms: "teruk", zh: "严重" },
+      { en: "mild", ms: "ringan", zh: "轻微" },
+      { en: "high", ms: "tinggi", zh: "高" },
+      { en: "low", ms: "rendah", zh: "低" },
+      { en: "safe", ms: "selamat", zh: "安全" }
+    ];
+
+    let result = text;
+
+    // 1. Greedy replace multi-word phrases (case insensitive, retaining brackets to avoid double translations)
+    vocab.forEach(entry => {
+      if (entry.en.includes(" ")) {
+        const regexEn = new RegExp(`\\b${entry.en}\\b`, "gi");
+        result = result.replace(regexEn, `[[${entry[langKey]}]]`);
+      }
+      if (entry.ms.includes(" ") && entry.ms !== entry.en) {
+        const regexMs = new RegExp(`\\b${entry.ms}\\b`, "gi");
+        result = result.replace(regexMs, `[[${entry[langKey]}]]`);
+      }
+    });
+
+    // 2. Tokenize the remaining text into words and non-words
+    const tokens = result.split(/(\b[a-zA-Z0-9'\u4e00-\u9fa5]+\b)/g);
+
+    // 3. Translate single tokens
+    const translatedTokens = tokens.map(token => {
+      if (token.startsWith("[[") && token.endsWith("]]")) {
+        return token.slice(2, -2);
+      }
+      
+      const trimmed = token.toLowerCase();
+      const matched = vocab.find(v => v.en === trimmed || v.ms === trimmed || v.zh === trimmed);
+      if (matched) {
+        let trans = matched[langKey];
+        if (token[0] === token[0].toUpperCase() && token[0] !== token[0].toLowerCase()) {
+          trans = trans.charAt(0).toUpperCase() + trans.slice(1);
+        }
+        return trans;
+      }
+      return token;
+    });
+
+    const translation = translatedTokens.join("");
+    return res.json({ translation });
+  } catch (error: any) {
+    console.error("POST /api/translate error:", error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // CAREY AI — LOCAL ML CONSULTATION
 // ============================================================
@@ -1558,12 +1983,92 @@ app.post("/api/gemini/consult", async (req, res) => {
       return res.status(400).json({ error: "Message is required." });
     }
 
-    const replyText = await localConsult(message, history || [], patientInfo);
+    const localIntent = getLocalIntent(message);
+    const apiKey = process.env.GEMINI_API_KEY;
+    const hasApiKey = apiKey && apiKey !== "MY_GEMINI_API_KEY" && apiKey.trim() !== "";
 
-    // Simulate human-like processing delay
-    setTimeout(() => {
-      res.json({ text: replyText });
-    }, 600);
+    // If the local ML system successfully identifies a targeted intent (greetings, reviews, symptoms, vitals), use it immediately!
+    if (localIntent !== "fallback") {
+      const replyText = await localConsult(message, history || [], patientInfo);
+      return res.json({ text: replyText });
+    }
+
+    // Only route unhandled general inquiries to live Gemini API if the API key is active
+    if (hasApiKey) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        
+        // ground prompts with medical history and vitals
+        const systemPrompt = `You are "Carey", a state-of-the-art AI clinical consultation assistant for PenangHealth.
+Analyze the user's symptoms and guide them to the appropriate medical department or clinician.
+
+Patient Information:
+- Full Name: ${patientInfo?.fullName || "Ahmad"}
+- Chronic Conditions: ${patientInfo?.chronicConditions?.join(", ") || "None"}
+- Allergies: ${patientInfo?.allergies?.join(", ") || "None"}
+
+Available Clinics, Specialists & Facilities Directory:
+1. Pantai Hospital Penang:
+   - Cardiologists: Dr. Sarah Jenkins & Dr. Adrian Rahman (Cardiology).
+   - Facility Strengths: 24/7 Coronary Care Unit (CCU) and state-of-the-art cardiac catheterization lab. Best for chest pain, heart issues, and high BP.
+2. Loh Guan Lye Specialists Centre:
+   - Pediatrician: Dr. Ling Wey Shuan (Pediatrics).
+   - Facility Strengths: Neonatal intensive care unit (NICU). Best for children's immunization, infant colds, and pediatric checkups.
+3. Lam Wah Eee Hospital:
+   - General Surgeon: Dr. Simon Lo (General Surgery).
+   - Facility Strengths: Advanced operating theatres for minimally invasive procedures. Best for appendix pain, hernia, and gallbladder surgery.
+4. KPJ Penang Specialist Hospital:
+   - Internal Medicine: Dr. Ainol Shareha.
+   - Facility Strengths: Comprehensive isolation screening facilities for viral diseases. Best for diabetes, viral infections, and chronic disease.
+5. Island Hospital:
+   - Orthopedic Surgeon: Dr. Adrian Mitchell (Orthopedics & Sports Medicine).
+   - Facility Strengths: Regional hub for musculoskeletal rehabilitation. Best for broken bones, joint pain, sprains, and knee/hip replacements.
+6. Gleneagles Penang:
+   - Neurologist: Dr. Tan Mei Ling (Neurology).
+   - Facility Strengths: Certified Stroke Center with 24/7 MRI/CT imaging support. Best for strokes, migraines, headache, and vertigo.
+7. Penang Adventist Hospital:
+   - Gastroenterologist: Dr. Gary Yusuf (Gastroenterology & Urology).
+   - Facility Strengths: Specialized Endoscopy Suite. Best for acid reflux (GERD), stomach ulcers, and stomach aches.
+8. O2 Klinik (Bayan Baru):
+   - Family Medicine: Dr. Lisa Wong (General Practice).
+   - Facility Strengths: Primary care screening and colds/flu. Best for mild ailments, sore throat, and checkups.
+
+Clinical Guidelines:
+1. Ground your diagnosis and routing advice.
+2. Recommend the specific clinic/hospital and doctor from the directory above that matches their symptom's specialty.
+3. Explain WHY that clinic and doctor are a good fit (mention their facility strengths and specialty).
+4. If they describe severe emergency symptoms (crushing chest pain, severe heavy bleeding, unconsciousness), warn them and direct them to Emergency SOS.
+5. Keep your response concise, clear, and professional. Avoid markdown headings that are too large. Use bullet points for recommendations.
+
+Chat History:
+${(history || []).map((h: any) => `${h.sender === 'user' ? 'Patient' : 'Carey'}: ${h.content}`).join("\n")}
+Patient: "${message}"
+
+Carey:`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }]
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.contents?.[0]?.parts?.[0]?.text;
+          if (result) {
+            return res.json({ text: result });
+          }
+        }
+      } catch (err) {
+        console.warn("Gemini consultation call failed, falling back to local ML:", err);
+      }
+    }
+
+    // Default local fallback consulting menu if no API key or if call fails
+    const replyText = await localConsult(message, history || [], patientInfo);
+    return res.json({ text: replyText });
   } catch (error: any) {
     console.error("Local ML Consultation Error:", error.message);
     return res.status(500).json({ error: error.message || "Consultation engine error." });

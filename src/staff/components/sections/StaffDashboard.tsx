@@ -18,6 +18,9 @@ import {
 import { mockPatients } from '../../data/mockData';
 
 function getClinicFromEmail(email: string): string {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+
   const emailLower = (email || '').toLowerCase().trim();
   if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
   if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
@@ -97,13 +100,28 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
     return `${year}-${month}-${day}`;
   }, []);
 
-  // Filter queue for today's active appointments (remove all mock list data fallbacks)
+  // Filter queue for active appointments (strictly today's appointments)
   const queueList = useMemo(() => {
-    return appointments.filter(apt => 
-      (apt.status === 'Approved' || apt.status === 'Upcoming' || apt.status === 'Rescheduled') &&
-      apt.date === todayDateStr
-    );
-  }, [appointments, todayDateStr]);
+    return appointments
+      .filter(apt => 
+        (apt.status === 'Approved' || apt.status === 'Upcoming' || apt.status === 'Rescheduled') &&
+        apt.date === todayDateStr
+      )
+      .sort((a, b) => {
+        const isAPriority = a.timeSlot === "Priority Triage";
+        const isBPriority = b.timeSlot === "Priority Triage";
+        if (isAPriority && !isBPriority) return -1;
+        if (!isAPriority && isBPriority) return 1;
+
+        // Sort by date ascending
+        const dateA = a.date || "";
+        const dateB = b.date || "";
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+        // Sort by timeSlot ascending
+        return (a.timeSlot || "").localeCompare(b.timeSlot || "");
+      });
+  }, [appointments]);
 
   // Determine if patient has checked in by matching logs
   const isPatientCheckedIn = (patientName: string, id: string) => {
@@ -254,13 +272,18 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
 
   const messages = dynamicAlarms;
 
-  // Filter appointments for timeline
+  // Filter appointments for timeline (strictly today's appointments)
   const timelineAppointments = useMemo(() => {
-    const sorted = [...appointments]
+    const sorted = appointments
       .filter(apt => apt.date === todayDateStr)
       .sort((a, b) => {
         if (a.status === 'Completed' && b.status !== 'Completed') return -1;
         if (a.status !== 'Completed' && b.status === 'Completed') return 1;
+        
+        // Sort by date ascending
+        const dateA = a.date || "";
+        const dateB = b.date || "";
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
         return 0;
       });
     return sorted.slice(0, 5);
@@ -370,7 +393,12 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
                           </div>
                         </td>
                         {/* Time slot */}
-                        <td className="py-3.5 font-mono font-bold text-neutral-750">{apt.timeSlot}</td>
+                        <td className="py-3.5 font-mono font-bold text-neutral-750">
+                          <span className={apt.timeSlot === "Priority Triage" ? "text-red-600 font-black animate-pulse" : ""}>
+                            {apt.timeSlot}
+                          </span>
+                          <span className="text-[10px] text-neutral-400 block font-sans font-medium mt-0.5">{apt.date}</span>
+                        </td>
                         {/* Checked-in status */}
                         <td className="py-3.5 text-center">
                           {isChecked ? (

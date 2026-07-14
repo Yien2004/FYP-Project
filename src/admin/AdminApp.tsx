@@ -41,6 +41,7 @@ export default function AdminApp({
   });
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard');
   const [pendingStaffCount, setPendingStaffCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const fetchPendingCount = () => {
     fetch("/api/admin/staff-requests")
@@ -151,6 +152,8 @@ export default function AdminApp({
         userName={userName}
         pendingStaffCount={pendingStaffCount}
         onLogout={handleLogout}
+        mobileMenuOpen={mobileMenuOpen}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
       />
 
       <div className="flex flex-col flex-1 h-full overflow-hidden">
@@ -161,6 +164,7 @@ export default function AdminApp({
           onLogout={handleLogout}
           userName={userName || 'System Administrator'}
           userRole={userRole}
+          onMenuToggle={() => setMobileMenuOpen(prev => !prev)}
         />
 
         <main className="flex-1 overflow-y-auto p-8 bg-neutral-50/60">

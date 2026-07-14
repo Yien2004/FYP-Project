@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 
 function getClinicFromEmail(email: string): string {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+
   const emailLower = (email || '').toLowerCase().trim();
   if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
   if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
@@ -76,31 +79,49 @@ export default function NotificationsSection() {
   };
 
   const fetchBroadcastLogs = React.useCallback(() => {
+    const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+    const currentClinic = localStorage.getItem("lifelink_user_clinic") || getClinicFromEmail(loggedEmail);
+
     fetch("/api/logs")
       .then(res => res.json())
       .then(list => {
         if (Array.isArray(list)) {
-          const mapped = list
-            .filter((l: any) => l.message && l.message.startsWith('[Broadcast]:'))
-            .map((l: any, idx: number) => {
-              const parts = l.message.replace('[Broadcast]:', '').trim();
-              let group = 'All Registered Patients';
-              let msg = parts;
-              if (parts.startsWith('(')) {
-                const closingIdx = parts.indexOf(')');
-                if (closingIdx > 0) {
-                  group = parts.substring(1, closingIdx);
-                  msg = parts.substring(closingIdx + 1).trim();
-                }
+          const filteredList = list.filter((l: any) => {
+            if (!l.message || !l.message.startsWith('[Broadcast]:')) return false;
+            if (l.message.includes('[Hospital: ')) {
+              return l.message.includes(`[Hospital: ${currentClinic}]`);
+            }
+            return !currentClinic || l.message.includes(currentClinic);
+          });
+
+          const mapped = filteredList.map((l: any, idx: number) => {
+            const parts = l.message.replace('[Broadcast]:', '').trim();
+            let group = 'All Registered Patients';
+            let msg = parts;
+            let hospital = currentClinic || 'System';
+            if (parts.startsWith('(')) {
+              const closingIdx = parts.indexOf(')');
+              if (closingIdx > 0) {
+                group = parts.substring(1, closingIdx);
+                msg = parts.substring(closingIdx + 1).trim();
               }
-              return {
-                id: l.id || `bc-${idx}-${l.timestamp}`,
-                timestamp: l.timestamp ? new Date(l.timestamp).toISOString().replace('T', ' ').substring(0, 16) : new Date().toISOString().replace('T', ' ').substring(0, 16),
-                group,
-                message: msg,
-                status: 'Sent' as const
-              };
-            });
+            }
+            if (msg.includes('[Hospital: ')) {
+              const startIdx = msg.indexOf('[Hospital: ');
+              const endIdx = msg.indexOf(']', startIdx);
+              if (endIdx > startIdx) {
+                hospital = msg.substring(startIdx + 11, endIdx);
+                msg = (msg.substring(0, startIdx) + msg.substring(endIdx + 1)).trim();
+              }
+            }
+            return {
+              id: l.id || `bc-${idx}-${l.timestamp}`,
+              timestamp: l.timestamp ? new Date(l.timestamp).toISOString().replace('T', ' ').substring(0, 16) : new Date().toISOString().replace('T', ' ').substring(0, 16),
+              group,
+              message: `[${hospital}] ${msg}`,
+              status: 'Sent' as const
+            };
+          });
           setBroadcastLogs(mapped);
         }
       })
@@ -211,6 +232,9 @@ export default function NotificationsSection() {
     if (!customMessage.trim() || isSending) return;
     setIsSending(true);
 
+    const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+    const currentClinic = localStorage.getItem("lifelink_user_clinic") || getClinicFromEmail(loggedEmail);
+
     try {
       if (targetGroup === 'Specific Patient...') {
         if (!selectedPatientEmail) {
@@ -226,7 +250,7 @@ export default function NotificationsSection() {
           
           const newNotif = {
             id: `notif-staff-${Date.now()}`,
-            title: `🔔 Alert from Clinic`,
+            title: `🔔 Alert from ${currentClinic || 'Clinic'}`,
             body: customMessage,
             time: "Just now",
             category: "general" as const,
@@ -249,7 +273,7 @@ export default function NotificationsSection() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              message: `[Broadcast]: (Patient: ${profile.fullName || selectedPatientEmail}) ${customMessage}`,
+              message: `[Broadcast]: (Patient: ${profile.fullName || selectedPatientEmail}) [Hospital: ${currentClinic}] ${customMessage}`,
               level: "info"
             })
           });
@@ -257,7 +281,7 @@ export default function NotificationsSection() {
       } else if (targetGroup === 'All Registered Patients') {
         const newNotif = {
           id: `notif-staff-${Date.now()}`,
-          title: `🔔 Clinic Broadcast Announcement`,
+          title: `🔔 Alert from ${currentClinic || 'Clinic'}`,
           body: customMessage,
           time: "Just now",
           category: "general" as const,
@@ -291,7 +315,7 @@ export default function NotificationsSection() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: `[Broadcast]: (All Registered Patients) ${customMessage}`,
+            message: `[Broadcast]: (All Registered Patients) [Hospital: ${currentClinic}] ${customMessage}`,
             level: "info"
           })
         });
@@ -300,7 +324,7 @@ export default function NotificationsSection() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: `[Broadcast]: (${targetGroup}) ${customMessage}`,
+            message: `[Broadcast]: (${targetGroup}) [Hospital: ${currentClinic}] ${customMessage}`,
             level: "info"
           })
         });

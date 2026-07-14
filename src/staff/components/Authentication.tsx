@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ShieldCheck, Lock, Mail, Eye, EyeOff, AlertCircle, ArrowRight, Activity, ArrowLeft } from "lucide-react";
 
 interface AuthenticationProps {
-  onLoginSuccess: (email: string, role: string, name: string) => void;
+  onLoginSuccess: (email: string, role: string, name: string, hospital?: string) => void;
   onBackToPatientPortal?: () => void;
   defaultEmail?: string;
   allowedRoles?: string[];
@@ -36,6 +36,7 @@ export default function Authentication({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [requestSuccess, setRequestSuccess] = useState("");
+  const [selectedHospital, setSelectedHospital] = useState("Hospital Pulau Pinang");
 
   const handlePasswordChange = (val: string) => {
     setNewPassword(val);
@@ -100,7 +101,7 @@ export default function Authentication({
         const res = await fetch('/api/staff/requests', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, fullName, role: registerRole, password }),
+          body: JSON.stringify({ email, fullName, role: registerRole, password, hospital: selectedHospital }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -162,7 +163,7 @@ export default function Authentication({
         setErrorMessage("Access denied. Patient accounts must use the Patient Portal.");
         return;
       }
-      onLoginSuccess(email, role, data.user.name);
+      onLoginSuccess(email, role, data.user.name, data.user.hospital);
     } catch {
       setErrorMessage("Unable to connect to the server. Please try again.");
     } finally {
@@ -375,6 +376,33 @@ export default function Authentication({
                 )}
               </select>
             </div>
+
+            {registerRole !== 'Admin' && (
+              <div>
+                <label className="block text-xs font-mono tracking-wider uppercase text-slate-400 mb-2">Assigned Facility / Hospital</label>
+                <select
+                  value={selectedHospital}
+                  onChange={(e) => setSelectedHospital(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 transition animate-none"
+                >
+                  <option value="Hospital Pulau Pinang">Hospital Pulau Pinang</option>
+                  <option value="Hospital Seberang Jaya">Hospital Seberang Jaya</option>
+                  <option value="Klinik Kesihatan Jalan Perak">Klinik Kesihatan Jalan Perak</option>
+                  <option value="Klinik Kesihatan Bayan Baru">Klinik Kesihatan Bayan Baru</option>
+                  <option value="Hospital Bukit Mertajam">Hospital Bukit Mertajam</option>
+                  <option value="Pantai Hospital Penang">Pantai Hospital Penang</option>
+                  <option value="Hospital Lam Wah Ee">Hospital Lam Wah Ee</option>
+                  <option value="Gleneagles Hospital Penang">Gleneagles Hospital Penang</option>
+                  <option value="Island Hospital">Island Hospital</option>
+                  <option value="Penang Adventist Hospital">Penang Adventist Hospital</option>
+                  <option value="Loh Guan Lye Specialists Centre">Loh Guan Lye Specialists Centre</option>
+                  <option value="KPJ Penang Specialist Hospital">KPJ Penang Specialist Hospital</option>
+                  <option value="O2 Klinik">O2 Klinik</option>
+                  <option value="Klinik Singapore">Klinik Singapore</option>
+                  <option value="Poliklinik Perdana">Poliklinik Perdana</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-mono tracking-wider uppercase text-slate-400 mb-2">Password</label>

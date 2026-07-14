@@ -13,7 +13,8 @@ import {
   Heart,
   Home,
   MessageSquare,
-  TrendingUp
+  TrendingUp,
+  Car
 } from "lucide-react";
 import { AppNotification, PatientProfile } from "../types";
 
@@ -23,6 +24,7 @@ interface SidebarProps {
   notifications: AppNotification[];
   onLogout: () => void;
   patientProfile: PatientProfile;
+  unreadMessagesCount?: number;
 }
 
 const translations: Record<string, Record<string, string>> = {
@@ -33,6 +35,7 @@ const translations: Record<string, Record<string, string>> = {
     "AI Consultation": "AI Consultation",
     "My Appointments": "My Appointments",
     "Clinic Locator": "Clinic Locator",
+    "Fetching Transit": "Fetching Transit",
     "Messages": "Messages",
     "Profile": "Profile",
     "Exit Portal Sessions": "Exit Portal Sessions",
@@ -46,6 +49,7 @@ const translations: Record<string, Record<string, string>> = {
     "AI Consultation": "Konsultasi AI",
     "My Appointments": "Temujanji Saya",
     "Clinic Locator": "Pencari Klinik",
+    "Fetching Transit": "Transit Pengambilan",
     "Messages": "Mesej",
     "Profile": "Profil",
     "Exit Portal Sessions": "Log Keluar Portal",
@@ -54,7 +58,7 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-export default function Sidebar({ currentScreen, onSetScreen, notifications, onLogout, patientProfile }: SidebarProps) {
+export default function Sidebar({ currentScreen, onSetScreen, notifications, onLogout, patientProfile, unreadMessagesCount = 0 }: SidebarProps) {
   const patientName = patientProfile.fullName;
   const lang = patientProfile.language || "English";
 
@@ -75,7 +79,8 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
     { id: "ai-consultation", label: "AI Consultation", icon: <Bot className="w-5 h-5" /> },
     { id: "appointments-history", label: "My Appointments", icon: <FolderHeart className="w-5 h-5" /> },
     { id: "clinic-search", label: "Clinic Locator", icon: <MapPin className="w-5 h-5" /> },
-    { id: "communication", label: "Messages", icon: <MessageSquare className="w-5 h-5" /> },
+    { id: "fetching-transit", label: "Fetching Transit", icon: <Car className="w-5 h-5" /> },
+    { id: "communication", label: "Messages", icon: <MessageSquare className="w-5 h-5" />, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined },
     { id: "user-settings", label: "Profile", icon: <Sliders className="w-5 h-5" /> }
   ];
 

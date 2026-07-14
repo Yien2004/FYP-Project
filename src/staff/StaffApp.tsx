@@ -23,6 +23,9 @@ interface StaffAppProps {
 }
 
 function getClinicFromEmail(email: string): string {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+
   const emailLower = (email || '').toLowerCase().trim();
   if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
   if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
@@ -102,6 +105,7 @@ export default function StaffApp({
   });
 
   const [staffTab, setStaffTab] = useState<StaffTab>('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Badge state
   const [unreadCount, setUnreadCount] = useState(0);
@@ -227,11 +231,16 @@ export default function StaffApp({
     }
   }, [initialEmail, initialRole, initialName]);
 
-  const handleLoginSuccess = (email: string, role: string, name: string) => {
+  const handleLoginSuccess = (email: string, role: string, name: string, hospital?: string) => {
     localStorage.setItem("lifelink_user_email", email);
     localStorage.setItem("lifelink_user_role", role);
     localStorage.setItem("lifelink_user_name", name);
     localStorage.setItem("lifelink_logged", "true");
+    if (hospital) {
+      localStorage.setItem("lifelink_user_clinic", hospital);
+    } else {
+      localStorage.removeItem("lifelink_user_clinic");
+    }
 
     setUserEmail(email);
     setUserRole(role);
@@ -246,6 +255,7 @@ export default function StaffApp({
     localStorage.removeItem("lifelink_user_role");
     localStorage.removeItem("lifelink_user_name");
     localStorage.removeItem("lifelink_logged");
+    localStorage.removeItem("lifelink_user_clinic");
 
     setUserEmail('');
     setUserRole('');
@@ -330,6 +340,8 @@ export default function StaffApp({
         userName={userName}
         onLogout={handleLogout}
         language={language}
+        mobileMenuOpen={mobileMenuOpen}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
       />
 
       {/* Right Content Space */}
@@ -346,6 +358,7 @@ export default function StaffApp({
           onSetTab={setStaffTab}
           alertCount={alertCount}
           onRefreshBadges={fetchBadgeCounts}
+          onMenuToggle={() => setMobileMenuOpen(prev => !prev)}
         />
 
         {/* Dynamic Views Slot */}

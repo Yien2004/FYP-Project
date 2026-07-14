@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, 
   User, 
@@ -18,7 +18,8 @@ import {
   Layers,
   History,
   FileSpreadsheet,
-  Eye
+  Eye,
+  Camera
 } from 'lucide-react';
 import { mockPatients } from '../../data/mockData';
 import { Patient, Prescription, Attachment, Appointment } from '../../types';
@@ -67,6 +68,13 @@ interface MedicationDraft {
   instructions: string;
 }
 
+const getLoggedUserClinic = () => {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+  const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+  return getClinicFromEmail(loggedEmail);
+};
+
 export default function PatientsSection() {
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('p1');
@@ -77,8 +85,8 @@ export default function PatientsSection() {
 
   // Load patients from backend and filter by clinic appointments
   const loadPatients = () => {
-    const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
-    const currentClinic = getClinicFromEmail(loggedEmail);
+    const isAdmin = localStorage.getItem('lifelink_user_role') === 'Admin';
+    const currentClinic = getLoggedUserClinic();
 
     Promise.all([
       fetch("/api/patients").then(res => res.json()),
@@ -87,7 +95,7 @@ export default function PatientsSection() {
     .then(([patientsList, appointmentsList]) => {
       if (Array.isArray(patientsList)) {
         let filtered = patientsList;
-        if (currentClinic) {
+        if (!isAdmin && currentClinic) {
           filtered = patientsList.filter((p: any) => {
             const hasApt = appointmentsList.some((ap: any) => 
               (ap.patientId === p.id || ap.patientId === p.dbId || ap.patientName.toLowerCase() === p.name.toLowerCase() || ap.patientId === p.email) &&
@@ -121,6 +129,23 @@ export default function PatientsSection() {
   // ==========================================
   const [patientAppointments, setPatientAppointments] = useState<Appointment[]>([]);
   const [selectedAptId, setSelectedAptId] = useState<string>('');
+
+  const hasConsent = useMemo(() => {
+    const currentClinic = getLoggedUserClinic();
+    const globalConsent = currentClinic && activePatient && activePatient.consentedClinics && 
+      activePatient.consentedClinics.some((c: string) => c.toLowerCase() === currentClinic.toLowerCase());
+    const appointmentConsent = patientAppointments.some(apt => apt.shareHistory === true);
+    return !!globalConsent || appointmentConsent;
+  }, [patientAppointments, activePatient]);
+
+  const visibleAttachments = useMemo(() => {
+    if (!activePatient || !activePatient.attachments) return [];
+    const currentClinic = getLoggedUserClinic();
+    if (!currentClinic || hasConsent) return activePatient.attachments;
+    return activePatient.attachments.filter((file: any) => {
+      return !file.clinic || file.clinic.toLowerCase() === currentClinic.toLowerCase();
+    });
+  }, [activePatient, hasConsent]);
   
   // Vitals inputs
   const [vitalBPsys, setVitalBPsys] = useState<number>(120);
@@ -541,13 +566,35 @@ export default function PatientsSection() {
       fetch("/api/appointments")
         .then(res => res.json())
         .then((data: Appointment[]) => {
-          const completed = data.filter(apt => {
+          const currentClinic = getLoggedUserClinic();
+          
+          // Check if patient has any appointment at the current clinic with shareHistory consent enabled
+          const patientClinicApts = data.filter(apt => {
             const matchesPatient = apt.patientName.toLowerCase() === activePatient.name.toLowerCase() || 
                                    apt.patientId === activePatient.id || 
                                    apt.patientId === activePatient.dbId;
-            return matchesPatient && apt.status === 'Completed';
+            const matchesClinic = currentClinic && (apt.clinic || apt.hospital || '').toLowerCase() === currentClinic.toLowerCase();
+            return matchesPatient && matchesClinic;
           });
-          setHistoryApts(completed);
+          const hasShareConsent = patientClinicApts.some(apt => apt.shareHistory === true) || 
+            (currentClinic && activePatient.consentedClinics && 
+             activePatient.consentedClinics.some((c: string) => c.toLowerCase() === currentClinic.toLowerCase()));
+
+          const filtered = data
+            .filter(apt => {
+              const matchesPatient = apt.patientName.toLowerCase() === activePatient.name.toLowerCase() || 
+                                     apt.patientId === activePatient.id || 
+                                     apt.patientId === activePatient.dbId;
+              if (!matchesPatient) return false;
+
+              const matchesCurrentClinic = !currentClinic || (apt.clinic || apt.hospital || '').toLowerCase() === currentClinic.toLowerCase();
+              if (matchesCurrentClinic) return true;
+
+              // If it's another clinic's booking, only show if they consented
+              return !!hasShareConsent;
+            })
+            .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+          setHistoryApts(filtered);
         })
         .catch(err => console.warn("Failed to load past appointments", err));
     }
@@ -556,6 +603,49 @@ export default function PatientsSection() {
   // ==========================================
   // TAB 4: EHR DOCUMENT UPLOAD CENTER
   // ==========================================
+  const [selectedFileObj, setSelectedFileObj] = useState<File | null>(null);
+
+  const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleDownloadAttachment = (file: Attachment) => {
+    if (file.data && file.data.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = file.data;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setSuccessMsg(`Document downloaded: ${file.name}`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } else {
+      const contents = `CarePoint MOH Health Ledger System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt}\nPatient Name: ${activePatient.name}\nPatient DOB: ${activePatient.dob}\nGender: ${activePatient.gender}\nEmail: ${activePatient.email}\n---------------------------------------\n[COMPILER SUCCESS] This is a simulated clinical record file parsed from CarePoint central database.\n`;
+      const blob = new Blob([contents], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name.endsWith('.pdf') || file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.doc') 
+        ? file.name 
+        : `${file.name}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setSuccessMsg(`Simulated report downloaded: ${file.name}`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
+
+  const handlePreviewAttachment = (file: Attachment) => {
+    setPreviewFile(file);
+  };
+
   const [uploadName, setUploadName] = useState('');
   const [uploadType, setUploadType] = useState('pdf');
   const [uploadSize, setUploadSize] = useState('1.5 MB');
@@ -563,27 +653,6 @@ export default function PatientsSection() {
 
   // States & handlers for document preview and download
   const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
-
-  const handleDownloadAttachment = (file: Attachment) => {
-    const contents = `CarePoint MOH Health Ledger System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt}\nPatient Name: ${activePatient.name}\nPatient DOB: ${activePatient.dob}\nGender: ${activePatient.gender}\nEmail: ${activePatient.email}\n---------------------------------------\n[COMPILER SUCCESS] This is a simulated clinical record file parsed from CarePoint central database.\n`;
-    const blob = new Blob([contents], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = file.name.endsWith('.pdf') || file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.doc') 
-      ? file.name 
-      : `${file.name}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    setSuccessMsg(`Simulated report downloaded: ${file.name}`);
-    setTimeout(() => setSuccessMsg(''), 3000);
-  };
-
-  const handlePreviewAttachment = (file: Attachment) => {
-    setPreviewFile(file);
-  };
 
   const handleDocumentUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -605,15 +674,26 @@ export default function PatientsSection() {
       });
     }, 200);
 
+    let base64Data: string | null = null;
+    if (selectedFileObj) {
+      try {
+        base64Data = await readFileAsDataURL(selectedFileObj);
+      } catch (err) {
+        console.error("Failed to read file contents", err);
+      }
+    }
+
     setTimeout(async () => {
       try {
         const res = await fetch(`/api/patients/${activePatient.id}/attachments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: `${uploadName}.${uploadType}`,
+            name: uploadName.includes('.') ? uploadName : `${uploadName}.${uploadType}`,
             size: uploadSize,
-            type: uploadType
+            type: uploadType,
+            clinic: getLoggedUserClinic(),
+            data: base64Data
           })
         });
 
@@ -630,6 +710,7 @@ export default function PatientsSection() {
           }));
           setSuccessMsg("Document scanned and attached successfully!");
           setUploadName('');
+          setSelectedFileObj(null);
           setUploadProgress(null);
           setTimeout(() => setSuccessMsg(''), 3000);
         }
@@ -1042,13 +1123,20 @@ export default function PatientsSection() {
                       Visit History ({historyApts.length} {historyApts.length === 1 ? 'time' : 'times'})
                     </span>
                     {historyApts.length === 0 ? (
-                      <p className="text-xs text-neutral-400 italic">No completed clinic visits recorded.</p>
+                      <p className="text-xs text-neutral-400 italic">No previous clinic visits recorded.</p>
                     ) : (
-                      <ul className="space-y-1 text-xs text-neutral-700 max-h-[140px] overflow-y-auto pr-1">
+                      <ul className="space-y-1.5 text-xs text-neutral-700 max-h-[140px] overflow-y-auto pr-1">
                         {historyApts.map((apt, idx) => (
-                          <li key={apt.id || idx} className="flex justify-between items-center bg-neutral-50 px-2.5 py-1.5 rounded-lg border border-neutral-200/50">
-                            <span className="font-medium text-neutral-800">{apt.clinic || apt.hospital || "General Clinic"}</span>
-                            <span className="font-mono text-[10px] font-bold text-neutral-500 bg-neutral-250/50 px-1.5 py-0.5 rounded">{apt.date}</span>
+                          <li key={apt.id || idx} className="flex flex-col bg-neutral-50 px-2.5 py-1.5 rounded-lg border border-neutral-200/50">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-neutral-800">{apt.date} at {apt.timeSlot}</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${
+                                apt.status === 'Completed' || apt.status === 'Done'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                  : 'bg-neutral-50 text-neutral-600 border-neutral-200'
+                              }`}>{apt.status}</span>
+                            </div>
+                            <span className="text-[10px] text-neutral-450 mt-0.5 block font-medium">Doctor: {apt.doctorName} • {apt.specialty}</span>
                           </li>
                         ))}
                       </ul>
@@ -1066,11 +1154,11 @@ export default function PatientsSection() {
                   <FileCheck2 className="w-4 h-4 text-neutral-400" />
                   EHR Document Scan Index
                 </h3>
-                {(!activePatient.attachments || activePatient.attachments.length === 0) ? (
+                {(!visibleAttachments || visibleAttachments.length === 0) ? (
                   <p className="text-xs text-neutral-455 italic text-center py-8">No uploaded clinical lab files attached.</p>
                 ) : (
                   <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                    {activePatient.attachments.map((file: Attachment) => (
+                    {visibleAttachments.map((file: Attachment) => (
                       <div key={file.id} className="p-2.5 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/50 rounded-xl flex items-center justify-between text-xs animate-fadeIn">
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-neutral-900 truncate pr-2" title={file.name}>{file.name}</p>
@@ -1965,7 +2053,7 @@ export default function PatientsSection() {
                   </div>
                 </div>
 
-                {/* Upload Drag Drop Area */}
+                {/* Upload Inputs (standard file + mobile camera capture) */}
                 <input
                   type="file"
                   id="ehr-file-input"
@@ -1974,6 +2062,7 @@ export default function PatientsSection() {
                     const file = e.target.files?.[0];
                     if (file) {
                       setUploadName(file.name);
+                      setSelectedFileObj(file);
                       const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
                       setUploadSize(`${sizeInMB} MB`);
                       if (file.type.includes('image')) {
@@ -1986,14 +2075,47 @@ export default function PatientsSection() {
                     }
                   }}
                 />
-                <div 
-                  onClick={() => document.getElementById('ehr-file-input')?.click()}
-                  className="border-2 border-dashed border-neutral-200 rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-2 bg-neutral-50 hover:bg-neutral-100/50 transition-colors cursor-pointer"
-                >
-                  <UploadCloud className="w-10 h-10 text-neutral-400 animate-bounce" />
-                  <div>
-                    <span className="font-bold text-xs text-neutral-800 block">Click to select or drag file scanner logs here</span>
-                    <span className="text-[10px] text-neutral-400 block mt-0.5">Supports automated OCR text ingestion</span>
+                <input
+                  type="file"
+                  id="ehr-camera-input"
+                  className="hidden"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setUploadName(file.name || `camera_capture_${Date.now()}.jpg`);
+                      setSelectedFileObj(file);
+                      const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
+                      setUploadSize(`${sizeInMB} MB`);
+                      setUploadType('image');
+                    }
+                  }}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Select Document File Card */}
+                  <div 
+                    onClick={() => document.getElementById('ehr-file-input')?.click()}
+                    className="border-2 border-dashed border-neutral-200 rounded-2xl p-6 text-center flex flex-col items-center justify-center gap-2 bg-neutral-50 hover:bg-neutral-100/50 transition-colors cursor-pointer"
+                  >
+                    <UploadCloud className="w-8 h-8 text-neutral-450 animate-bounce" />
+                    <div>
+                      <span className="font-bold text-xs text-neutral-800 block">Select Document File</span>
+                      <span className="text-[10px] text-neutral-400 block mt-0.5">Upload PDFs, docs, or images</span>
+                    </div>
+                  </div>
+
+                  {/* Use Phone Camera Card */}
+                  <div 
+                    onClick={() => document.getElementById('ehr-camera-input')?.click()}
+                    className="border-2 border-dashed border-neutral-200 rounded-2xl p-6 text-center flex flex-col items-center justify-center gap-2 bg-neutral-50 hover:bg-neutral-100/50 transition-colors cursor-pointer"
+                  >
+                    <Camera className="w-8 h-8 text-neutral-455 animate-pulse" />
+                    <div>
+                      <span className="font-bold text-xs text-neutral-800 block">Use Phone Camera</span>
+                      <span className="text-[10px] text-neutral-400 block mt-0.5">Capture and upload clinical photo</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2029,11 +2151,11 @@ export default function PatientsSection() {
                   <h3 className="font-bold text-sm text-neutral-900">Document Upload History</h3>
                   <p className="text-xs text-neutral-550 mt-0.5">Archive of scanned records, attachments, and files uploaded for this patient.</p>
                 </div>
-                {(!activePatient.attachments || activePatient.attachments.length === 0) ? (
+                {(!visibleAttachments || visibleAttachments.length === 0) ? (
                   <p className="text-xs text-neutral-455 italic text-center py-12">No uploaded clinical files in history.</p>
                 ) : (
                   <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 mt-4">
-                    {activePatient.attachments.map((file: Attachment) => (
+                    {visibleAttachments.map((file: Attachment) => (
                       <div key={file.id} className="p-3 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/50 rounded-xl flex items-center justify-between text-xs animate-fadeIn">
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-neutral-900 truncate pr-2" title={file.name}>{file.name}</p>

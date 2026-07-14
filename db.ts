@@ -59,6 +59,7 @@ function mapProfile(row: any) {
   let prescriptions: any[] = [];
   let attachments: any[] = [];
   let notifications: any[] = [];
+  let consentedClinics: string[] = [];
   
   let nationality = row.nationality ?? '';
   let emergencyContactName = "Razali Bin Ahmad";
@@ -84,6 +85,7 @@ function mapProfile(row: any) {
       smsAlerts = parsed.smsAlerts !== false;
       inAppAlerts = parsed.inAppAlerts !== false;
       notifications = parsed.notifications ?? [];
+      consentedClinics = parsed.consentedClinics ?? [];
     } catch (e) {
       // ignore
     }
@@ -118,7 +120,8 @@ function mapProfile(row: any) {
     emailAlerts,
     smsAlerts,
     inAppAlerts,
-    notifications
+    notifications,
+    consentedClinics
   };
 }
 
@@ -126,11 +129,17 @@ function mapAppointment(row: any) {
   if (!row) return null;
   let symptoms = row.symptoms ?? '';
   let clinic = '';
+  let checkedIn = false;
+  let shareHistory = true;
+  let requestRide = false;
   if (symptoms.startsWith('{') && symptoms.endsWith('}')) {
     try {
       const parsed = JSON.parse(symptoms);
       symptoms = parsed.symptoms ?? '';
       clinic = parsed.clinic ?? '';
+      checkedIn = !!parsed.checkedIn;
+      shareHistory = parsed.shareHistory !== undefined ? !!parsed.shareHistory : true;
+      requestRide = !!parsed.requestRide;
     } catch (e) {
       // ignore
     }
@@ -150,6 +159,9 @@ function mapAppointment(row: any) {
     symptoms:      symptoms,
     remarks:       symptoms, // Map to remarks for staff system compatibility
     clinic:        clinic,
+    checkedIn:     checkedIn,
+    shareHistory:  shareHistory,
+    requestRide:   requestRide,
     clinicalNotes: row.clinical_notes  ?? '',
     prescription:  row.prescription    ?? '',
   };
@@ -248,11 +260,12 @@ function mapReview(row: any) {
 export async function registerUser(
   email: string,
   password: string,
-  metadata?: { fullName?: string; role?: string; approved?: boolean }
+  metadata?: { fullName?: string; role?: string; approved?: boolean; hospital?: string }
 ) {
   const fullName = metadata?.fullName ?? email.split('@')[0];
   const role = metadata?.role ?? 'Patient';
   const approved = metadata?.approved ?? (role === 'Patient' || role === 'Admin');
+  const hospital = metadata?.hospital ?? '';
 
   if (supabaseServiceRoleKey) {
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -263,6 +276,7 @@ export async function registerUser(
         full_name: fullName,
         role,
         approved,
+        hospital,
       },
     });
 
@@ -291,6 +305,7 @@ export async function registerUser(
         full_name: fullName,
         role,
         approved,
+        hospital,
       },
     },
   });
@@ -310,7 +325,8 @@ export function getAuthUserProfile(authUser: { email?: string; user_metadata?: R
     (meta.fullName as string) ||
     email.split('@')[0];
   const approved = meta.approved === undefined ? (role === 'Patient' || role === 'Admin') : !!meta.approved;
-  return { role, name, approved };
+  const hospital = (meta.hospital as string) || '';
+  return { role, name, approved, hospital };
 }
 
 /**
@@ -418,7 +434,9 @@ export async function updatePatientProfile(email: string, updates: any, userId?:
     updates.defaultRegion !== undefined ||
     updates.emailAlerts !== undefined ||
     updates.smsAlerts !== undefined ||
-    updates.inAppAlerts !== undefined
+    updates.inAppAlerts !== undefined ||
+    updates.notifications !== undefined ||
+    updates.consentedClinics !== undefined
   ) {
     let currentNationality = "";
     let currentContactName = "Razali Bin Ahmad";
@@ -434,6 +452,7 @@ export async function updatePatientProfile(email: string, updates: any, userId?:
     let currentSmsAlerts = true;
     let currentInAppAlerts = true;
     let currentNotifications: any[] = [];
+    let currentConsentedClinics: string[] = [];
 
     try {
       const existing = await getPatientProfileByEmail(email);
@@ -452,6 +471,7 @@ export async function updatePatientProfile(email: string, updates: any, userId?:
         currentSmsAlerts = existing.smsAlerts !== false;
         currentInAppAlerts = existing.inAppAlerts !== false;
         currentNotifications = existing.notifications || [];
+        currentConsentedClinics = existing.consentedClinics || [];
       }
     } catch (e) {
       // ignore fetch errors
@@ -471,6 +491,7 @@ export async function updatePatientProfile(email: string, updates: any, userId?:
     const nextSmsAlerts = updates.smsAlerts !== undefined ? updates.smsAlerts : currentSmsAlerts;
     const nextInAppAlerts = updates.inAppAlerts !== undefined ? updates.inAppAlerts : currentInAppAlerts;
     const nextNotifications = updates.notifications !== undefined ? updates.notifications : currentNotifications;
+    const nextConsentedClinics = updates.consentedClinics !== undefined ? updates.consentedClinics : currentConsentedClinics;
 
     dbRow.nationality = JSON.stringify({
       nationality: nextNationality,
@@ -486,7 +507,8 @@ export async function updatePatientProfile(email: string, updates: any, userId?:
       emailAlerts: nextEmailAlerts,
       smsAlerts: nextSmsAlerts,
       inAppAlerts: nextInAppAlerts,
-      notifications: nextNotifications
+      notifications: nextNotifications,
+      consentedClinics: nextConsentedClinics
     });
   }
 
@@ -512,6 +534,25 @@ export async function updatePatientProfile(email: string, updates: any, userId?:
 // APPOINTMENTS
 // ============================================================
 
+function parseAppointmentDateTime(dateStr: string, timeSlot: string): Date | null {
+  if (!dateStr || !timeSlot) return null;
+  const match = timeSlot.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hrs = parseInt(match[1], 10);
+  const mins = parseInt(match[2], 10);
+  const pm = match[3].toUpperCase() === "PM";
+  if (pm && hrs < 12) hrs += 12;
+  if (!pm && hrs === 12) hrs = 0;
+
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return null;
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+
+  return new Date(year, month, day, hrs, mins, 0, 0);
+}
+
 export async function getAppointments(patientId?: string) {
   let query = supabaseAdmin
     .from('appointments')
@@ -522,18 +563,52 @@ export async function getAppointments(patientId?: string) {
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapAppointment);
+
+  const appointments = (data ?? []).map(mapAppointment);
+  const now = new Date();
+  
+  const autoDoneIds: string[] = [];
+  for (const apt of appointments) {
+    if (apt && ['Upcoming', 'Approved', 'Pending', 'Rescheduled'].includes(apt.status)) {
+      const aptDate = parseAppointmentDateTime(apt.date, apt.timeSlot);
+      if (aptDate) {
+        const timeDiffMs = now.getTime() - aptDate.getTime();
+        // 30 minutes past scheduled slot
+        if (timeDiffMs > 30 * 60 * 1000) {
+          autoDoneIds.push(apt.id);
+          apt.status = 'Done';
+        }
+      }
+    }
+  }
+
+  if (autoDoneIds.length > 0) {
+    supabaseAdmin
+      .from('appointments')
+      .update({ status: 'Done' })
+      .in('id', autoDoneIds)
+      .then(({ error: updateErr }) => {
+        if (updateErr) {
+          console.error("Failed to auto-update expired appointments:", updateErr);
+        } else {
+          console.log(`Auto-marked ${autoDoneIds.length} expired appointments as 'Done'.`);
+        }
+      });
+  }
+
+  return appointments;
 }
 
 export async function addAppointment(apt: any) {
   let symptoms = apt.symptoms || apt.remarks || '';
   const clinic = apt.clinic || apt.hospital || '';
-  if (clinic) {
-    symptoms = JSON.stringify({
-      symptoms: symptoms,
-      clinic: clinic
-    });
-  }
+  
+  symptoms = JSON.stringify({
+    symptoms: symptoms,
+    clinic: clinic,
+    shareHistory: apt.shareHistory !== undefined ? !!apt.shareHistory : true,
+    requestRide: !!apt.requestRide
+  });
 
   const dbRow: any = {
     patient_name:  apt.patientName  ?? '',
@@ -566,9 +641,12 @@ export async function updateAppointment(id: string, updates: any) {
   if (updates.date         !== undefined) dbRow.date          = updates.date;
   if (updates.status       !== undefined) dbRow.status        = updates.status;
   
-  if (updates.symptoms !== undefined || updates.remarks !== undefined || updates.clinic !== undefined) {
+  if (updates.symptoms !== undefined || updates.remarks !== undefined || updates.clinic !== undefined || updates.checkedIn !== undefined || updates.shareHistory !== undefined || updates.requestRide !== undefined) {
     let existingSymptoms = '';
     let existingClinic = '';
+    let existingCheckedIn = false;
+    let existingShareHistory = true;
+    let existingRequestRide = false;
     try {
       const { data: existingData } = await supabaseAdmin
         .from('appointments')
@@ -581,6 +659,9 @@ export async function updateAppointment(id: string, updates: any) {
           const parsed = JSON.parse(sym);
           existingSymptoms = parsed.symptoms ?? '';
           existingClinic = parsed.clinic ?? '';
+          existingCheckedIn = !!parsed.checkedIn;
+          existingShareHistory = parsed.shareHistory !== undefined ? !!parsed.shareHistory : true;
+          existingRequestRide = !!parsed.requestRide;
         } else {
           existingSymptoms = sym;
         }
@@ -590,15 +671,17 @@ export async function updateAppointment(id: string, updates: any) {
     }
     const nextSymptoms = updates.symptoms !== undefined ? updates.symptoms : (updates.remarks !== undefined ? updates.remarks : existingSymptoms);
     const nextClinic = updates.clinic !== undefined ? updates.clinic : existingClinic;
+    const nextCheckedIn = updates.checkedIn !== undefined ? updates.checkedIn : existingCheckedIn;
+    const nextShareHistory = updates.shareHistory !== undefined ? !!updates.shareHistory : existingShareHistory;
+    const nextRequestRide = updates.requestRide !== undefined ? !!updates.requestRide : existingRequestRide;
     
-    if (nextClinic) {
-      dbRow.symptoms = JSON.stringify({
-        symptoms: nextSymptoms,
-        clinic: nextClinic
-      });
-    } else {
-      dbRow.symptoms = nextSymptoms;
-    }
+    dbRow.symptoms = JSON.stringify({
+      symptoms: nextSymptoms,
+      clinic: nextClinic,
+      checkedIn: nextCheckedIn,
+      shareHistory: nextShareHistory,
+      requestRide: nextRequestRide
+    });
   }
 
   if (updates.clinicalNotes !== undefined) dbRow.clinical_notes = updates.clinicalNotes;
@@ -613,6 +696,16 @@ export async function updateAppointment(id: string, updates: any) {
     .single();
 
   if (error) throw new Error(error.message);
+  return mapAppointment(data);
+}
+
+export async function getAppointmentById(id: string) {
+  const { data, error } = await supabaseAdmin
+    .from('appointments')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
   return mapAppointment(data);
 }
 

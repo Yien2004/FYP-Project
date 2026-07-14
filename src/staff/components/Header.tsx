@@ -8,7 +8,8 @@ import {
   Flame,
   Wifi,
   LogOut,
-  Bell
+  Bell,
+  Menu
 } from 'lucide-react';
 import { PortalType } from '../types';
 
@@ -24,6 +25,7 @@ interface HeaderProps {
   onSetTab?: (tab: any) => void;
   alertCount?: number;
   onRefreshBadges?: () => void;
+  onMenuToggle?: () => void;
 }
 
 export default function Header({
@@ -37,7 +39,8 @@ export default function Header({
   userRole = 'Clinician',
   onSetTab,
   alertCount = 0,
-  onRefreshBadges
+  onRefreshBadges,
+  onMenuToggle
 }: HeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
@@ -118,24 +121,36 @@ export default function Header({
   };
 
   return (
-    <header className="bg-white border-b border-neutral-200/80 px-8 py-5 flex items-center justify-between shrink-0 font-sans select-none">
-      {/* Title & Status Block */}
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-neutral-900 tracking-tight">{title}</h2>
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-            portal === 'staff'
-              ? 'bg-teal-50 text-teal-700 border border-teal-200/50'
-              : 'bg-sky-50 text-sky-700 border border-sky-200/50'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${portal === 'staff' ? 'bg-teal-500' : 'bg-sky-500'}`}></span>
-            {portal === 'staff' ? 'Staff Portal' : 'Admin Operations Control'}
-          </span>
+    <header className="bg-white border-b border-neutral-200/80 px-4 lg:px-8 py-5 flex items-center justify-between shrink-0 font-sans select-none">
+      <div className="flex items-center gap-3">
+        {onMenuToggle && (
+          <button 
+            onClick={onMenuToggle}
+            className="block lg:hidden p-2 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-xl transition cursor-pointer"
+            title="Toggle Menu"
+          >
+            <Menu className="w-5.5 h-5.5" />
+          </button>
+        )}
+        
+        {/* Title & Status Block */}
+        <div className="flex flex-col">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-neutral-900 tracking-tight">{title}</h2>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              portal === 'staff'
+                ? 'bg-teal-50 text-teal-700 border border-teal-200/50'
+                : 'bg-sky-50 text-sky-700 border border-sky-200/50'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${portal === 'staff' ? 'bg-teal-500' : 'bg-sky-500'}`}></span>
+              {portal === 'staff' ? 'Staff Portal' : 'Admin Operations Control'}
+            </span>
+          </div>
+          <p className="text-xs text-neutral-500 mt-1 flex items-center gap-2">
+            <Wifi className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+            HL7 Feed Live: <span className="font-semibold text-neutral-700">{activeStatusText}</span>
+          </p>
         </div>
-        <p className="text-xs text-neutral-500 mt-1 flex items-center gap-2">
-          <Wifi className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-          HL7 Feed Live: <span className="font-semibold text-neutral-700">{activeStatusText}</span>
-        </p>
       </div>
 
       {/* Global Clinical Context Telemetry / Search Panel / User Profile */}

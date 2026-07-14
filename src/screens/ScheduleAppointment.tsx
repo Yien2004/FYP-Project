@@ -176,6 +176,8 @@ export default function ScheduleAppointment({
   const [selectedDate, setSelectedDate] = useState(prefilledApt?.date ?? "2026-10-12");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(prefilledApt?.timeSlot ?? "");
   const [remarks, setRemarks] = useState(prefilledApt?.symptoms ?? "");
+  const [shareHistory, setShareHistory] = useState(true);
+  const [requestRide, setRequestRide] = useState(false);
   const consultType = 'In-Clinic';
   
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
@@ -253,7 +255,7 @@ export default function ScheduleAppointment({
     // Filter symptom options to those that have matching specialties at the selected facility
     // Always include "other" / general triage
     return symptomOptions.filter(opt =>
-      availableSpecialtyIds.has(opt.specialtyId) || opt.id === "other"
+      availableSpecialtyIds.has(opt.specialtyId) || opt.id === "other" || opt.id === "emergency-symptom"
     );
   }, [selectedClinic]);
 
@@ -420,8 +422,32 @@ export default function ScheduleAppointment({
     fetchAppointments();
   }, [selectedDoctor, selectedDate]);
 
+  const isSlotInPast = (slot: string) => {
+    if (!selectedDate) return false;
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    const todayStr = localDate.toISOString().split('T')[0];
+    if (selectedDate !== todayStr) return false;
+
+    const match = slot.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+    if (!match) return false;
+    let hrs = parseInt(match[1], 10);
+    const mins = parseInt(match[2], 10);
+    const pm = match[3].toUpperCase() === "PM";
+    if (pm && hrs < 12) hrs += 12;
+    if (!pm && hrs === 12) hrs = 0;
+
+    const slotTime = new Date();
+    slotTime.setHours(hrs, mins, 0, 0);
+
+    const now = new Date();
+    return slotTime.getTime() < now.getTime();
+  };
+
   const isSlotBooked = (slot: string) => {
     if (!selectedDoctor) return false;
+    if (isSlotInPast(slot)) return true;
     
     if (doctorSchedule) {
       const parseTimeStr = (t: string) => {
@@ -499,7 +525,9 @@ export default function ScheduleAppointment({
       status: "Upcoming",
       type: consultType,
       clinic: selectedClinic.name,
-      symptoms: remarks || `${selectedSymptom.label} Consultation`
+      symptoms: remarks || `${selectedSymptom.label} Consultation`,
+      shareHistory,
+      requestRide
     };
 
     onAddAppointment(newAppointment);
@@ -754,12 +782,12 @@ export default function ScheduleAppointment({
                 </div>
 
                 {selectedSymptomId === "emergency-symptom" && (
-                  <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-3 text-red-800">
-                    <AlertTriangle className="w-5.5 h-5.5 shrink-0 text-red-600 mt-0.5" />
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-3 text-red-800 animate-pulse">
+                    <AlertTriangle className="w-5.5 h-5.5 shrink-0 text-red-650 mt-0.5" />
                     <div>
-                      <p className="font-extrabold text-sm uppercase tracking-wide">🚨 CRITICAL NOTICE: LIFE-THREATENING EMERGENCY</p>
-                      <p className="mt-1 leading-relaxed text-sm text-red-700 font-medium">
-                        If this is a life-threatening medical emergency, please call <strong className="underline text-red-900">999</strong> or <strong className="underline text-red-900">991</strong> for an ambulance immediately. This booking is solely to alert the hospital emergency department to prepare for your self-arrival.
+                      <p className="font-extrabold text-sm uppercase tracking-wide">🚨 please call the 999 first</p>
+                      <p className="mt-1 leading-relaxed text-sm text-red-700 font-semibold">
+                        If you have called already, you can continue booking and remarks the details below so we can make the preparation. We will bypass standard schedule selectors to alert the facility emergency team immediately.
                       </p>
                     </div>
                   </div>
@@ -785,13 +813,36 @@ export default function ScheduleAppointment({
                   >
                     Back to Facility
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setStep(3)}
-                    className="rounded-xl bg-teal-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 cursor-pointer"
-                  >
-                    Continue to Choose Doctor
-                  </button>
+                  {selectedSymptomId === "emergency-symptom" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        setSelectedDate(todayStr);
+                        setSelectedTimeSlot("Priority Triage");
+                        setSelectedDoctor({
+                          name: "Duty Triage Officer",
+                          title: "Emergency Medicine Specialist",
+                          specialty: "emergency",
+                          hospital: selectedClinic?.name || "",
+                          availability: [],
+                          avatar: "DTO"
+                        });
+                        setStep(4);
+                      }}
+                      className="rounded-xl bg-red-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-red-700 cursor-pointer animate-pulse"
+                    >
+                      Continue to Emergency Remarks
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setStep(3)}
+                      className="rounded-xl bg-teal-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 cursor-pointer"
+                    >
+                      Continue to Choose Doctor
+                    </button>
+                  )}
                 </div>
               </section>
             )}
@@ -957,100 +1008,160 @@ export default function ScheduleAppointment({
                     <h2 className="text-lg font-bold text-slate-900">Date, Time & Remarks: When & Details</h2>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                  {/* Calendar Input */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Pick Date</label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                        min={new Date().toISOString().split('T')[0]}
-                      />
+                {selectedSymptomId === "emergency-symptom" ? (
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3 text-red-800">
+                    <p className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="w-5 h-5 text-red-650" />
+                      Priority Triage Booking Confirmed
+                    </p>
+                    <p className="text-xs text-red-700 leading-relaxed font-medium">
+                      Your booking is registered as a priority triage emergency alert. Please self-arrive at the facility as soon as you have called 999. Below are the details set for the clinical teams:
+                    </p>
+                    <div className="bg-white border border-red-100 rounded-xl p-3.5 space-y-2 text-xs font-mono font-bold text-neutral-800">
+                      <div className="flex justify-between"><span>Scheduled Date:</span><span>Today ({selectedDate})</span></div>
+                      <div className="flex justify-between"><span>Lobby Queue Slot:</span><span>Priority Triage</span></div>
+                      <div className="flex justify-between"><span>Attending Clinician:</span><span>Duty Triage Officer</span></div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 gap-6">
+                      {/* Calendar Input */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Pick Date</label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!val) {
+                                  setSelectedDate("");
+                                  return;
+                              }
+                              
+                              // Validate closed day
+                              let closed = false;
+                              if (selectedClinic) {
+                                  const parts = val.split("-");
+                                  if (parts.length === 3) {
+                                  const year = parseInt(parts[0], 10);
+                                  const month = parseInt(parts[1], 10) - 1;
+                                  const day = parseInt(parts[2], 10);
+                                  const dateObj = new Date(year, month, day);
+                                  const dayOfWeek = dateObj.getDay();
+                                  const hours = getBookingHours(selectedClinic, dayOfWeek);
+                                  closed = hours.isClosed;
+                                  }
+                              }
+                              if (closed) {
+                                  alert("This facility is closed on the selected day of the week. Please choose another date.");
+                                  return;
+                              }
 
-                {/* Time Slots Grid */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Select Time Slot</label>
-                  {isDoctorOnLeave ? (
-                    <div className="bg-amber-50 border border-amber-255 text-amber-900 rounded-2xl p-4 flex items-start gap-3 text-xs">
-                      <AlertCircle className="w-4.5 h-4.5 shrink-0 text-amber-600 mt-0.5" />
-                      <div>
-                        <p className="font-bold">Doctor is Away / On Leave</p>
-                        <p className="mt-1 leading-relaxed text-amber-850">
-                          <strong>{selectedDoctor?.name}</strong> is on leave or unavailable on this date. Please select another date or check another doctor's availability.
-                        </p>
+                              // Validate doctor on leave
+                              let onLeave = false;
+                              if (doctorSchedule && doctorSchedule.blockedDates && doctorSchedule.blockedDates.includes(val)) {
+                                  onLeave = true;
+                              }
+                              if (onLeave) {
+                                  alert(`Dr. ${selectedDoctor?.name} is on leave or unavailable on this date. Please choose another date.`);
+                                  return;
+                              }
+
+                              setSelectedDate(val);
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-bold"
+                            min={(() => {
+                              const d = new Date();
+                              const offset = d.getTimezoneOffset();
+                              const local = new Date(d.getTime() - (offset * 60 * 1000));
+                              return local.toISOString().split('T')[0];
+                            })()}
+                          />
+                        </div>
                       </div>
                     </div>
-                  ) : isClinicClosed ? (
-                    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-800 text-xs">
-                      <AlertCircle className="w-4.5 h-4.5 shrink-0 text-rose-600 mt-0.5" />
-                      <div>
-                        <p className="font-bold">Facility is Closed</p>
-                        <p className="mt-1 leading-relaxed text-rose-700">
-                          <strong>{selectedClinic?.name}</strong> is closed on this day of the week (
-                          {(() => {
-                            const parts = selectedDate.split("-");
-                            if (parts.length !== 3) return "";
-                            const year = parseInt(parts[0], 10);
-                            const month = parseInt(parts[1], 10) - 1;
-                            const day = parseInt(parts[2], 10);
-                            return new Date(year, month, day).toLocaleDateString("en-MY", { weekday: 'long' });
-                          })()}
-                          ). Please select another date.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {isLoadingAppointments && (
-                        <div className="text-xs text-teal-600 animate-pulse flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 animate-spin" /> Checking slot availability...
+
+                    {/* Time Slots Grid */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Select Time Slot</label>
+                      {isDoctorOnLeave ? (
+                        <div className="bg-amber-50 border border-amber-255 text-amber-900 rounded-2xl p-4 flex items-start gap-3 text-xs">
+                          <AlertCircle className="w-4.5 h-4.5 shrink-0 text-amber-600 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Doctor is Away / On Leave</p>
+                            <p className="mt-1 leading-relaxed text-amber-850">
+                              <strong>{selectedDoctor?.name}</strong> is on leave or unavailable on this date. Please select another date or check another doctor's availability.
+                            </p>
+                          </div>
+                        </div>
+                      ) : isClinicClosed ? (
+                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-800 text-xs">
+                          <AlertCircle className="w-4.5 h-4.5 shrink-0 text-rose-600 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Facility is Closed</p>
+                            <p className="mt-1 leading-relaxed text-rose-700">
+                              <strong>{selectedClinic?.name}</strong> is closed on this day of the week (
+                              {(() => {
+                                const parts = selectedDate.split("-");
+                                if (parts.length !== 3) return "";
+                                const year = parseInt(parts[0], 10);
+                                const month = parseInt(parts[1], 10) - 1;
+                                const day = parseInt(parts[2], 10);
+                                return new Date(year, month, day).toLocaleDateString("en-MY", { weekday: 'long' });
+                              })()}
+                              ). Please select another date.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {isLoadingAppointments && (
+                            <div className="text-xs text-teal-600 animate-pulse flex items-center gap-1.5">
+                              <Clock className="w-4 h-4 animate-spin" /> Checking slot availability...
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {visibleSlots.map((slot) => {
+                              const selected = selectedTimeSlot === slot;
+                              const booked = isSlotBooked(slot);
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  disabled={booked}
+                                  onClick={() => setSelectedTimeSlot(slot)}
+                                  className={`rounded-2xl border px-3 py-2.5 text-xs font-bold transition ${
+                                    selected
+                                      ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
+                                      : booked
+                                      ? 'bg-slate-200 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                                  }`}
+                                >
+                                  {slot}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          {generatedSlots.length > 8 && (
+                            <div className="flex justify-center pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowAllSlots(!showAllSlots)}
+                                className="text-xs font-bold text-teal-600 hover:text-teal-700 transition flex items-center gap-1 cursor-pointer"
+                              >
+                                {showAllSlots ? "Show Less" : `View All Slots (${generatedSlots.length})`}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {visibleSlots.map((slot) => {
-                          const selected = selectedTimeSlot === slot;
-                          const booked = isSlotBooked(slot);
-                          return (
-                            <button
-                              key={slot}
-                              type="button"
-                              disabled={booked}
-                              onClick={() => setSelectedTimeSlot(slot)}
-                              className={`rounded-2xl border px-3 py-2.5 text-xs font-bold transition ${
-                                selected
-                                  ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
-                                  : booked
-                                  ? 'bg-slate-200 border-slate-200 text-slate-400 cursor-not-allowed'
-                                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
-                              }`}
-                            >
-                              {slot}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      
-                      {generatedSlots.length > 8 && (
-                        <div className="flex justify-center pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowAllSlots(!showAllSlots)}
-                            className="text-xs font-bold text-teal-600 hover:text-teal-700 transition flex items-center gap-1 cursor-pointer"
-                          >
-                            {showAllSlots ? "Show Less" : `View All Slots (${generatedSlots.length})`}
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
 
                 {/* Final Remarks text field */}
                 <div className="space-y-2">
@@ -1059,9 +1170,47 @@ export default function ScheduleAppointment({
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     rows={4}
-                    placeholder="Enter any additional instructions or medication requests..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-teal-500"
+                    placeholder={selectedSymptomId === "emergency-symptom" ? "Please remarks the details here so our clinical team can prepare for your arrival..." : "Enter any additional instructions or medication requests..."}
+                    required={selectedSymptomId === "emergency-symptom"}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-teal-500 font-semibold"
                   />
+                </div>
+
+                {/* Consent & Ride Option Form Controls */}
+                <div className="space-y-3.5 pt-2 border-t border-slate-100">
+                  {/* Consent Checkbox */}
+                  <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-250 rounded-2xl cursor-pointer transition">
+                    <input
+                      type="checkbox"
+                      checked={shareHistory}
+                      onChange={(e) => setShareHistory(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 accent-teal-600 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-slate-800">Share Previous Medical History</p>
+                      <p className="text-slate-500 mt-0.5 leading-relaxed">
+                        Allow the attending clinician at <span className="font-bold text-slate-700">{selectedClinic?.name}</span> to access your past consultation logs and file uploads from other hospitals.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Grab Fetching Checkbox */}
+                  <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-250 rounded-2xl cursor-pointer transition">
+                    <input
+                      type="checkbox"
+                      checked={requestRide}
+                      onChange={(e) => setRequestRide(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 accent-teal-600 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                        🚗 Request LifeLink Fetching Transport (Grab-Style)
+                      </p>
+                      <p className="text-slate-500 mt-0.5 leading-relaxed">
+                        Request a third-party transit driver to pick you up and fetch you safely to the facility for your scheduled appointment time slot.
+                      </p>
+                    </div>
+                  </label>
                 </div>
 
                 <div className="flex justify-between pt-2">
@@ -1070,13 +1219,15 @@ export default function ScheduleAppointment({
                     onClick={() => {
                       if (isRescheduling) {
                         setIsRescheduling(false);
+                      } else if (selectedSymptomId === "emergency-symptom") {
+                        setStep(2);
                       } else {
                         setStep(3);
                       }
                     }}
                     className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
-                    {isRescheduling ? "Cancel Reschedule" : "Back to Doctor"}
+                    {isRescheduling ? "Cancel Reschedule" : selectedSymptomId === "emergency-symptom" ? "Back to Symptoms" : "Back to Doctor"}
                   </button>
                   <button
                     type="submit"

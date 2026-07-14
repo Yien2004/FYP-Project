@@ -185,7 +185,7 @@ export default function UserSettings({
   onLogout, 
   onUpdateProfile 
 }: UserSettingsProps) {
-  const [activeTab, setActiveTab] = useState<"profile" | "controls">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "controls" | "consent">("profile");
 
   // Medical Identity Form states
   const [fullName, setFullName] = useState(patientProfile.fullName || "");
@@ -201,7 +201,7 @@ export default function UserSettings({
   const [emergencyContactPhone, setEmergencyContactPhone] = useState(patientProfile.emergencyContactPhone || "+60 12-987 6543 (Father)");
   const [insuranceProvider, setInsuranceProvider] = useState(patientProfile.insuranceProvider || "Allianz Health Malaysia");
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState(patientProfile.insurancePolicyNumber || "ALZ-88942-004");
-  
+  const [consentedClinics, setConsentedClinics] = useState<string[]>(patientProfile.consentedClinics || []);
   // Notification Prefs
   const [emailAlerts, setEmailAlerts] = useState(() => {
     return patientProfile.emailAlerts !== false && localStorage.getItem("carepoint_email_alerts") !== "false";
@@ -349,6 +349,17 @@ export default function UserSettings({
     setTimeout(() => setControlsSavedMsg(""), 2500);
   };
 
+  const handleSaveConsent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        ...patientProfile,
+        consentedClinics
+      });
+    }
+    alert(t("SUCCESS: Medical history consent sharing preferences updated successfully!"));
+  };
+
   const handleSendResetEmail = async () => {
     setResetStatus("Sending...");
     setDevResetUrl("");
@@ -444,10 +455,10 @@ export default function UserSettings({
       </div>
 
       {/* Tab Navigation Segment */}
-      <div className="flex border-b border-slate-200 gap-6">
+      <div className="flex border-b border-slate-200 gap-6 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab("profile")}
-          className={`pb-3 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+          className={`pb-3 text-xs font-bold uppercase tracking-wider transition cursor-pointer whitespace-nowrap ${
             activeTab === "profile" 
               ? "border-b-2 border-teal-650 text-teal-700 font-extrabold" 
               : "text-slate-400 hover:text-slate-700"
@@ -457,13 +468,23 @@ export default function UserSettings({
         </button>
         <button
           onClick={() => setActiveTab("controls")}
-          className={`pb-3 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+          className={`pb-3 text-xs font-bold uppercase tracking-wider transition cursor-pointer whitespace-nowrap ${
             activeTab === "controls" 
               ? "border-b-2 border-teal-650 text-teal-700 font-extrabold" 
               : "text-slate-400 hover:text-slate-700"
           }`}
         >
           {t("2. Account Settings View (System Controls)")}
+        </button>
+        <button
+          onClick={() => setActiveTab("consent")}
+          className={`pb-3 text-xs font-bold uppercase tracking-wider transition cursor-pointer whitespace-nowrap ${
+            activeTab === "consent" 
+              ? "border-b-2 border-teal-650 text-teal-700 font-extrabold" 
+              : "text-slate-400 hover:text-slate-700"
+          }`}
+        >
+          {t("3. Data Consent & Release Center")}
         </button>
       </div>
 
@@ -916,6 +937,85 @@ export default function UserSettings({
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === "consent" && (
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 animate-fade-in font-sans">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-teal-655" />
+                  <span className="font-bold text-slate-900 text-sm">{t("Medical Record Access & Consent Release")}</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 text-xs space-y-2 leading-relaxed text-slate-650">
+                <p className="font-bold text-slate-900">🔒 Malaysia Personal Data Protection Act (PDPA) & Clinical Privacy compliance</p>
+                <p>
+                  By default, all your medical profiles, diagnostic uploads, and prescription sheets are fully isolated inside the database and only accessible by the clinic where they were created.
+                </p>
+                <p>
+                  Use this settings panel to grant global access to other registered PenangHealth clinic facilities so they can consult your history during appointments.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveConsent} className="space-y-6">
+                <div className="space-y-3.5">
+                  {[
+                    "Hospital Pulau Pinang",
+                    "Hospital Seberang Jaya",
+                    "Klinik Kesihatan Jalan Perak",
+                    "Klinik Kesihatan Bayan Baru",
+                    "Hospital Bukit Mertajam",
+                    "Pantai Hospital Penang",
+                    "Hospital Lam Wah Ee",
+                    "Gleneagles Hospital Penang",
+                    "Island Hospital",
+                    "Penang Adventist Hospital",
+                    "Loh Guan Lye Specialists Centre",
+                    "KPJ Penang Specialist Hospital",
+                    "O2 Klinik",
+                    "Klinik Singapore",
+                    "Poliklinik Perdana"
+                  ].map((facility) => {
+                    const isConsented = consentedClinics.includes(facility);
+                    return (
+                      <label 
+                        key={facility} 
+                        className="flex items-center justify-between p-3.5 bg-white hover:bg-slate-50 border border-slate-205 rounded-2xl cursor-pointer transition"
+                      >
+                        <div className="text-xs">
+                          <p className="font-bold text-slate-800">{facility}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {isConsented ? "Authorized to inspect medical records" : "Access restricted (Default Isolation)"}
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={isConsented}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setConsentedClinics(prev => [...prev, facility]);
+                            } else {
+                              setConsentedClinics(prev => prev.filter(c => c !== facility));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-350 accent-teal-600 cursor-pointer"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-slate-100">
+                  <button 
+                    type="submit"
+                    className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-6 rounded-xl transition cursor-pointer shadow-md uppercase tracking-wider text-[11px]"
+                  >
+                    {t("Save Consent Preferences")}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 

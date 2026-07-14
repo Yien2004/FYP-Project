@@ -34,14 +34,89 @@ function getClinicFromEmail(email: string): string {
   return '';
 }
 
+const getLoggedUserClinic = () => {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+  const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+  return getClinicFromEmail(loggedEmail);
+};
+
 export default function AppointmentsSection() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [editModalApt, setEditModalApt] = useState<Appointment | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editTimeSlot, setEditTimeSlot] = useState('');
-  const [editStatus, setEditStatus] = useState<'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected'>('Pending');
+  const [editStatus, setEditStatus] = useState<string>('Pending');
   const [editRemarks, setEditRemarks] = useState('');
-  const [selectedHospital, setSelectedHospital] = useState('ALL');
+  
+  // Telephone manual booking states
+  const [showIntakeModal, setShowIntakeModal] = useState(false);
+  const [intakePatientName, setIntakePatientName] = useState('');
+  const [intakePatientPhone, setIntakePatientPhone] = useState('');
+  const [intakePatientEmail, setIntakePatientEmail] = useState('');
+  const [intakeDoctorName, setIntakeDoctorName] = useState('');
+  const [intakeDate, setIntakeDate] = useState('');
+  const [intakeTimeSlot, setIntakeTimeSlot] = useState('10:00 AM');
+  const [intakeRemarks, setIntakeRemarks] = useState('');
+  const [clinicians, setClinicians] = useState<any[]>([]);
+
+  const handleConfirmIntakeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!intakePatientName || !intakePatientPhone || !intakeDate || !intakeDoctorName) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
+    const currentClinic = getLoggedUserClinic();
+    const docObj = clinicians.find(c => c.name.toLowerCase() === intakeDoctorName.toLowerCase());
+    const specialty = docObj ? docObj.specialty : "General Medicine";
+    const doctorId = intakeDoctorName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+
+    const payload = {
+      patientName: intakePatientName,
+      patientEmail: intakePatientEmail || `phone-${intakePatientPhone}@lifelink.my`,
+      patientId: `p-phone-${Date.now()}`,
+      doctorId,
+      doctorName: intakeDoctorName,
+      specialty,
+      doctorImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(intakeDoctorName)}&background=0d9488&color=fff`,
+      date: intakeDate,
+      timeSlot: intakeTimeSlot,
+      status: "Approved",
+      type: "In-Clinic",
+      clinic: currentClinic || "General Clinic",
+      symptoms: intakeRemarks || "Telephone Booking Triage"
+    };
+
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setAppointments(prev => [saved, ...prev]);
+        setShowIntakeModal(false);
+        setIntakePatientName('');
+        setIntakePatientPhone('');
+        setIntakePatientEmail('');
+        setIntakeDoctorName('');
+        setIntakeDate('');
+        setIntakeRemarks('');
+      } else {
+        const errData = await res.json();
+        alert(`Error: ${errData.error || "Failed to save phone appointment."}`);
+      }
+    } catch (err) {
+      console.error("Failed to post manual intake appointment", err);
+      alert("Network error: failed to submit phone booking.");
+    }
+  };
+  const [selectedHospital, setSelectedHospital] = useState(() => {
+    const isAdmin = localStorage.getItem('lifelink_user_role') === 'Admin';
+    return isAdmin ? 'ALL' : getLoggedUserClinic();
+  });
   const isAdmin = localStorage.getItem('lifelink_user_role') === 'Admin';
 
   const handleOpenEditModal = (apt: Appointment) => {
@@ -90,15 +165,34 @@ export default function AppointmentsSection() {
     }
   };
 
+  const handleToggleDone = async (apt: Appointment) => {
+    const nextStatus = apt.status === 'Done' ? 'Approved' : 'Done';
+    try {
+      const res = await fetch(`/api/appointments/${apt.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      if (res.ok) {
+        setAppointments(prev => prev.map(ap => 
+          ap.id === apt.id 
+            ? { ...ap, status: nextStatus } 
+            : ap
+        ));
+      }
+    } catch (err) {
+      console.error("Failed to toggle done status", err);
+    }
+  };
+
   React.useEffect(() => {
-    const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
-    const currentClinic = getClinicFromEmail(loggedEmail);
+    const currentClinic = getLoggedUserClinic();
 
     fetch("/api/appointments")
       .then(res => res.json())
       .then(data => {
         let mapped = data;
-        if (currentClinic) {
+        if (localStorage.getItem('lifelink_user_role') !== 'Admin' && currentClinic) {
           mapped = data.filter((ap: any) => (ap.clinic || ap.hospital || '').toLowerCase() === currentClinic.toLowerCase());
         }
         setAppointments(mapped.map((ap: any) => ({ ...ap, checked: false })));
@@ -107,6 +201,15 @@ export default function AppointmentsSection() {
         console.warn("Failed to load appointments, using mock data.", err);
         setAppointments(mockAppointments.map(ap => ({ ...ap, checked: false })));
       });
+
+    fetch("/api/clinicians")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setClinicians(data);
+        }
+      })
+      .catch(err => console.warn("Failed to load clinicians list", err));
   }, []);
 
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected'>('ALL');
@@ -200,6 +303,12 @@ export default function AppointmentsSection() {
       return false;
     }
     return true;
+  }).sort((a, b) => {
+    const isAPriority = a.timeSlot === "Priority Triage";
+    const isBPriority = b.timeSlot === "Priority Triage";
+    if (isAPriority && !isBPriority) return -1;
+    if (!isAPriority && isBPriority) return 1;
+    return 0;
   });
 
   const checkedCount = appointments.filter(ap => ap.checked).length;
@@ -234,6 +343,12 @@ export default function AppointmentsSection() {
 
           {/* Quick tab filter & Hospital Selector */}
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={() => setShowIntakeModal(true)}
+              className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-teal-650/15 cursor-pointer h-9 shrink-0"
+            >
+              <Plus className="w-4 h-4" /> Telephone Booking
+            </button>
             {isAdmin && (
               <select
                 value={selectedHospital}
@@ -363,13 +478,19 @@ export default function AppointmentsSection() {
                   const isPend = ap.status === 'Pending';
                   const isResc = ap.status === 'Rescheduled';
                   const isReje = ap.status === 'Rejected';
+                  const isDone = ap.status === 'Done';
+                  const isMiss = ap.status === 'Missing';
                   const statusColors = isAppr 
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                     : isPend 
                       ? 'bg-rose-50 text-rose-700 border-rose-200' 
                       : isResc 
                         ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                        : 'bg-neutral-100 text-neutral-600 border-neutral-200';
+                        : isDone
+                          ? 'bg-sky-50 text-sky-700 border-sky-200'
+                          : isMiss
+                            ? 'bg-red-55 text-red-705 border-red-200'
+                            : 'bg-neutral-100 text-neutral-600 border-neutral-200';
 
                   return (
                     <tr key={ap.id} className="hover:bg-neutral-50/50 transition-colors">
@@ -388,11 +509,19 @@ export default function AppointmentsSection() {
                             <img src={ap.patientAvatar} alt={ap.patientName} className="w-8 h-8 rounded-full object-cover border border-neutral-200" />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center justify-center border border-red-200">
-                              {initials}
+                               {initials}
                             </div>
                           )}
                           <div>
-                            <p className="font-bold text-neutral-900 text-xs">{ap.patientName}</p>
+                            <p className="font-bold text-neutral-900 text-xs flex items-center gap-1.5">
+                              {ap.patientName}
+                              {ap.timeSlot === "Priority Triage" && (
+                                <span className="bg-red-50 text-red-700 border border-red-200 text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase font-mono tracking-wider animate-pulse shrink-0">EMERGENCY PRIORITY</span>
+                              )}
+                              {ap.checkedIn && (
+                                <span className="bg-emerald-150 text-emerald-800 text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase font-mono tracking-wider scale-90 origin-left">CHECKED IN</span>
+                              )}
+                            </p>
                             <p className="text-[10px] text-neutral-400 font-sans">Authorized: {ap.doctorName}</p>
                           </div>
                         </div>
@@ -412,12 +541,24 @@ export default function AppointmentsSection() {
                         {ap.remarks}
                       </td>
                       <td className="py-4 text-right pr-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleOpenEditModal(ap)}
-                          className="bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[10px] font-bold px-2 py-1 rounded transition cursor-pointer"
-                        >
-                          Reschedule
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleToggleDone(ap)}
+                            className={`text-[10px] font-bold px-2 py-1 rounded transition cursor-pointer ${
+                              ap.status === 'Done'
+                                ? 'bg-neutral-200 text-neutral-750 hover:bg-neutral-300'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {ap.status === 'Done' ? 'Not Done' : 'Done'}
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditModal(ap)}
+                            className="bg-neutral-100 hover:bg-neutral-200 text-neutral-850 text-[10px] font-bold px-2 py-1 rounded transition cursor-pointer"
+                          >
+                            Reschedule
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -569,6 +710,8 @@ export default function AppointmentsSection() {
                   <option value="Pending">Pending</option>
                   <option value="Rescheduled">Rescheduled</option>
                   <option value="Rejected">Rejected</option>
+                  <option value="Done">Done</option>
+                  <option value="Missing">Missing</option>
                 </select>
               </div>
 
@@ -596,6 +739,134 @@ export default function AppointmentsSection() {
                   className="bg-neutral-900 hover:bg-neutral-850 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
                 >
                   Save Changes
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {showIntakeModal && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in font-sans">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-neutral-200 shadow-xl overflow-hidden">
+            
+            <div className="p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+              <div>
+                <h4 className="font-extrabold text-sm text-neutral-900">☎️ Register Telephone Call Booking</h4>
+                <p className="text-[10px] text-neutral-450 mt-0.5">Staff manual intake triage reservation.</p>
+              </div>
+              <button 
+                onClick={() => setShowIntakeModal(false)}
+                className="text-neutral-400 hover:text-neutral-600 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmIntakeSubmit} className="p-5 space-y-4 max-h-[500px] overflow-y-auto">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Patient Name *</label>
+                <input
+                  type="text"
+                  value={intakePatientName}
+                  onChange={(e) => setIntakePatientName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  required
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Patient Phone Number *</label>
+                <input
+                  type="tel"
+                  value={intakePatientPhone}
+                  onChange={(e) => setIntakePatientPhone(e.target.value)}
+                  placeholder="e.g. 0123456789"
+                  required
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Patient Email (Optional)</label>
+                <input
+                  type="email"
+                  value={intakePatientEmail}
+                  onChange={(e) => setIntakePatientEmail(e.target.value)}
+                  placeholder="e.g. patient@gmail.com"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Attending Doctor *</label>
+                <select
+                  value={intakeDoctorName}
+                  onChange={(e) => setIntakeDoctorName(e.target.value)}
+                  required
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-bold"
+                >
+                  <option value="">-- Select Clinician --</option>
+                  {clinicians
+                    .filter(c => !selectedHospital || selectedHospital === 'ALL' || c.hospital.toLowerCase() === selectedHospital.toLowerCase())
+                    .map(c => (
+                      <option key={c.id} value={c.name}>{c.name} ({c.specialty})</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Booking Date *</label>
+                <input
+                  type="date"
+                  value={intakeDate}
+                  onChange={(e) => setIntakeDate(e.target.value)}
+                  required
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-bold font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Time Slot *</label>
+                <select
+                  value={intakeTimeSlot}
+                  onChange={(e) => setIntakeTimeSlot(e.target.value)}
+                  required
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-bold"
+                >
+                  {['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'].map(slot => (
+                    <option key={slot} value={slot}>{slot}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Triage Symptoms / Notes</label>
+                <textarea
+                  rows={2}
+                  value={intakeRemarks}
+                  onChange={(e) => setIntakeRemarks(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 leading-relaxed font-sans placeholder:text-neutral-400"
+                  placeholder="Enter main symptoms reported over phone..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setShowIntakeModal(false)}
+                  className="bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-600 text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+                >
+                  Book Appointment
                 </button>
               </div>
             </form>

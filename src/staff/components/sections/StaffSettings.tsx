@@ -25,6 +25,9 @@ import {
    Clinic resolver – maps email suffix to clinic name
    ────────────────────────────────────────────── */
 function getClinicFromEmail(email: string): string {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+
   const emailLower = (email || '').toLowerCase().trim();
   if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
   if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';

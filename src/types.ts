@@ -25,6 +25,7 @@ export interface PatientProfile {
   smsAlerts?: boolean;
   inAppAlerts?: boolean;
   attachments?: any[];
+  consentedClinics?: string[];
 }
 
 export interface PatientPrescription {
@@ -69,12 +70,15 @@ export interface Appointment {
   doctorImage: string;
   date: string;
   timeSlot: string;
-  status: 'Upcoming' | 'Completed' | 'Cancelled';
+  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected' | 'Done' | 'Missing';
   type: 'In-Clinic' | 'Video Consultation';
   clinic?: string;
   symptoms: string;
   clinicalNotes?: string;
   prescription?: string;
+  checkedIn?: boolean;
+  shareHistory?: boolean;
+  requestRide?: boolean;
 }
 
 export interface Clinic {

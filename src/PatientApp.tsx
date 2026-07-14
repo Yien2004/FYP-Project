@@ -10,6 +10,7 @@ import PatientRegistration from "./screens/PatientRegistration";
 import Notifications from "./screens/Notifications";
 import UserSettings from "./screens/UserSettings";
 import HealthcareAnalytics from "./screens/HealthcareAnalytics";
+import FetchingTransit from "./screens/FetchingTransit";
 
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
@@ -59,6 +60,13 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
   const [prefilledApt, setPrefilledApt]       = useState<Appointment | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(1);
+
+  useEffect(() => {
+    if (currentScreen === "communication") {
+      setUnreadMessagesCount(0);
+    }
+  }, [currentScreen]);
 
   // ── Fetch all patient data from Supabase via the Express API ─────────────
 
@@ -69,8 +77,17 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       if (!pRes.ok) return;
       const profile = await pRes.json();
       setPatientProfile(profile);
+      
+      let profileNotifs: AppNotification[] = [];
       if (profile.notifications && Array.isArray(profile.notifications)) {
-        setNotifications(profile.notifications);
+        profileNotifs = profile.notifications.map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          body: n.body || n.message || "",
+          time: n.time || (n.timestamp ? new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"),
+          category: n.category || "general",
+          read: n.read
+        }));
       }
 
       const patientId = profile.id;
@@ -84,9 +101,10 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       }
 
       // 3. Appointments
+      let apts: Appointment[] = [];
       const aRes = await apiFetch(`/api/appointments?patientId=${patientId}`);
       if (aRes.ok) {
-        const apts: Appointment[] = await aRes.json();
+        apts = await aRes.json();
         setAppointments(apts);
       }
 
@@ -111,6 +129,81 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           })));
         }
       }
+
+      // 6. Fetch Broadcast Alerts from system logs
+      let broadcastNotifs: AppNotification[] = [];
+      try {
+        const logsRes = await apiFetch("/api/logs");
+        if (logsRes.ok) {
+          const logsList = await logsRes.json();
+          if (Array.isArray(logsList)) {
+            // Find unique clinic names from booked appointments
+            const bookedClinics = Array.from(
+              new Set(
+                apts
+                  .map((apt: any) => apt.clinic || apt.hospital)
+                  .filter((c: any): c is string => !!c)
+              )
+            );
+
+            const readBroadcastsKey = `patient_read_broadcasts_${patientId}`;
+            let readBroadcasts: string[] = [];
+            try {
+              const saved = localStorage.getItem(readBroadcastsKey);
+              if (saved) readBroadcasts = JSON.parse(saved);
+            } catch (e) {}
+
+            logsList.forEach((log: any, idx: number) => {
+              const msg = log.message || "";
+              if (!msg.startsWith("[Broadcast]:")) return;
+              const cleanMsg = msg.replace("[Broadcast]:", "").trim();
+
+              // Parse audience group target
+              let group = "All Registered Patients";
+              let text = cleanMsg;
+              if (cleanMsg.startsWith("(")) {
+                const closingIdx = cleanMsg.indexOf(")");
+                if (closingIdx > 0) {
+                  group = cleanMsg.substring(1, closingIdx);
+                  text = cleanMsg.substring(closingIdx + 1).trim();
+                }
+              }
+
+              // Determine if this broadcast targets this patient
+              const isTargetGroup = 
+                group === "All Users" || 
+                group === "All Registered Patients" || 
+                bookedClinics.some(c => c.toLowerCase().includes(group.toLowerCase()) || group.toLowerCase().includes(c.toLowerCase()));
+
+              if (isTargetGroup) {
+                const logId = String(log.id || `bc-${idx}-${log.timestamp}`);
+                const isRead = readBroadcasts.includes(logId);
+                
+                broadcastNotifs.push({
+                  id: logId,
+                  title: `📢 Announcement Alert`,
+                  body: text,
+                  time: log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+                  category: "general",
+                  read: isRead
+                });
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load system broadcasts:", err);
+      }
+
+      // Merge profile notifications and broadcast notifications
+      const mergedNotifs = [...profileNotifs];
+      broadcastNotifs.forEach(bNotif => {
+        if (!mergedNotifs.some(n => n.id === bNotif.id)) {
+          mergedNotifs.push(bNotif);
+        }
+      });
+      setNotifications(mergedNotifs);
+
     } catch (err) {
       console.warn("Failed to load patient records from Supabase — using local mock data.", err);
     }
@@ -198,6 +291,23 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       if (res.ok) {
         const saved = await res.json();
         setAppointments(prev => [saved, ...prev]);
+
+        // Append local notification immediately
+        const newNotif = {
+          id: "notif-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+          title: "Booking Confirmed",
+          body: `Booking confirmed, ${saved.timeSlot} ${saved.clinic}`,
+          message: `Booking confirmed, ${saved.timeSlot} ${saved.clinic}`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date().toISOString(),
+          read: false,
+          category: "general" as any
+        };
+        const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
+        setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
+        setNotifications(prev => [newNotif, ...prev]);
+
+        alert(`SUCCESS: Booking confirmed at ${saved.clinic} with ${saved.doctorName || 'Specialist'} on ${saved.date} at ${saved.timeSlot}! A notification has been saved to your records.`);
       } else {
         setAppointments(prev => [newAptWithPatient, ...prev]);
       }
@@ -218,6 +328,26 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         setAppointments(prev => prev.map(apt => 
           apt.id === id ? { ...apt, status: "Cancelled" } : apt
         ));
+
+        // Append local notification immediately
+        const target = appointments.find(apt => apt.id === id);
+        if (target) {
+          const newNotif = {
+            id: "notif-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+            title: "Appointment Cancelled",
+            body: `Booking cancelled, ${target.timeSlot} ${target.clinic}`,
+            message: `Booking cancelled, ${target.timeSlot} ${target.clinic}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: new Date().toISOString(),
+            read: false,
+            category: "general" as any
+          };
+          const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
+          setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
+          setNotifications(prev => [newNotif, ...prev]);
+
+          alert(`SUCCESS: Your appointment at ${target.clinic} has been cancelled. A notification log has been saved to your records.`);
+        }
       } else {
         setAppointments(prev => prev.map(apt => 
           apt.id === id ? { ...apt, status: "Cancelled" } : apt
@@ -231,6 +361,10 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
     }
   };
 
+  const handleUpdateAppointment = (id: string, updates: Partial<Appointment>) => {
+    setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, ...updates } : apt));
+  };
+
   const handleRescheduleAppointment = async (id: string, date: string, timeSlot: string) => {
     try {
       const res = await apiFetch(`/api/appointments/${id}`, {
@@ -241,6 +375,26 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         setAppointments(prev => prev.map(apt => 
           apt.id === id ? { ...apt, date, timeSlot } : apt
         ));
+
+        // Append local notification immediately
+        const target = appointments.find(apt => apt.id === id);
+        if (target) {
+          const newNotif = {
+            id: "notif-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+            title: "Appointment Rescheduled",
+            body: `Booking rescheduled, ${timeSlot} ${target.clinic}`,
+            message: `Booking rescheduled, ${timeSlot} ${target.clinic}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: new Date().toISOString(),
+            read: false,
+            category: "general" as any
+          };
+          const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
+          setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
+          setNotifications(prev => [newNotif, ...prev]);
+
+          alert(`SUCCESS: Your appointment at ${target.clinic} has been rescheduled to ${date} at ${timeSlot}.`);
+        }
       } else {
         setAppointments(prev => prev.map(apt => 
           apt.id === id ? { ...apt, date, timeSlot } : apt
@@ -308,6 +462,12 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
   // ── Messages ──────────────────────────────────────────────────────────────
 
   const handleSendMessage = async (msg: Message) => {
+    // Optimistically add the message to state immediately for instant rendering
+    setMessages(prev => {
+      if (prev.some(m => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+
     const threadId = `chat-${patientProfile.id || "p1"}`;
     const payload = {
       threadId,
@@ -323,19 +483,17 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       });
       if (res.ok) {
         const saved = await res.json();
-        setMessages(prev => [...prev, {
+        // Replace the temporary message with the synchronized version from the server
+        setMessages(prev => prev.map(m => m.id === msg.id ? {
           id:         saved.id,
           sender:     "user",
           senderName: patientProfile.fullName,
-          content:    saved.content || saved.text,
+          content:    saved.content || saved.text || msg.content,
           timestamp:  saved.timestamp
-        }]);
-      } else {
-        setMessages(prev => [...prev, msg]);
+        } : m));
       }
     } catch (err) {
-      console.error("Failed to send message", err);
-      setMessages(prev => [...prev, msg]);
+      console.warn("Failed to synchronize message to database, keeping local copy:", err);
     }
   };
 
@@ -378,24 +536,61 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
   const handleMarkRead      = async (id: string) => {
     const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
     setNotifications(updated);
+
+    const patientId = patientProfile.id || "p1";
+    const readBroadcastsKey = `patient_read_broadcasts_${patientId}`;
+    try {
+      let readBroadcasts: string[] = [];
+      const saved = localStorage.getItem(readBroadcastsKey);
+      if (saved) readBroadcasts = JSON.parse(saved);
+      if (!readBroadcasts.includes(id)) {
+        readBroadcasts.push(id);
+        localStorage.setItem(readBroadcastsKey, JSON.stringify(readBroadcasts));
+      }
+    } catch (e) {}
+
     if (patientProfile) {
-      await handleUpdateProfile({ ...patientProfile, notifications: updated });
+      const profileOnlyNotifs = updated.filter(n => !n.id.startsWith("bc-") && !n.id.startsWith("log-"));
+      await handleUpdateProfile({ ...patientProfile, notifications: profileOnlyNotifs });
     }
   };
 
   const handleMarkAllRead   = async () => {
     const updated = notifications.map(n => ({ ...n, read: true }));
     setNotifications(updated);
+
+    const patientId = patientProfile.id || "p1";
+    const readBroadcastsKey = `patient_read_broadcasts_${patientId}`;
+    try {
+      const allBroadcastIds = notifications.map(n => n.id);
+      localStorage.setItem(readBroadcastsKey, JSON.stringify(allBroadcastIds));
+    } catch (e) {}
+
     if (patientProfile) {
-      await handleUpdateProfile({ ...patientProfile, notifications: updated });
+      const profileOnlyNotifs = updated.filter(n => !n.id.startsWith("bc-") && !n.id.startsWith("log-"));
+      await handleUpdateProfile({ ...patientProfile, notifications: profileOnlyNotifs });
     }
   };
 
   const handleDeleteNotif   = async (id: string) => {
     const updated = notifications.filter(n => n.id !== id);
     setNotifications(updated);
+
+    const patientId = patientProfile.id || "p1";
+    const readBroadcastsKey = `patient_read_broadcasts_${patientId}`;
+    try {
+      let readBroadcasts: string[] = [];
+      const saved = localStorage.getItem(readBroadcastsKey);
+      if (saved) readBroadcasts = JSON.parse(saved);
+      if (!readBroadcasts.includes(id)) {
+        readBroadcasts.push(id);
+        localStorage.setItem(readBroadcastsKey, JSON.stringify(readBroadcasts));
+      }
+    } catch (e) {}
+
     if (patientProfile) {
-      await handleUpdateProfile({ ...patientProfile, notifications: updated });
+      const profileOnlyNotifs = updated.filter(n => !n.id.startsWith("bc-") && !n.id.startsWith("log-"));
+      await handleUpdateProfile({ ...patientProfile, notifications: profileOnlyNotifs });
     }
   };
 
@@ -417,6 +612,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         notifications={notifications}
         onLogout={handleLogout}
         patientProfile={patientProfile}
+        unreadMessagesCount={unreadMessagesCount}
       />
 
       {/* Main content area */}
@@ -475,6 +671,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
                 onSendMessage={handleSendMessage}
                 onSetScreen={setCurrentScreen}
                 appointments={appointments}
+                patientProfile={patientProfile}
               />
             )}
 
@@ -500,6 +697,14 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
 
             {currentScreen === "clinic-search" && (
               <ClinicSearch onSetScreen={setCurrentScreen} />
+            )}
+
+            {currentScreen === "fetching-transit" && (
+              <FetchingTransit
+                appointments={appointments}
+                onSetScreen={setCurrentScreen}
+                onUpdateAppointment={handleUpdateAppointment}
+              />
             )}
 
             {currentScreen === "patient-registration" && (

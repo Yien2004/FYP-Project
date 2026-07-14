@@ -167,6 +167,24 @@ export default function StaffManagementSection() {
     }
   };
 
+  const handleTerminate = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently terminate/delete this staff account? This action cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        alert("Staff account terminated and deleted successfully.");
+        fetchUsers();
+      } else {
+        const err = await res.json();
+        alert(`Failed to delete account: ${err.error || "Server error"}`);
+      }
+    } catch (e: any) {
+      alert(`Network error: ${e.message}`);
+    }
+  };
+
   const openEditModal = (u: StaffUser) => {
     setSelectedUser(u);
     setEditName(u.fullName);
@@ -375,6 +393,13 @@ export default function StaffManagementSection() {
                               title="Reset Password"
                             >
                               <Key className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleTerminate(u.id)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                              title="Terminate Account"
+                            >
+                              <UserX className="w-4 h-4" />
                             </button>
                           </div>
                         )}

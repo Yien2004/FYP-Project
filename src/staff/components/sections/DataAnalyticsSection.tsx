@@ -25,6 +25,29 @@ interface Appointment {
   hospital?: string;
 }
 
+function getClinicFromEmail(email: string): string {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+
+  const emailLower = (email || '').toLowerCase().trim();
+  if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
+  if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
+  if (emailLower.includes('kkjalanperak')) return 'Klinik Kesihatan Jalan Perak';
+  if (emailLower.includes('kkbayanbaru')) return 'Klinik Kesihatan Bayan Baru';
+  if (emailLower.includes('hospitalbukitmertajam')) return 'Hospital Bukit Mertajam';
+  if (emailLower.includes('pantaihospital')) return 'Pantai Hospital Penang';
+  if (emailLower.includes('lamwahee')) return 'Hospital Lam Wah Ee';
+  if (emailLower.includes('gleneagleshospital')) return 'Gleneagles Hospital Penang';
+  if (emailLower.includes('islandhospital')) return 'Island Hospital';
+  if (emailLower.includes('o2klinik')) return 'O2 Klinik';
+  if (emailLower.includes('kliniksingapore')) return 'Klinik Singapore';
+  if (emailLower.includes('poliklinikperdana')) return 'Poliklinik Perdana';
+  if (emailLower.includes('penangadventisthospital')) return 'Penang Adventist Hospital';
+  if (emailLower.includes('lohguanlye')) return 'Loh Guan Lye Specialists Centre';
+  if (emailLower.includes('kpjpenang')) return 'KPJ Penang Specialist Hospital';
+  return '';
+}
+
 export default function DataAnalyticsSection() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +59,15 @@ export default function DataAnalyticsSection() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          setAppointments(data);
+          const isAdmin = localStorage.getItem("lifelink_user_role") === "Admin";
+          const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+          const currentClinic = getClinicFromEmail(loggedEmail);
+          
+          let filtered = data;
+          if (!isAdmin && currentClinic) {
+            filtered = data.filter((ap: any) => (ap.clinic || ap.hospital || '').toLowerCase() === currentClinic.toLowerCase());
+          }
+          setAppointments(filtered);
         }
       })
       .catch(err => console.error("Failed to fetch appointments for analytics", err))

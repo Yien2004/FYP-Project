@@ -26,8 +26,8 @@ export default function ReportsSection() {
   const [activeReportSubTab, setActiveReportSubTab] = useState<'monitoring' | 'facility' | 'archive'>('monitoring');
 
   // State managers to let admins modify clinicians and logs live
-  const [clinicians, setClinicians] = useState<Clinician[]>(mockClinicians);
-  const [logs, setLogs] = useState<SystemLog[]>(mockSystemLogs);
+  const [clinicians, setClinicians] = useState<Clinician[]>([]);
+  const [logs, setLogs] = useState<SystemLog[]>([]);
   const [logFilter, setLogFilter] = useState<'ALL' | 'INFO' | 'WARNING' | 'CRITICAL'>('ALL');
   const [logSearch, setLogSearch] = useState('');
 
@@ -51,9 +51,120 @@ export default function ReportsSection() {
       .catch(err => console.error("Failed to load archive patients", err));
   };
 
+  const fetchLogs = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/logs");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const mappedLogs: SystemLog[] = data.map((l: any) => {
+            const msg = l.message || '';
+            let service = 'System';
+            let event = msg;
+            if (msg.startsWith('[') && msg.includes(']:')) {
+              const idx = msg.indexOf(']:');
+              service = msg.substring(1, idx).trim();
+              event = msg.substring(idx + 2).trim();
+            }
+            
+            let formattedTime = '';
+            if (l.timestamp) {
+              const dt = new Date(l.timestamp);
+              if (!isNaN(dt.getTime())) {
+                const yyyy = dt.getFullYear();
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const hh = String(dt.getHours()).padStart(2, '0');
+                const min = String(dt.getMinutes()).padStart(2, '0');
+                const ss = String(dt.getSeconds()).padStart(2, '0');
+                formattedTime = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+              } else {
+                formattedTime = l.timestamp;
+              }
+            } else {
+              formattedTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            }
+
+            const isWarn = l.level === 'warning';
+            const isCrit = l.level === 'critical';
+            const isSucc = l.level === 'success';
+            const lvl: 'INFO' | 'WARNING' | 'CRITICAL' | 'SUCCESS' = isCrit 
+              ? 'CRITICAL' 
+              : isWarn 
+                ? 'WARNING' 
+                : isSucc 
+                  ? 'SUCCESS' 
+                  : 'INFO';
+
+            return {
+              id: l.id ? String(l.id) : `log_${Date.now()}_${Math.random()}`,
+              timestamp: formattedTime,
+              level: lvl,
+              service,
+              event,
+              execTime: `${Math.floor(Math.random() * 45) + 5}ms`
+            };
+          });
+          setLogs(mappedLogs);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch logs", err);
+    }
+  }, []);
+
+  const fetchClinicians = React.useCallback(async () => {
+    try {
+      const [usersRes, appointmentsRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/appointments")
+      ]);
+      if (usersRes.ok && appointmentsRes.ok) {
+        const users = await usersRes.json();
+        const appointments = await appointmentsRes.json();
+
+        if (Array.isArray(users) && Array.isArray(appointments)) {
+          const staffUsers = users.filter((u: any) => u.role === 'Doctor' || u.role === 'Nurse');
+          
+          const mappedClinicians: Clinician[] = staffUsers.map((u: any) => {
+            const activeAppointments = appointments.filter((apt: any) => {
+              const isAssigned = (apt.doctorName === u.fullName || apt.doctorId === u.id);
+              const isSameHospital = !u.hospital || !apt.clinic || apt.clinic === u.hospital;
+              const isActive = apt.status !== 'Completed' && apt.status !== 'Done';
+              return isAssigned && isSameHospital && isActive;
+            });
+
+            return {
+              id: u.id,
+              name: u.fullName,
+              role: u.role,
+              department: u.hospital || 'General Ward',
+              status: 'Active',
+              patientsActive: activeAppointments.length
+            };
+          });
+
+          setClinicians(prev => {
+            const statusMap = new Map<string, 'Active' | 'On Call' | 'Off Duty'>();
+            prev.forEach(c => statusMap.set(c.id, c.status));
+            
+            return mappedClinicians.map(c => ({
+              ...c,
+              status: statusMap.has(c.id) ? statusMap.get(c.id)! : c.status
+            }));
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch clinicians schedule", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchArchivePatients();
-  }, []);
+    fetchLogs();
+    fetchClinicians();
+  }, [fetchLogs, fetchClinicians]);
 
   const loadArchiveDetail = async (email: string) => {
     setSelectedArchiveEmail(email);
@@ -105,30 +216,39 @@ export default function ReportsSection() {
   };
 
   const handleDownloadAttachment = (att: any) => {
-    const ocrStream = 
-      `PenangHealth SECURE OCR RETRIEVAL REPORT\n` +
-      `==================================================\n` +
-      `File Name:     ${att.name}\n` +
-      `File Size:     ${att.size}\n` +
-      `Uploaded:      ${att.uploadedAt}\n` +
-      `Patient ID:    ${archiveProfile?.email}\n` +
-      `==================================================\n\n` +
-      `Simulated OCR Text Stream Extract:\n` +
-      `----------------------------------\n` +
-      `[OCR Stream Start]\n` +
-      `Patient Name: ${archiveProfile?.fullName}\n` +
-      `MyKad/ID: ${archiveProfile?.myKadOrPassport}\n` +
-      `Lab / Document Type: ${att.type.toUpperCase()}\n` +
-      `Notes: Diagnostic scan verified. Blood markers and radiological plates archived in primary clinical vault.\n` +
-      `[OCR Stream End]\n`;
+    if (att.data && att.data.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = att.data;
+      link.download = att.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const ocrStream = 
+        `PenangHealth SECURE OCR RETRIEVAL REPORT\n` +
+        `==================================================\n` +
+        `File Name:     ${att.name}\n` +
+        `File Size:     ${att.size}\n` +
+        `Uploaded:      ${att.uploadedAt}\n` +
+        `Patient ID:    ${archiveProfile?.email}\n` +
+        `==================================================\n\n` +
+        `Simulated OCR Text Stream Extract:\n` +
+        `----------------------------------\n` +
+        `[OCR Stream Start]\n` +
+        `Patient Name: ${archiveProfile?.fullName}\n` +
+        `MyKad/ID: ${archiveProfile?.myKadOrPassport}\n` +
+        `Lab / Document Type: ${att.type.toUpperCase()}\n` +
+        `Notes: Diagnostic scan verified. Blood markers and radiological plates archived in primary clinical vault.\n` +
+        `[OCR Stream End]\n`;
 
-    const element = document.createElement("a");
-    const file = new Blob([ocrStream], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `ocr_report_${att.name.replace(/\s+/g, '_')}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+      const element = document.createElement("a");
+      const file = new Blob([ocrStream], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = `ocr_report_${att.name.replace(/\s+/g, '_')}.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
   };
 
   // Toggle clinician availability status
@@ -147,7 +267,7 @@ export default function ReportsSection() {
   };
 
   // Add system dummy log
-  const handleTriggerSimulatedLog = () => {
+  const handleTriggerSimulatedLog = async () => {
     const randomServices = ['HL7-Parser', 'API-Gateway', 'DMR-Central', 'AuthSvc', 'DrizzleORM'];
     const randomEvents = [
       'Database connection pool recycle triggered.',
@@ -158,16 +278,23 @@ export default function ReportsSection() {
     ];
     const levels: ('INFO' | 'WARNING' | 'CRITICAL' | 'SUCCESS')[] = ['INFO', 'SUCCESS', 'WARNING', 'CRITICAL'];
     
-    const newLog: SystemLog = {
-      id: `log_sim_${Date.now()}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      level: levels[Math.floor(Math.random() * levels.length)],
-      service: randomServices[Math.floor(Math.random() * randomServices.length)],
-      event: randomEvents[Math.floor(Math.random() * randomEvents.length)],
-      execTime: `${Math.floor(Math.random() * 45) + 5}ms`
-    };
-
-    setLogs(prev => [newLog, ...prev]);
+    const level = levels[Math.floor(Math.random() * levels.length)];
+    const service = randomServices[Math.floor(Math.random() * randomServices.length)];
+    const event = randomEvents[Math.floor(Math.random() * randomEvents.length)];
+    const message = `[${service}]: ${event}`;
+    
+    try {
+      const res = await fetch("/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, level: level.toLowerCase() })
+      });
+      if (res.ok) {
+        fetchLogs();
+      }
+    } catch (err) {
+      console.error("Failed to add simulated log", err);
+    }
   };
 
   const filteredLogs = logs.filter(log => {

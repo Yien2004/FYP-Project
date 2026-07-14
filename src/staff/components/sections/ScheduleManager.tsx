@@ -29,6 +29,29 @@ interface ScheduleData {
   breaks: string[];
 }
 
+function getClinicFromEmail(email: string): string {
+  const cached = localStorage.getItem("lifelink_user_clinic");
+  if (cached) return cached;
+
+  const emailLower = (email || '').toLowerCase().trim();
+  if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
+  if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
+  if (emailLower.includes('kkjalanperak')) return 'Klinik Kesihatan Jalan Perak';
+  if (emailLower.includes('kkbayanbaru')) return 'Klinik Kesihatan Bayan Baru';
+  if (emailLower.includes('hospitalbukitmertajam')) return 'Hospital Bukit Mertajam';
+  if (emailLower.includes('pantaihospital')) return 'Pantai Hospital Penang';
+  if (emailLower.includes('lamwahee')) return 'Hospital Lam Wah Ee';
+  if (emailLower.includes('gleneagleshospital')) return 'Gleneagles Hospital Penang';
+  if (emailLower.includes('islandhospital')) return 'Island Hospital';
+  if (emailLower.includes('o2klinik')) return 'O2 Klinik';
+  if (emailLower.includes('kliniksingapore')) return 'Klinik Singapore';
+  if (emailLower.includes('poliklinikperdana')) return 'Poliklinik Perdana';
+  if (emailLower.includes('penangadventisthospital')) return 'Penang Adventist Hospital';
+  if (emailLower.includes('lohguanlye')) return 'Loh Guan Lye Specialists Centre';
+  if (emailLower.includes('kpjpenang')) return 'KPJ Penang Specialist Hospital';
+  return '';
+}
+
 interface ScheduleManagerProps {
   doctorName: string;
 }
@@ -55,6 +78,8 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+
 
   // Load schedule from server
   useEffect(() => {
@@ -478,7 +503,7 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
             </div>
           </div>
 
-        </div>
+          </div>
 
       </div>
 

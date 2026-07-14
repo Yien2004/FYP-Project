@@ -14,7 +14,8 @@ import {
   TrendingUp,
   ShieldAlert,
   Megaphone,
-  Send
+  Send,
+  X
 } from 'lucide-react';
 import { PortalType, StaffTab, AdminTab } from '../types';
 
@@ -32,6 +33,8 @@ interface SidebarProps {
   userName?: string;
   onLogout?: () => void;
   language?: string;
+  mobileMenuOpen?: boolean;
+  onCloseMobileMenu?: () => void;
 }
 
 const translations: Record<string, Record<string, string>> = {
@@ -123,6 +126,8 @@ export default function Sidebar({
   userName = 'Staff Member',
   onLogout,
   language = 'English',
+  mobileMenuOpen = false,
+  onCloseMobileMenu,
 }: SidebarProps) {
   const t = (key: string) => {
     return translations[language]?.[key] || key;
@@ -153,139 +158,167 @@ export default function Sidebar({
   ];
 
   return (
-    <div className="w-72 bg-slate-100 border-r border-slate-200 text-slate-900 flex flex-col h-full shrink-0 select-none font-sans justify-between">
-      {/* Brand Section */}
-      <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shadow-md shadow-teal-500/30 shrink-0">
-              <Activity className="w-4.5 h-4.5 text-white" />
-            </div>
-            <div>
-              <span className="font-extrabold text-slate-900 text-md tracking-tight block">
-                Penang<span className="text-teal-600">Health</span>
-              </span>
-              <span className="text-[9px] text-teal-655 font-mono tracking-widest uppercase font-bold block leading-none mt-0.5">MOH MALAYSIA</span>
-            </div>
-          </div>
-        </div>
+    <>
+      {/* Mobile Sidebar Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={onCloseMobileMenu}
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 lg:hidden transition-opacity"
+        />
+      )}
 
-        {/* Portal Switcher Tabs */}
-        {!hidePortalSwitcher && (
-          <div className="px-5 pt-5 pb-3">
-            <div className="bg-white p-1 rounded-xl flex gap-1 border border-slate-200 shadow-sm">
-              <button
-                id="sidebar-portal-toggle-staff"
-                onClick={() => {
-                  setPortal('staff');
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
-                  portal === 'staff' 
-                    ? 'bg-teal-600 text-white shadow-sm shadow-teal-500/20' 
-                    : 'text-slate-650 hover:text-slate-900 hover:bg-slate-100'
-                }`}
+      <div className={`w-72 bg-slate-100 border-r border-slate-200 text-slate-900 flex flex-col h-full shrink-0 select-none font-sans justify-between
+        fixed lg:static inset-y-0 left-0 z-50 transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`
+      }>
+        {/* Brand Section */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
+          <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shadow-md shadow-teal-500/30 shrink-0">
+                <Activity className="w-4.5 h-4.5 text-white" />
+              </div>
+              <div>
+                <span className="font-extrabold text-slate-900 text-md tracking-tight block">
+                  Penang<span className="text-teal-600">Health</span>
+                </span>
+                <span className="text-[9px] text-teal-655 font-mono tracking-widest uppercase font-bold block leading-none mt-0.5">MOH MALAYSIA</span>
+              </div>
+            </div>
+            {onCloseMobileMenu && (
+              <button 
+                onClick={onCloseMobileMenu}
+                className="block lg:hidden p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-550 hover:text-neutral-800 transition cursor-pointer"
+                title="Close Menu"
               >
-                <Users className="w-3.5 h-3.5" />
-                Clinical Staff
+                <X className="w-5 h-5" />
               </button>
-              <button
-                id="sidebar-portal-toggle-admin"
-                onClick={() => {
-                  setPortal('admin');
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
-                  portal === 'admin' 
-                    ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' 
-                    : 'text-slate-655 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Sys Admin
-              </button>
-            </div>
+            )}
           </div>
-        )}
-
-        {/* Doctor Summary Card (consistent with Patient portal, no avatar) */}
-        <div className="px-5 pt-4 pb-2">
-          <div className="bg-white border border-slate-205 p-3.5 rounded-2xl flex items-center gap-3 shadow-sm">
-            <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold text-xs shrink-0 select-none">
-              {userName ? userName.replace("Dr. ", "")[0] : "D"}
-            </div>
-            <div className="overflow-hidden">
-              <span className="font-extrabold text-slate-900 text-xs block leading-tight truncate">
-                {userName || "Staff Member"}
-              </span>
-              <span className="text-[9px] text-teal-655 block font-mono mt-0.5 font-bold uppercase tracking-wider">
-                {portal === 'admin' ? 'System Administrator' : 'Pantai Hospital Staff'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Menu */}
-        <div className="px-3 py-4 flex flex-col gap-1.5" id="sidebar-nav-menu">
-          <p className="px-3 text-[10px] font-bold text-neutral-550 tracking-wider uppercase mb-2">
-            {portal === 'staff' ? t('Clinical Workspace') : t('Core Infrastructure')}
-          </p>
-
-          {portal === 'staff' ? (
-            staffMenu.map((item) => {
-              const IconComp = item.icon;
-              const isActive = staffTab === item.id;
-              return (
+  
+          {/* Portal Switcher Tabs */}
+          {!hidePortalSwitcher && (
+            <div className="px-5 pt-5 pb-3">
+              <div className="bg-white p-1 rounded-xl flex gap-1 border border-slate-200 shadow-sm">
                 <button
-                  key={item.id}
-                  id={`sidebar-tab-staff-${item.id}`}
-                  onClick={() => setStaffTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-teal-50 text-teal-600 border-l-[3px] border-teal-500 pl-[11px]'
-                      : 'text-slate-605 hover:text-slate-900 hover:bg-slate-100'
+                  id="sidebar-portal-toggle-staff"
+                  onClick={() => {
+                    setPortal('staff');
+                    onCloseMobileMenu?.();
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
+                    portal === 'staff' 
+                      ? 'bg-teal-600 text-white shadow-sm shadow-teal-500/20' 
+                      : 'text-slate-655 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <IconComp className={`w-4 h-4 ${isActive ? 'text-teal-400' : 'text-neutral-450'}`} />
-                    <span>{t(item.label)}</span>
-                  </div>
-                  {item.count && item.count > 0 ? (
-                    <span className="bg-teal-500/20 text-teal-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-500/30">
-                      {item.count}
-                    </span>
-                  ) : null}
+                  <Users className="w-3.5 h-3.5" />
+                  Clinical Staff
                 </button>
-              );
-            })
-          ) : (
-            adminMenu.map((item) => {
-              const IconComp = item.icon;
-              const isActive = adminTab === item.id;
-              return (
                 <button
-                  key={item.id}
-                  id={`sidebar-tab-admin-${item.id}`}
-                  onClick={() => setAdminTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-sky-50 text-sky-600 border-l-[3px] border-sky-500 pl-[11px]'
-                      : 'text-slate-605 hover:text-slate-900 hover:bg-slate-100'
+                  id="sidebar-portal-toggle-admin"
+                  onClick={() => {
+                    setPortal('admin');
+                    onCloseMobileMenu?.();
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
+                    portal === 'admin' 
+                      ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' 
+                      : 'text-slate-655 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <IconComp className={`w-4 h-4 ${isActive ? 'text-sky-400' : 'text-neutral-450'}`} />
-                    <span>{t(item.label)}</span>
-                  </div>
-                  {item.count && item.count > 0 ? (
-                    <span className="bg-sky-500/20 text-sky-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-500/30">
-                      {item.count}
-                    </span>
-                  ) : null}
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Sys Admin
                 </button>
-              );
-            })
+              </div>
+            </div>
           )}
+  
+          {/* Doctor Summary Card */}
+          <div className="px-5 pt-4 pb-2">
+            <div className="bg-white border border-slate-205 p-3.5 rounded-2xl flex items-center gap-3 shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold text-xs shrink-0 select-none">
+                {userName ? userName.replace("Dr. ", "")[0] : "D"}
+              </div>
+              <div className="overflow-hidden">
+                <span className="font-extrabold text-slate-900 text-xs block leading-tight truncate">
+                  {userName || "Staff Member"}
+                </span>
+                <span className="text-[9px] text-teal-655 block font-mono mt-0.5 font-bold uppercase tracking-wider">
+                  {portal === 'admin' ? 'System Administrator' : 'Pantai Hospital Staff'}
+                </span>
+              </div>
+            </div>
+          </div>
+  
+          {/* Navigation Menu */}
+          <div className="px-3 py-4 flex flex-col gap-1.5" id="sidebar-nav-menu">
+            <p className="px-3 text-[10px] font-bold text-neutral-550 tracking-wider uppercase mb-2">
+              {portal === 'staff' ? t('Clinical Workspace') : t('Core Infrastructure')}
+            </p>
+  
+            {portal === 'staff' ? (
+              staffMenu.map((item) => {
+                const IconComp = item.icon;
+                const isActive = staffTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    id={`sidebar-tab-staff-${item.id}`}
+                    onClick={() => {
+                      setStaffTab(item.id);
+                      onCloseMobileMenu?.();
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm font-medium transition-all ${
+                      isActive
+                        ? 'bg-teal-50 text-teal-600 border-l-[3px] border-teal-500 pl-[11px]'
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <IconComp className={`w-4 h-4 ${isActive ? 'text-teal-400' : 'text-neutral-450'}`} />
+                      <span>{t(item.label)}</span>
+                    </div>
+                    {item.count && item.count > 0 ? (
+                      <span className="bg-teal-500/20 text-teal-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-500/30">
+                        {item.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })
+            ) : (
+              adminMenu.map((item) => {
+                const IconComp = item.icon;
+                const isActive = adminTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    id={`sidebar-tab-admin-${item.id}`}
+                    onClick={() => {
+                      setAdminTab(item.id);
+                      onCloseMobileMenu?.();
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm font-medium transition-all ${
+                      isActive
+                        ? 'bg-sky-50 text-sky-600 border-l-[3px] border-sky-500 pl-[11px]'
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <IconComp className={`w-4 h-4 ${isActive ? 'text-sky-400' : 'text-neutral-450'}`} />
+                      <span>{t(item.label)}</span>
+                    </div>
+                    {item.count && item.count > 0 ? (
+                      <span className="bg-sky-500/20 text-sky-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-500/30">
+                        {item.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
 
       {/* User / Footer Section */}
       <div className="p-4 border-t border-slate-200 flex flex-col gap-3 bg-white">
@@ -310,5 +343,6 @@ export default function Sidebar({
         </div>
       </div>
     </div>
+  </>
   );
 }
