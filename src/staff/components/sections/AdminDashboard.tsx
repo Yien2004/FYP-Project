@@ -482,24 +482,27 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* Recent System Activities Terminal */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-xl text-neutral-300">
-        <div className="border-b border-neutral-800 pb-4 mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-neutral-800 rounded-lg border border-neutral-700">
-              <Terminal className="w-4 h-4 text-amber-400" />
+      {/* Recent System Activities Terminal (Clean White Card Theme) */}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs text-neutral-700">
+        <div className="border-b border-neutral-100 pb-4 mb-5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-sky-50 rounded-xl border border-sky-100 text-sky-600">
+              <Terminal className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-white font-mono">System Audit Logger Engine</h3>
-              <p className="text-[10px] text-neutral-500 font-sans">Edge router security telemetry feeds.</p>
+              <h3 className="font-bold text-sm text-neutral-900 font-sans">System Audit Logger Engine</h3>
+              <p className="text-[10px] text-neutral-400 font-sans">Edge router security telemetry feeds.</p>
             </div>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded-md border border-neutral-800 text-neutral-500 font-mono">ONLINE</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 font-mono font-bold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            ONLINE
+          </span>
         </div>
 
-        <div className="font-mono text-xs divide-y divide-neutral-800/60 leading-relaxed max-h-60 overflow-y-auto space-y-2">
+        <div className="font-mono text-xs divide-y divide-neutral-100 leading-relaxed max-h-60 overflow-y-auto space-y-2">
           {systemLogs.length === 0 ? (
-            <div className="py-4 text-center text-neutral-500 font-mono">
+            <div className="py-4 text-center text-neutral-400 font-mono">
               No recent audit feeds logged.
             </div>
           ) : (
@@ -507,23 +510,23 @@ export default function AdminDashboard() {
               const isWarn = log.level === 'WARNING' || log.level === 'warning';
               const isCrit = log.level === 'CRITICAL' || log.level === 'error';
               const badgeCol = isCrit 
-                ? 'bg-red-955 text-red-400 border-red-900/40' 
+                ? 'bg-red-50 text-red-700 border-red-200' 
                 : isWarn 
-                  ? 'bg-amber-955 text-amber-400 border-amber-900/40' 
-                  : 'bg-neutral-800 text-neutral-400 border-neutral-700/60';
+                  ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                  : 'bg-sky-50 text-sky-700 border-sky-100';
               
               const service = log.service || 'SystemAPI';
               const execTime = log.execTime || '20ms';
 
               return (
                 <div key={log.id || idx} className="pt-2 flex items-start gap-4">
-                  <span className="text-[10px] text-neutral-500 shrink-0 select-none">[{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'N/A'}]</span>
+                  <span className="text-[10px] text-neutral-400 shrink-0 select-none">[{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'N/A'}]</span>
                   <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border ${badgeCol} shrink-0`}>
                     {log.level || 'INFO'}
                   </span>
-                  <span className="text-[11px] text-white font-semibold shrink-0">[{service}]</span>
-                  <p className="text-neutral-300 text-[11px] flex-1 leading-snug">{log.message}</p>
-                  <span className="text-[10px] text-neutral-500 font-mono shrink-0 select-none">rt={execTime}</span>
+                  <span className="text-[11px] text-neutral-900 font-semibold shrink-0">[{service}]</span>
+                  <p className="text-neutral-700 text-[11px] flex-1 leading-snug">{log.message}</p>
+                  <span className="text-[10px] text-neutral-400 font-mono shrink-0 select-none">rt={execTime}</span>
                 </div>
               );
             })

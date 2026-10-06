@@ -50,9 +50,6 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
   const [presenceOverrides, setPresenceOverrides] = useState<{ [key: string]: boolean }>({});
   const [roomAssignments, setRoomAssignments] = useState<{ [key: string]: string }>({});
 
-  const [replies, setReplies] = useState<{ [key: string]: string }>({});
-  const [repliedAlarms, setRepliedAlarms] = useState<{ [key: string]: string }>({});
-
   const [activeCallText, setActiveCallText] = useState<string | null>(null);
 
   // Fetch appointments and logs on load, poll every 5 seconds
@@ -213,65 +210,6 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
     setRoomAssignments(prev => ({ ...prev, [id]: room }));
   };
 
-  const handleMessageSend = (id: string, text: string) => {
-    if (!text.trim()) return;
-    setRepliedAlarms(prev => ({ ...prev, [id]: text }));
-    setReplies(prev => ({ ...prev, [id]: '' }));
-
-    // Log response action to backend
-    fetch("/api/logs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: `Triage Desk Action: Replied to alarm [${id}]: "${text}"`,
-        level: "info"
-      })
-    }).catch(err => console.warn("Failed to log reply action", err));
-  };
-
-  // Map dynamic vital/clinical alarms from real system logs
-  const dynamicAlarms = useMemo(() => {
-    const alarmLogs = logs.filter(log => {
-      const msg = (log.message || "").toLowerCase();
-      return log.level === "error" || log.level === "warn" || msg.includes("critical") || msg.includes("alarm") || msg.includes("alert");
-    });
-    
-    return alarmLogs.map((log, idx) => {
-      const msgText = log.message || "";
-      let sender = "Clinical Telemetry System";
-      let role = "Automated Alert Monitor";
-      let team = "Vitals Triage";
-      let text = msgText;
-      let urgent = true;
-      
-      if (msgText.includes("CRITICAL ALARM: ")) {
-        text = msgText.replace("CRITICAL ALARM: ", "");
-        sender = "Central Vitals Monitor";
-      } else if (msgText.includes("Queue Ticket Check-in:")) {
-        sender = "Reception Counter";
-        role = "Lobby Desk Monitor";
-        team = "Reception";
-        urgent = false;
-      }
-      
-      const alarmId = log.id || `alarm-${idx}`;
-
-      return {
-        id: alarmId,
-        sender,
-        team,
-        role,
-        text,
-        urgent,
-        replied: !!repliedAlarms[alarmId],
-        replyText: repliedAlarms[alarmId] || '',
-        timestamp: log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Just Now'
-      };
-    });
-  }, [logs, repliedAlarms]);
-
-  const messages = dynamicAlarms;
-
   // Filter appointments for timeline (strictly today's appointments)
   const timelineAppointments = useMemo(() => {
     const sorted = appointments
@@ -293,17 +231,17 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
   const stats = useMemo(() => {
     const totalToday = queueList.length;
     const checkedInCount = queueList.filter(q => isPatientCheckedIn(q.patientName, q.id)).length;
-    const criticalCount = dynamicAlarms.filter(a => a.urgent && !a.replied).length;
+    const completedCount = queueList.filter(q => q.status === 'Completed').length;
     const waitingCount = queueList.filter(q => isPatientCheckedIn(q.patientName, q.id) && q.status !== 'Completed').length;
     const avgWaitTime = waitingCount > 0 ? `${waitingCount * 12}m` : '0m';
 
     return [
-      { label: 'Today Arrivals', value: `${totalToday}`, change: 'Appointments scheduled', icon: Users, color: 'text-teal-600 bg-teal-50 border-teal-100' },
+      { label: 'Today Arrivals', value: `${totalToday}`, change: 'Appointments scheduled', icon: Users, color: 'text-sky-600 bg-sky-50 border-sky-100' },
       { label: 'Confirmed Present', value: `${checkedInCount}`, change: 'Waiting in lobby', icon: DoorOpen, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-      { label: 'Critical Alarms', value: `${criticalCount}`, change: 'Requires review', icon: Zap, color: 'text-red-500 bg-red-50 border-red-100' },
-      { label: 'Lobby Wait-Time', value: avgWaitTime, change: 'Current average', icon: Clock, color: 'text-sky-600 bg-sky-50 border-sky-100' },
+      { label: 'Completed Consults', value: `${completedCount}`, change: 'Finished today', icon: CheckCircle2, color: 'text-blue-600 bg-blue-50 border-blue-100' },
+      { label: 'Lobby Wait-Time', value: avgWaitTime, change: 'Current average', icon: Clock, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
     ];
-  }, [queueList, logs, presenceOverrides, dynamicAlarms]);
+  }, [queueList, logs, presenceOverrides]);
 
   return (
     <div className="space-y-6 text-neutral-800">
@@ -343,22 +281,19 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
         })}
       </div>
 
-      {/* Main Grid: Queue & Lobby on left, Triage alarms on right */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: Lobby Queue & Checked-in Status */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Content: Lobby Queue & Operational Sequence */}
+      <div className="space-y-6">
           
-          {/* Primary Queue Board */}
-          <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-100 pb-4 mb-5 gap-3">
-              <div>
-                <h3 className="font-extrabold text-base text-neutral-900 tracking-tight">Lobby Queue Dashboard</h3>
-                <p className="text-xs text-neutral-500 mt-0.5 font-sans">Monitor patient portal check-in actions, assign rooms, and call tickets.</p>
-              </div>
-              <span className="text-[10px] font-extrabold text-teal-700 bg-teal-50 border border-teal-100 px-3 py-1 rounded-full uppercase tracking-widest">
-                Active Board
-              </span>
+        {/* Primary Queue Board */}
+        <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-100 pb-4 mb-5 gap-3">
+            <div>
+              <h3 className="font-extrabold text-base text-neutral-900 tracking-tight">Lobby Queue Dashboard</h3>
+              <p className="text-xs text-neutral-500 mt-0.5 font-sans">Monitor patient portal check-in actions, assign rooms, and call tickets.</p>
+            </div>
+            <span className="text-[10px] font-extrabold text-sky-700 bg-sky-50 border border-sky-100 px-3 py-1 rounded-full uppercase tracking-widest">
+              Active Board
+            </span>
             </div>
 
             <div className="overflow-x-auto">
@@ -522,85 +457,8 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
                   );
                 })
               )}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Right Column: Healthcare Alarms */}
-        <div className="space-y-6">
-          <div className="bg-neutral-900 text-neutral-100 rounded-2xl p-6 border border-neutral-800 shadow-xl relative overflow-hidden">
-            <div className="absolute right-0 top-0 opacity-10 translate-x-4 -translate-y-4">
-              <span className="text-red-500"><BellRing className="w-48 h-48 animate-pulse" /></span>
-            </div>
-
-            <div className="flex items-center gap-2.5 mb-5 border-b border-neutral-850 pb-4">
-              <div className="bg-red-500/10 p-2 rounded-xl text-red-400 border border-red-500/20 shrink-0">
-                <AlertTriangle className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-sm tracking-tight text-white">Healthcare Alarms Central</h3>
-                <p className="text-[10px] text-neutral-400 mt-0.5">Urgent hospital/lab communications triage desk.</p>
-              </div>
-            </div>
-
-            {/* Direct message feed */}
-            <div className="space-y-5 relative z-10">
-              {messages.map((message) => (
-                <div key={message.id} className="bg-neutral-800/60 p-4 rounded-xl border border-neutral-700/50 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold text-xs text-white flex items-center gap-2">
-                        {message.sender}
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                      </h4>
-                      <p className="text-[9px] text-neutral-400 uppercase font-mono tracking-wider">{message.role} • {message.team}</p>
-                    </div>
-                    {message.urgent && (
-                      <span className="text-[9px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full uppercase font-mono tracking-wide">
-                        Critical
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-neutral-300 leading-relaxed font-sans">{message.text}</p>
-
-                  {/* If already replied */}
-                  {message.replied ? (
-                    <div className="bg-neutral-900 border border-dashed border-neutral-700 rounded-lg p-2.5 text-[11px] text-neutral-300 space-y-1">
-                      <p className="font-bold text-neutral-400 uppercase tracking-widest text-[8px]">Replying from Triage Desk:</p>
-                      <p className="italic">"{message.replyText}"</p>
-                    </div>
-                  ) : (
-                    <div className="flex gap-1.5 pt-1">
-                      <input
-                        type="text"
-                        placeholder="Type urgent instructions..."
-                        id={`it-reply-input-${message.id}`}
-                        value={replies[message.id] || ''}
-                        onChange={(e) => setReplies({ ...replies, [message.id]: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleMessageSend(message.id, replies[message.id] || '');
-                          }
-                        }}
-                        className="bg-neutral-900 border border-neutral-750 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 flex-1 placeholder:text-neutral-500"
-                      />
-                      <button
-                        onClick={() => handleMessageSend(message.id, replies[message.id] || '')}
-                        id={`it-reply-btn-${message.id}`}
-                        className="p-2 rounded-lg bg-red-650 hover:bg-red-650 text-white transition-colors cursor-pointer"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -77,7 +77,10 @@ export interface Appointment {
   clinicalNotes?: string;
   prescription?: string;
   checkedIn?: boolean;
+  checkInTime?: string;
+  queueNumber?: string;
   shareHistory?: boolean;
+  syncCrossFacilityRecords?: boolean;
   requestRide?: boolean;
 }
 
@@ -109,7 +112,7 @@ export interface AppNotification {
   title: string;
   body: string;
   time: string;
-  category: 'alert' | 'medication' | 'lab' | 'general';
+  category: 'alert' | 'medication' | 'lab' | 'general' | 'reminder';
   read: boolean;
 }
 

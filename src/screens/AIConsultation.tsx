@@ -38,13 +38,13 @@ interface AIConsultationProps {
 export default function AIConsultation({ patientProfile, vitals, onSetScreen, onInjectDoctorMessage }: AIConsultationProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: "init-carey",
+      id: "init-health-assistant",
       role: "model",
-      text: `Hello ${patientProfile.fullName.split(" ")[0]}! I am **Carey**, your CarePoint AI Health Assistant. 
+      text: `Hello ${patientProfile.fullName.split(" ")[0]}! I am your **Health Assistant**. 
 
-I can help you audit symptoms, understand biological vitals trends, and evaluate physical diagnostics. 
+I can help you review symptoms, understand vital telemetry trends, and prepare for your specialist appointment. 
 
-What symptoms or health queries are on your mind today?`,
+What symptoms or health questions would you like to discuss today?`,
       timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     }
   ]);
@@ -112,7 +112,7 @@ What symptoms or health queries are on your mind today?`,
       }
 
       if (!response.ok) {
-        throw new Error("Local server experienced response latency. Carey is currently in simulated diagnostic mode.");
+        throw new Error("Local server experienced response latency. Health Assistant is currently in simulated diagnostic mode.");
       }
 
       const data = await response.json();
@@ -127,7 +127,7 @@ What symptoms or health queries are on your mind today?`,
       setMessages(prev => [...prev, modelMsg]);
 
     } catch (err: any) {
-      console.warn("API Consultation Error, using simulated Carey guidance: ", err);
+      console.warn("API Consultation Error, using simulated Health Assistant guidance: ", err);
       
       let triageData: any = undefined;
       try {
@@ -156,7 +156,7 @@ What symptoms or health queries are on your mind today?`,
 
 1. **Information Found**: Standard symptom check indicates a mild reaction or localized fatigue. Maintain hydration and keep monitoring.
 2. **Allergen Alert Check**: Avoid penicillin or derivatives, matching your declared allergic record.
-3. **Important Medical Disclaimer**: I am Carey, an AI assessor. Please click the "**Escalate to Doctor**" panel options above if you experience compounding throat swelling or acute respiratory constraints.
+3. **Important Medical Disclaimer**: I am your Health Assistant. Please click the "**Escalate to Doctor**" panel options above if you experience compounding throat swelling or acute respiratory constraints.
 
 Would you like me to map nearby physical pharmacies or connect you directly with Dr. Mitchell?`,
           timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
@@ -170,17 +170,17 @@ Would you like me to map nearby physical pharmacies or connect you directly with
   };
 
   const handleEscalateDoctor = () => {
-    // Generate a beautiful context history package
-    const chatTranscript = messages.map(m => `${m.role === 'user' ? 'Patient' : 'Carey'}: ${m.text}`).join("\n");
-    const doctorPayload = `Hello Ahmad! I am your CarePoint Facility Duty Triage Nurse.
-I have reviewed your Carey AI Consultation transcript regarding:
+    // Generate a context history package
+    const chatTranscript = messages.map(m => `${m.role === 'user' ? 'Patient' : 'Health Assistant'}: ${m.text}`).join("\n");
+    const doctorPayload = `Hello ${patientProfile.fullName.split(" ")[0]}! I am your PenangHealth Clinical Nurse.
+I have reviewed your consultation notes regarding:
 
 "${messages[messages.length - 2]?.text || 'symptom checklist'}"
 
-I noticed your respiratory remarks. I have logged these symptoms and flagged your patient chart for review by the duty doctor. Please stand by here for check-in advice, or let us know if you need to reschedule your timing.`;
+I noticed your health remarks. I have logged these symptoms and flagged your patient chart for review by the duty doctor. Please stand by here for check-in advice, or let us know if you need to reschedule your timing.`;
 
     onInjectDoctorMessage(doctorPayload);
-    alert("DISPATCHED: Carey AI has safely compiled your consultation ledger and securely transmitted it to your clinic support triage desk. Transferring you to active communications now...");
+    alert("DISPATCHED: Your consultation summary has been transmitted to your clinic triage desk. Transferring you to active communications now...");
     onSetScreen("communication");
   };
 
@@ -191,33 +191,33 @@ I noticed your respiratory remarks. I have logged these symptoms and flagged you
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight flex items-center gap-2">
-            Carey AI Assistant & Symptom Assessor <Sparkles className="w-6 h-6 text-teal-600 animate-pulse fill-teal-50" />
+            Health Assistant <Sparkles className="w-6 h-6 text-sky-600 animate-pulse fill-sky-50" />
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Grounded by electronic healthcare databases to diagnose mild outpatient symptoms over state-of-the-art server-side Gemini.
+            Review mild outpatient symptoms, understand vitals, and connect with clinical care teams.
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
         
-        {/* Left Part: Carey Chat Conversation Window */}
+        {/* Left Part: Health Assistant Chat Conversation Window */}
         <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl flex flex-col justify-between h-[550px] shadow-sm relative overflow-hidden">
           
           {/* Header banner stats */}
-          <div className="bg-slate-50 border-b border-slate-100 p-4 flex items-center justify-between z-10 shrink-0">
+          <div className="bg-slate-50 border-b border-slate-150 p-4 flex items-center justify-between z-10 shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-teal-600 text-white rounded-xl flex items-center justify-center shadow-md">
-                <Bot className="w-5 h-5 fill-teal-50" />
+              <div className="w-9 h-9 bg-sky-600 text-white rounded-xl flex items-center justify-center shadow-xs">
+                <Bot className="w-5 h-5 fill-sky-50" />
               </div>
               <div>
-                <span className="font-extrabold text-xs text-slate-900 block font-mono">Carey Core Engine v3.5-Flash</span>
-                <span className="text-[9px] text-emerald-600 font-bold tracking-widest font-mono uppercase block">● ONLINE / SECURED PORTAL</span>
+                <span className="font-bold text-xs text-slate-900 block font-sans">Health Assistant</span>
+                <span className="text-[10px] text-emerald-600 font-bold tracking-wider uppercase block">● Online</span>
               </div>
             </div>
 
             <div className="flex gap-2">
-              <span className="text-[10px] text-slate-500 bg-slate-200 px-2 py-0.5 rounded font-bold font-mono">ENGL / BM</span>
+              <span className="text-[10px] text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded font-bold font-mono">EN / BM</span>
             </div>
           </div>
 
@@ -229,47 +229,47 @@ I noticed your respiratory remarks. I have logged these symptoms and flagged you
                 <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
                   <div className={`max-w-[85%] rounded-2xl p-4 text-xs leading-relaxed space-y-1 ${
                     isUser 
-                      ? 'bg-slate-900 text-white rounded-br-none font-mono shadow' 
-                      : 'bg-teal-50/50 border border-teal-150/40 text-slate-800 rounded-bl-none shadow-sm'
+                      ? 'bg-sky-600 text-white rounded-br-none shadow-xs' 
+                      : 'bg-sky-50/70 border border-sky-100 text-slate-800 rounded-bl-none shadow-xs'
                   }`}>
                     {/* Header author line */}
-                    <div className="flex items-center justify-between gap-6 text-[10px] pb-1 opacity-75 font-mono">
-                      <span className="font-bold">{isUser ? 'Patient Profile' : 'Carey AI Assessor'}</span>
-                      <span>{msg.timestamp}</span>
+                    <div className="flex items-center justify-between gap-6 text-[10px] pb-1 opacity-80 font-sans">
+                      <span className="font-bold">{isUser ? 'You' : 'Health Assistant'}</span>
+                      <span className="font-mono text-[9px]">{msg.timestamp}</span>
                     </div>
-                    {/* Render plain text (or simple manual markdown format checker) */}
-                    <div className="whitespace-pre-wrap select-text font-serif leading-relaxed">
+                    {/* Render message content */}
+                    <div className="whitespace-pre-wrap select-text leading-relaxed font-sans">
                       {msg.text}
                     </div>
 
                     {msg.triageData && (
-                      <div className="mt-4 pt-3 border-t border-teal-200/40 space-y-3 font-sans">
-                        <div className="flex items-center gap-1.5 text-teal-800 font-extrabold text-[11px] uppercase tracking-wider">
-                          <ShieldAlert className="w-4 h-4 text-teal-650 shrink-0" />
-                          Triage Recommendation
+                      <div className="mt-4 pt-3 border-t border-sky-200/60 space-y-3 font-sans">
+                        <div className="flex items-center gap-1.5 text-sky-800 font-bold text-[11px] uppercase tracking-wider">
+                          <ShieldAlert className="w-4 h-4 text-sky-600 shrink-0" />
+                          Recommended Specialist Category
                         </div>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
-                          Based on symptom parsing, we recommend seeking consultation with our <span className="font-bold text-teal-700 bg-teal-105/60 px-1.5 py-0.5 rounded">{msg.triageData.department}</span> specialists.
+                          Based on your symptoms, we recommend consulting our <span className="font-bold text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded">{msg.triageData.department}</span> specialists.
                         </p>
                         
                         {msg.triageData.doctors && msg.triageData.doctors.length > 0 && (
                           <div className="space-y-2">
-                            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold block">Available Specialists</span>
+                            <span className="text-[10px] uppercase font-sans tracking-wider text-slate-400 font-bold block">Available Specialists</span>
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {msg.triageData.doctors.map((doc: any) => (
-                                <div key={doc.id} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+                                <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs flex flex-col justify-between hover:border-sky-300 transition">
                                   <div>
-                                    <span className="font-extrabold text-slate-900 block text-xs leading-tight">{doc.name}</span>
+                                    <span className="font-bold text-slate-900 block text-xs leading-tight">{doc.name}</span>
                                     <span className="text-[10px] text-slate-500 block mt-0.5">{doc.specialty}</span>
-                                    <span className="text-[9px] text-slate-400 font-mono block mt-1">🏥 {doc.hospital}</span>
+                                    <span className="text-[9px] text-slate-400 font-sans block mt-1">🏥 {doc.hospital}</span>
                                   </div>
                                   
-                                  <div className="mt-2.5 pt-2 border-t border-slate-50 flex items-center justify-between gap-2">
-                                    <span className="text-[9px] text-emerald-600 font-bold font-mono">{doc.availability ? doc.availability.split(' — ')[0] : 'Mon-Fri'}</span>
+                                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                    <span className="text-[9px] text-emerald-600 font-bold">{doc.availability ? doc.availability.split(' — ')[0] : 'Mon-Fri'}</span>
                                     <button 
                                       onClick={() => onSetScreen("schedule-appointment")}
-                                      className="bg-slate-950 text-white font-bold text-[9px] py-1 px-2.5 rounded-lg transition hover:bg-slate-800 cursor-pointer"
+                                      className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-[9px] py-1 px-2.5 rounded-lg transition cursor-pointer"
                                     >
                                       Book Now
                                     </button>
@@ -288,9 +288,9 @@ I noticed your respiratory remarks. I have logged these symptoms and flagged you
 
             {isLoading && (
               <div className="flex justify-start animate-pulse">
-                <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-center gap-2 text-teal-800 text-xs">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Carey is querying clinical diagnostics and symptom checkers...</span>
+                <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 flex items-center gap-2 text-sky-800 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                  <span>Health Assistant is analyzing symptom information...</span>
                 </div>
               </div>
             )}
@@ -299,21 +299,21 @@ I noticed your respiratory remarks. I have logged these symptoms and flagged you
           </div>
 
           {/* Chat input box */}
-          <form onSubmit={handleSend} className="bg-slate-50 border-t border-slate-100 p-4.5 flex gap-2 shrink-0 z-10">
+          <form onSubmit={handleSend} className="bg-slate-50 border-t border-slate-100 p-4 flex gap-2 shrink-0 z-10">
             <input 
               id="chat-input-consult"
               type="text" 
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Query Carey AI symptoms (e.g. asthma shortness of breath checking)..."
-              className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs placeholder-slate-400 focus:outline-none focus:border-teal-500 font-medium shadow-inner"
+              placeholder="Describe symptoms (e.g. slight cough, sore throat, or mild fever)..."
+              className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs placeholder-slate-400 focus:outline-none focus:border-sky-500 font-medium shadow-inner"
               disabled={isLoading}
             />
             <button 
               id="chat-btn-send"
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="bg-teal-605 bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs p-3.5 rounded-xl transition shadow flex items-center justify-center shrink-0"
+              className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs p-3.5 rounded-xl transition shadow-xs flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -411,7 +411,7 @@ I noticed your respiratory remarks. I have logged these symptoms and flagged you
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-teal-600" />
+                  <Bot className="w-4 h-4 text-sky-600" />
                   <div>
                     <span className="text-[9px] text-slate-400 block font-mono">OXYGEN SpO2</span>
                     <span className="font-bold text-slate-800 text-xs font-mono">{vitals[0].oxygenSaturation}%</span>
@@ -419,17 +419,6 @@ I noticed your respiratory remarks. I have logged these symptoms and flagged you
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Legal Compliance and Escalate Callout */}
-          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-4.5 text-xs text-slate-650 leading-relaxed text-slate-700">
-            <div className="flex gap-2 items-start mb-2">
-              <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5 animate-bounce" />
-              <span className="font-bold text-slate-900 leading-none block">AI Diagnosis Disclaimer</span>
-            </div>
-            <p className="text-[11px] text-slate-600">
-              Carey AI delivers preliminary triage support. AI guidelines do not replace professional physician checkups. In case of emergency breathing constraints, immediately click <strong>EMERGENCY SOS DISPATCH</strong>.
-            </p>
           </div>
 
         </div>

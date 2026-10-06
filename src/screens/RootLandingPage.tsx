@@ -1,599 +1,419 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   ArrowRight,
+  Activity,
+  ShieldCheck,
+  CheckCircle,
+  Compass,
+  FileText,
+  AlertTriangle,
+  Lock,
+  Mail,
+  User,
   Building2,
   Stethoscope,
-  Heart,
-  Baby,
-  Brain,
-  Bone,
-  Shield,
-  Clock,
-  Users,
-  CalendarCheck,
-  Activity,
-  Star,
-  MapPin,
-  CheckCircle,
-  Menu,
-  X,
-  ChevronRight,
-  ChevronDown,
-  Microscope,
   Phone,
+  Menu,
+  X
 } from "lucide-react";
 
 interface RootLandingPageProps {
-  onNavigateLogin: () => void;
+  onNavigateLogin: (defaultMode?: "login" | "register") => void;
   onNavigateHospitals: (params?: string) => void;
   onNavigateDoctors: (params?: string) => void;
+  onLoginSuccess?: (email: string, role: string, name: string) => void;
 }
-
-/* ─── STATIC PREVIEW DATA ───────────────────────────────────── */
-
-const featuredHospitals = [
-  { id: "hpg", name: "Hospital Pulau Pinang", type: "Government Hospital", tag: "24/7 Emergency", gradient: "from-teal-500 to-teal-600" },
-  { id: "hsj", name: "Hospital Seberang Jaya", type: "Government Hospital", tag: "Largest in Seberang", gradient: "from-sky-500 to-sky-600" },
-  { id: "pantai", name: "Pantai Hospital Penang", type: "Private Hospital", tag: "Specialist Centre", gradient: "from-rose-500 to-rose-600" },
-  { id: "gleneagles", name: "Gleneagles Hospital Penang", type: "Private Hospital", tag: "International Standards", gradient: "from-indigo-500 to-indigo-600" },
-];
-
-const allHospitalsList = [
-  { id: "hpg", name: "Hospital Pulau Pinang" },
-  { id: "hsj", name: "Hospital Seberang Jaya" },
-  { id: "kkjp", name: "Klinik Kesihatan Jalan Perak" },
-  { id: "kkbb", name: "Klinik Kesihatan Bayan Baru" },
-  { id: "pantai", name: "Pantai Hospital Penang" },
-  { id: "lwe", name: "Hospital Lam Wah Ee" },
-  { id: "gleneagles", name: "Gleneagles Hospital Penang" },
-  { id: "island", name: "Island Hospital" },
-  { id: "adv", name: "Penang Adventist Hospital" },
-  { id: "loh", name: "Loh Guan Lye Specialists Centre" },
-  { id: "hbm", name: "Hospital Bukit Mertajam" },
-  { id: "kpj", name: "KPJ Penang Specialist Hospital" },
-  { id: "o2", name: "O2 Klinik" },
-  { id: "ks", name: "Klinik Singapore" },
-  { id: "pp", name: "Poliklinik Perdana" },
-];
-
-const specialties = [
-  { id: "cardiology", name: "Cardiology", icon: Heart, desc: "Heart & cardiovascular care", count: 3 },
-  { id: "internal-medicine", name: "Internal Medicine & Inf. Diseases", icon: Microscope, desc: "Complex metabolic & viral conditions", count: 2 },
-  { id: "pediatrics", name: "Pediatrics", icon: Baby, desc: "Child & newborn healthcare", count: 3 },
-  { id: "general-surgery", name: "General Surgery", icon: Stethoscope, desc: "Operative & laparoscopic care", count: 3 },
-  { id: "neurology", name: "Neurology", icon: Brain, desc: "Brain & nervous system disorders", count: 2 },
-  { id: "gastro-urology", name: "Gastroenterology & Urology", icon: Bone, desc: "GI, liver & urinary tract", count: 2 },
-  { id: "orthopedics", name: "Orthopedics & Sports Medicine", icon: Bone, desc: "Bones, joints & sports injuries", count: 2 },
-  { id: "gp-family", name: "General Practice & Family Medicine", icon: Stethoscope, desc: "Primary care & outpatient services", count: 11 },
-];
-
-const stats = [
-  { value: "15", label: "Partner Facilities" },
-  { value: "28", label: "Specialist Doctors" },
-  { value: "10K+", label: "Appointments Booked" },
-  { value: "98%", label: "Patient Satisfaction" },
-];
-
-const features = [
-  { icon: CalendarCheck, title: "Smart Appointment Booking", desc: "Book, reschedule or cancel in seconds across all Penang partner hospitals and clinics.", bg: "bg-teal-50", accent: "text-teal-600", border: "border-teal-100" },
-  { icon: Shield, title: "Unified Secure Login", desc: "One login for Patients, Doctors, Nurses and Admins — each routed to their own dashboard.", bg: "bg-sky-50", accent: "text-sky-600", border: "border-sky-100" },
-  { icon: Activity, title: "Live Health Monitoring", desc: "Track vitals, medical history and lab results in a privacy-first electronic health record.", bg: "bg-rose-50", accent: "text-rose-600", border: "border-rose-100" },
-  { icon: Users, title: "Doctor–Patient Messaging", desc: "Communicate directly with your care team via secure in-app messaging with read receipts.", bg: "bg-amber-50", accent: "text-amber-600", border: "border-amber-100" },
-  { icon: Clock, title: "Real-time Availability", desc: "See live doctor schedules and grab the earliest available slot — no phone calls needed.", bg: "bg-emerald-50", accent: "text-emerald-600", border: "border-emerald-100" },
-  { icon: Star, title: "Patient Reviews & Ratings", desc: "Read verified patient reviews to choose the right specialist with confidence.", bg: "bg-violet-50", accent: "text-violet-600", border: "border-violet-100" },
-];
-
-const testimonials = [
-  { name: "Lim Mei Ling", role: "Patient — Cardiology", text: "Booking my cardiologist appointment used to take a week of phone calls. Now I do it in under 2 minutes.", stars: 5 },
-  { name: "Dr. Azmi Bin Osman", role: "Consultant, Penang General", text: "The staff dashboard is incredibly intuitive. I can review all my patients' histories in one place.", stars: 5 },
-  { name: "Siti Rahimah", role: "Patient — Pediatrics", text: "I love that I can track my son's vaccination schedule and medical records from my phone.", stars: 5 },
-];
 
 export default function RootLandingPage({
   onNavigateLogin,
   onNavigateHospitals,
   onNavigateDoctors,
+  onLoginSuccess,
 }: RootLandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [selectedQuickHospital, setSelectedQuickHospital] = useState("Hospital Pulau Pinang");
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  // Private Accredited Facilities Only
+  const partnerFacilities = [
+    { id: "pantai", name: "Pantai Hospital Penang", area: "Bayan Baru", waitTime: "~14 Mins", type: "Private Tertiary Hospital", status: "Normal" },
+    { id: "gleneagles", name: "Gleneagles Hospital Penang", area: "George Town", waitTime: "~16 Mins", type: "Private Specialist Centre", status: "Normal" },
+    { id: "island", name: "Island Hospital", area: "Peel Avenue", waitTime: "~11 Mins", type: "Private Tertiary Centre", status: "Optimal" },
+    { id: "loh", name: "Loh Guan Lye Specialists Centre", area: "Logan Road", waitTime: "~12 Mins", type: "Private Specialist Centre", status: "Optimal" },
+    { id: "lwe", name: "Hospital Lam Wah Ee", area: "Jalan Perak", waitTime: "~15 Mins", type: "Not-for-Profit Private Hospital", status: "Normal" },
+    { id: "kpj", name: "KPJ Penang Specialist Hospital", area: "Bukit Mertajam", waitTime: "~18 Mins", type: "Private Specialist Hospital", status: "Normal" },
+    { id: "bagan", name: "Bagan Specialist Centre", area: "Butterworth", waitTime: "~17 Mins", type: "Private Specialist Centre", status: "Normal" },
+    { id: "mount", name: "Mount Miriam Cancer Hospital", area: "Tanjung Tokong", waitTime: "~13 Mins", type: "Private Oncology Centre", status: "Optimal" },
+  ];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-sky-500 selection:text-white">
 
-      {/* ══════════════════════════════════════════════════════
-          NAVBAR — direct links, no dropdowns
-      ══════════════════════════════════════════════════════ */}
-      <header
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? "bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm"
-            : "bg-white/80 backdrop-blur-md"
-        }`}
-      >
-        <nav className="mx-auto max-w-7xl px-6 lg:px-10 h-16 flex items-center justify-between gap-4">
-
-          {/* Logo */}
-          <a href="/" className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shadow-md shadow-teal-500/30">
-              <Activity className="w-4 h-4 text-white" />
+      {/* ── 1. GLOBAL NAVIGATION BAR (TOP HEADER) ── */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 lg:px-10 py-3.5 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          
+          {/* Brand Identity: System Logo & Title */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+              <Activity className="w-5 h-5 text-white" />
             </div>
-            <span className="text-sm font-bold tracking-tight text-slate-800">
-              Penang<span className="text-teal-600">Health</span>
+            <span className="font-extrabold text-slate-900 text-lg tracking-tight block">
+              Penang<span className="text-sky-600">Health</span>
             </span>
-          </a>
-
-          {/* Desktop nav — plain buttons, click → page directly */}
-          <div className="hidden md:flex items-center gap-1">
-            <button
-              onClick={onNavigateHospitals}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-teal-600 transition-colors px-4 py-2 rounded-lg hover:bg-teal-50"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              Hospitals / Clinics
-            </button>
-            <button
-              onClick={onNavigateDoctors}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-sky-600 transition-colors px-4 py-2 rounded-lg hover:bg-sky-50"
-            >
-              <Stethoscope className="w-3.5 h-3.5" />
-              Doctors
-            </button>
-            <a
-              href="#features"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-50"
-            >
-              Features
-            </a>
-            <a
-              href="#about"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-50"
-            >
-              About
-            </a>
           </div>
 
-          {/* CTA buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Quick Links */}
+          <nav className="hidden md:flex items-center gap-5 text-xs font-semibold text-slate-600">
             <button
-              onClick={onNavigateLogin}
-              className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors px-4 py-2"
+              onClick={() => onNavigateHospitals()}
+              className="hover:text-sky-600 transition-colors cursor-pointer flex items-center gap-1.5"
             >
-              Sign In
+              <Building2 className="w-3.5 h-3.5 text-sky-600" />
+              <span>Hospitals & Clinics</span>
             </button>
             <button
-              onClick={onNavigateLogin}
-              className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-md shadow-teal-500/25 transition-all hover:-translate-y-px"
+              onClick={() => onNavigateDoctors()}
+              className="hover:text-sky-600 transition-colors cursor-pointer flex items-center gap-1.5"
             >
-              Book Now <ArrowRight className="w-3.5 h-3.5" />
+              <Stethoscope className="w-3.5 h-3.5 text-sky-600" />
+              <span>Find Doctors</span>
+            </button>
+            <a href="#services" className="hover:text-sky-600 transition-colors">
+              Services
+            </a>
+            <a href="#facilities" className="hover:text-sky-600 transition-colors">
+              Live Wait Times
+            </a>
+          </nav>
+
+          {/* Action Callouts */}
+          <div className="flex items-center gap-2.5">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 cursor-pointer"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
+        </div>
 
-          {/* Mobile hamburger */}
-          <button
-            className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            onClick={() => setMobileMenuOpen((o) => !o)}
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </nav>
-
-        {/* Mobile menu */}
+        {/* Mobile menu dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-6 pb-6 pt-2 shadow-lg">
+          <div className="md:hidden mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2 pb-2">
             <button
               onClick={() => { onNavigateHospitals(); setMobileMenuOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-teal-50 text-sm font-semibold text-slate-700 hover:text-teal-700 transition-colors"
+              className="text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 rounded-lg"
             >
-              <Building2 className="w-4 h-4" /> Hospitals / Clinics
+              Hospitals & Clinics
             </button>
             <button
               onClick={() => { onNavigateDoctors(); setMobileMenuOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-sky-50 text-sm font-semibold text-slate-700 hover:text-sky-700 transition-colors"
+              className="text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 rounded-lg"
             >
-              <Stethoscope className="w-4 h-4" /> Doctors
+              Find Doctors
             </button>
             <a
-              href="#features"
+              href="#services"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-slate-50 text-sm font-medium text-slate-600 transition-colors"
+              className="px-3 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 rounded-lg"
             >
-              Features
+              Services
             </a>
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <button
-                onClick={onNavigateLogin}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-sky-500 text-white font-bold text-sm shadow-md shadow-teal-500/25"
-              >
-                Book Now / Sign In
-              </button>
-            </div>
+            <a
+              href="#facilities"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 rounded-lg"
+            >
+              Live Wait Times
+            </a>
+            <button
+              onClick={() => { onNavigateLogin("login"); setMobileMenuOpen(false); }}
+              className="text-left px-3 py-2 text-xs font-bold text-sky-600 hover:bg-sky-50 rounded-lg cursor-pointer"
+            >
+              Sign In / Register
+            </button>
           </div>
         )}
       </header>
 
-      {/* ══════════════════════════════════════════════════════
-          HERO
-      ══════════════════════════════════════════════════════ */}
-      <section className="relative pt-36 pb-24 px-6 lg:px-10 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-[55%] h-[80%] rounded-full bg-gradient-to-bl from-teal-100/80 via-sky-50/60 to-transparent blur-3xl" />
-          <div className="absolute bottom-0 left-[-5%] w-[40%] h-[55%] rounded-full bg-gradient-to-tr from-violet-100/40 to-transparent blur-3xl" />
-        </div>
+      {/* ── 2. HERO SECTION (SPLIT-PANE / DUAL-ZONE LAYOUT) ── */}
+      <section id="about" className="relative px-6 lg:px-10 pt-10 pb-12 lg:pt-14 lg:pb-16 max-w-7xl mx-auto overflow-hidden">
+        {/* Soft background ambient gradients */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-sky-100/50 rounded-full blur-3xl pointer-events-none -z-10" />
+        <div className="absolute top-20 left-10 w-80 h-80 bg-blue-100/40 rounded-full blur-3xl pointer-events-none -z-10" />
 
-        <div className="relative max-w-7xl mx-auto">
-          {/* Live badge */}
-          <div className="flex justify-center mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-xs font-semibold text-teal-700">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500" />
-              </span>
-              Penang's Unified Digital Healthcare Platform — Now Live
-            </div>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          
+          {/* Left Column (System Value Proposition) */}
+          <div className="lg:col-span-7 space-y-6">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
+              Centralized Smart Outpatient Booking & Triage
+            </h1>
 
-          <h1 className="text-center text-4xl sm:text-5xl lg:text-[4.5rem] font-extrabold tracking-tight leading-[1.07] max-w-5xl mx-auto text-slate-900">
-            Penang Centralized{" "}
-            <span className="bg-gradient-to-r from-teal-500 via-sky-500 to-violet-500 bg-clip-text text-transparent">
-              Smart Healthcare Gate
-            </span>
-          </h1>
-
-          <p className="mt-7 text-center text-base sm:text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
-            One unified gateway for patients, doctors, nurses and administrators across
-            Penang's public hospitals and government clinics — book appointments, manage
-            health records, and connect with your care team securely.
-          </p>
-
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <button
-              onClick={onNavigateLogin}
-              className="inline-flex items-center gap-2.5 bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white font-bold text-sm px-8 py-4 rounded-2xl shadow-lg shadow-teal-500/30 transition-all hover:-translate-y-0.5"
-            >
-              Book Now / Sign In <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onNavigateHospitals}
-              className="inline-flex items-center gap-2 border-2 border-slate-200 hover:border-teal-300 bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-700 font-semibold text-sm px-8 py-4 rounded-2xl transition-all"
-            >
-              Explore Facilities <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Stats */}
-          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            {stats.map((s) => (
-              <div key={s.label} className="rounded-2xl bg-slate-50 border border-slate-100 px-5 py-5 text-center hover:border-teal-200 hover:bg-teal-50/40 transition-colors">
-                <p className="text-2xl font-extrabold text-teal-600">{s.value}</p>
-                <p className="mt-1 text-xs text-slate-500 font-medium">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          HOSPITALS PREVIEW — 4 featured, click → explore detail
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-teal-600 font-bold mb-2">Partner Network</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Hospitals & Clinics</h2>
-            <p className="mt-2 text-slate-500 text-sm">15 partner facilities — government and private. Click any to explore services and book.</p>
-          </div>
-          <button onClick={() => onNavigateHospitals()} className="shrink-0 flex items-center gap-2 text-sm font-bold text-teal-600 hover:text-teal-700 border-2 border-teal-200 hover:border-teal-300 hover:bg-teal-50 px-5 py-2.5 rounded-xl transition-all">
-            View All 15 Facilities <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredHospitals.map((h) => (
-            <button
-              key={h.id}
-              onClick={() => onNavigateHospitals(`id=${h.id}`)}
-              className="group text-left rounded-2xl border-2 border-slate-100 bg-white hover:border-teal-200 hover:shadow-lg hover:shadow-teal-500/8 transition-all duration-200 hover:-translate-y-0.5 overflow-hidden"
-            >
-              <div className={`h-1.5 w-full bg-gradient-to-r ${h.gradient}`} />
-              <div className="p-5">
-                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${h.gradient} flex items-center justify-center mb-3 shadow-sm`}>
-                  <Building2 className="w-4 h-4 text-white" />
-                </div>
-                <p className="text-sm font-extrabold text-slate-900 leading-snug group-hover:text-teal-700 transition-colors">{h.name}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{h.type}</p>
-                <span className="inline-block mt-2 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">{h.tag}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          DOCTORS PREVIEW — click card → /doctors page
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto bg-slate-50/60">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-sky-600 font-bold mb-2">Medical Specialties</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Our Doctors</h2>
-            <p className="mt-2 text-slate-500 text-sm">Browse specialties to find the right doctor — no login required.</p>
-          </div>
-          <button
-            onClick={() => onNavigateDoctors()}
-            className="shrink-0 flex items-center gap-2 text-sm font-bold text-sky-600 hover:text-sky-700 border-2 border-sky-200 hover:border-sky-300 hover:bg-sky-50 px-5 py-2.5 rounded-xl transition-all"
-          >
-            View All Doctors <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {specialties.slice(0, 4).map((s) => (
-            <button
-              key={s.id}
-              onClick={() => onNavigateDoctors(`specialty=${s.id}`)}
-              className="group text-left rounded-3xl border-2 border-slate-100 bg-white hover:border-sky-200 hover:shadow-xl hover:shadow-sky-500/10 transition-all duration-200 hover:-translate-y-1 p-7"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-100 to-teal-100 border border-sky-200 flex items-center justify-center mb-5 group-hover:from-sky-200 group-hover:to-teal-200 transition-colors">
-                <s.icon className="w-6 h-6 text-sky-600" />
-              </div>
-              <p className="text-base font-extrabold text-slate-900 group-hover:text-sky-700 transition-colors">
-                {s.name}
-              </p>
-              <p className="text-sm text-slate-400 mt-1.5 mb-4">{s.desc}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">
-                  {s.count} specialist{s.count !== 1 ? "s" : ""}
-                </span>
-                <span className="flex items-center gap-1 text-xs font-bold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  View doctors <ChevronRight className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          QUICK ACTIONS — Select Hospital → Find Doctors
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-16 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="rounded-3xl bg-gradient-to-br from-teal-50 to-sky-50 border border-teal-100 p-8 lg:p-12 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-teal-200/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="max-w-xl">
-              <p className="text-[11px] uppercase tracking-[0.3em] text-teal-600 font-bold mb-2">Ready to Book?</p>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3">
-                Find Doctors Here
-              </h2>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                Browse specialist doctors available at Hospital Pulau Pinang or any of our other 14 partner facilities. Select a hospital or clinic to view its specific medical staff.
-              </p>
-            </div>
-
-            <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-              <div className="relative min-w-[260px]">
-                <select
-                  value={selectedQuickHospital}
-                  onChange={(e) => setSelectedQuickHospital(e.target.value)}
-                  className="w-full bg-white border border-slate-200 text-slate-800 text-sm font-semibold pl-4 pr-10 py-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent appearance-none"
-                >
-                  {allHospitalsList.map((item) => (
-                    <option key={item.id} value={item.name}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                  <ChevronDown className="w-4 h-4" />
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigateDoctors(`hospital=${encodeURIComponent(selectedQuickHospital)}`)}
-                className="bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-md shadow-teal-500/20 transition-all hover:-translate-y-0.5 whitespace-nowrap text-center"
-              >
-                Find Doctors
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          WHY DIGITAL
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 p-8 lg:p-12">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-teal-400 font-bold mb-4">Our Mission</p>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-5 leading-tight">
-                Why Penang's Healthcare is Going Digital
-              </h2>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                The Ministry of Health Malaysia's{" "}
-                <span className="text-slate-200 font-semibold">MyHealth Portal</span> initiative
-                identifies Penang as a pilot state for centralised digital health records.
-              </p>
-              {[
-                "Zero paperwork — digital records synced across facilities",
-                "Reduced patient waiting times by up to 40%",
-                "Secure, PDPA-compliant health data management",
-                "Accessible from any device, anywhere in Penang",
-              ].map((item) => (
-                <div key={item} className="flex items-start gap-3 mb-3">
-                  <CheckCircle className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
-                  <span className="text-sm text-slate-300">{item}</span>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { icon: MapPin,  label: "Coverage",     value: "Both Penang Districts" },
-                { icon: Phone,   label: "Support",      value: "24/7 Available" },
-                { icon: Shield,  label: "Security",     value: "PDPA Compliant" },
-                { icon: Clock,   label: "Avg. Booking", value: "Under 2 Minutes" },
-              ].map((item) => (
-                <div key={item.label} className="rounded-2xl bg-white/6 border border-white/10 p-5">
-                  <item.icon className="w-5 h-5 text-teal-400 mb-2" />
-                  <p className="text-xs text-slate-500">{item.label}</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          FEATURES
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto" id="features">
-        <div className="text-center mb-12">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-violet-600 font-bold mb-3">Platform Features</p>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Everything You Need, In One Place</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {features.map((f) => (
-            <div
-              key={f.title}
-              className={`rounded-3xl border-2 ${f.border} ${f.bg} p-7 hover:-translate-y-1 hover:shadow-lg transition-all duration-200`}
-            >
-              <div className={`w-10 h-10 rounded-xl bg-white border ${f.border} flex items-center justify-center mb-5 shadow-sm`}>
-                <f.icon className={`w-5 h-5 ${f.accent}`} />
-              </div>
-              <h3 className="text-base font-extrabold text-slate-900 mb-2">{f.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          HOW IT WORKS
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto" id="about">
-        <div className="rounded-3xl bg-gradient-to-br from-teal-600 to-sky-600 p-10 lg:p-14">
-          <div className="text-center mb-12">
-            <p className="text-[11px] uppercase tracking-[0.3em] text-teal-200 font-bold mb-3">How It Works</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Your Health Journey, Simplified</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            {[
-              { step: "01", title: "Browse & Explore",    desc: "Explore hospitals, clinics and doctors by specialty — no account needed to browse." },
-              { step: "02", title: "Sign In or Register", desc: "Create a free patient account or sign in. One login for patients, doctors, nurses and admins." },
-              { step: "03", title: "Book & Manage Care",  desc: "Book appointments, view records, track prescriptions and message your doctor — all in one place." },
-            ].map((item) => (
-              <div key={item.step} className="flex flex-col items-center">
-                <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center mb-5 text-white font-black text-xl">
-                  {item.step}
-                </div>
-                <h3 className="text-base font-extrabold text-white mb-2">{item.title}</h3>
-                <p className="text-sm text-teal-100/80 leading-relaxed max-w-xs">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          TESTIMONIALS
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-rose-500 font-bold mb-3">Testimonials</p>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Trusted by Penang's Health Community</h2>
-        </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          {testimonials.map((t) => (
-            <div
-              key={t.name}
-              className="rounded-3xl border-2 border-slate-100 bg-white p-7 flex flex-col gap-4 hover:border-teal-100 hover:shadow-lg transition-all duration-200"
-            >
-              <div className="flex gap-0.5">
-                {Array.from({ length: t.stars }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-              <p className="text-sm text-slate-600 leading-relaxed flex-1">"{t.text}"</p>
-              <div className="pt-4 border-t border-slate-100">
-                <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{t.role}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════
-          CTA BANNER
-      ══════════════════════════════════════════════════════ */}
-      <section className="py-20 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="rounded-3xl bg-slate-900 p-12 lg:p-16 text-center relative overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 right-0 w-[45%] h-full rounded-full bg-teal-600/10 blur-[80px]" />
-            <div className="absolute bottom-0 left-0 w-[40%] h-full rounded-full bg-sky-600/10 blur-[80px]" />
-          </div>
-          <div className="relative z-10">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white mb-5 leading-tight">
-              Ready to Transform Your
-              <br />
-              <span className="bg-gradient-to-r from-teal-400 to-sky-400 bg-clip-text text-transparent">
-                Healthcare Experience?
-              </span>
-            </h2>
-            <p className="text-slate-400 text-base mb-10 max-w-xl mx-auto leading-relaxed">
-              Join thousands of Penang residents managing their health smarter.
-              Sign in or register as a patient in under 2 minutes.
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
+              A unified digital healthcare coordination gateway connecting patients directly with accredited outpatient clinics and medical specialists across Penang.
             </p>
-            <div className="flex flex-wrap justify-center gap-4">
+
+            {/* Value Highlights with Icon Bullets */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle className="w-4 h-4 text-sky-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Book appointments in under 2 minutes</h4>
+                  <p className="text-xs text-slate-500">Streamlined booking workflow with real-time slot reservation.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle className="w-4 h-4 text-sky-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Rule-based symptom assessment and specialty routing</h4>
+                  <p className="text-xs text-slate-500">Structured pre-consultation notes for attending physicians.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle className="w-4 h-4 text-sky-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Find nearest private facilities with zero delays</h4>
+                  <p className="text-xs text-slate-500">Browser-based GPS location calculation without external mapping API fees.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle className="w-4 h-4 text-sky-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Strict data privacy compliant with Malaysia PDPA 2010</h4>
+                  <p className="text-xs text-slate-500">Secure role-based access control protecting patient consultation history.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Primary CTA buttons */}
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
-                onClick={onNavigateLogin}
-                className="inline-flex items-center gap-3 bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 text-white font-bold text-base px-10 py-4 rounded-2xl shadow-2xl shadow-teal-500/30 transition-all hover:-translate-y-0.5"
+                onClick={() => onNavigateLogin("login")}
+                className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm px-6 py-3 rounded-xl transition shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
-                Book Now / Sign In <ArrowRight className="w-5 h-5" />
+                <span>Get Started / Book Appointment</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
               <button
-                onClick={onNavigateHospitals}
-                className="inline-flex items-center gap-2 border-2 border-white/20 text-slate-300 hover:text-white hover:border-white/40 font-semibold text-base px-8 py-4 rounded-2xl transition-all"
+                onClick={() => onNavigateDoctors()}
+                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-sm px-5 py-3 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                Browse Facilities <Building2 className="w-5 h-5" />
+                <Stethoscope className="w-4 h-4 text-sky-600" />
+                <span>Find Doctors</span>
               </button>
             </div>
+          </div>
+
+          {/* Right Column (Healthcare Access Gateway Card) */}
+          <div className="lg:col-span-5">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-5 relative">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  Access Your Health Portal
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Sign in to manage appointments, consult specialist doctors, and view your digital health records.
+                </p>
+              </div>
+
+              {/* Primary Sign In / Register Actions */}
+              <div className="space-y-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => onNavigateLogin("login")}
+                  className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-3 px-4 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <span>Sign In to Healthcare Gate</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigateLogin("register")}
+                  className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Register New Account</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── 3. EMERGENCY RED-FLAG BANNER (TOP PRIORITY SAFETY CALLOUT) ── */}
+      <section id="emergency" className="px-6 lg:px-10 py-4 max-w-7xl mx-auto">
+        <div className="bg-rose-50/90 border border-rose-200 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-5 shadow-xs">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-rose-600" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-xs sm:text-sm font-extrabold text-rose-900 uppercase tracking-wide flex items-center gap-2">
+                <span>Emergency Red-Flag Protocol</span>
+                <span className="text-[10px] bg-rose-200 text-rose-800 px-2 py-0.5 rounded font-mono font-bold">Immediate Action</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-rose-800 leading-relaxed max-w-3xl">
+                Experiencing severe chest pain, shortness of breath, or sudden trauma? This platform is for non-critical outpatient bookings only. Please call 999 or proceed immediately to the nearest Accident &amp; Emergency department.
+              </p>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-3 w-full md:w-auto">
+            <a
+              href="tel:999"
+              className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-5 py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-sm shadow-rose-600/20 active:scale-98"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>Call Emergency 999</span>
+            </a>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════
-          FOOTER
-      ══════════════════════════════════════════════════════ */}
-      <footer className="border-t border-slate-100 py-10 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shadow-sm">
-              <Activity className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="text-sm font-bold text-slate-700">
-              Penang<span className="text-teal-600">Health</span> Gate
+      {/* ── 4. CORE FEATURE PREVIEW GRID (3-TIER HIGHLIGHTS) ── */}
+      <section id="services" className="bg-white border-y border-slate-200 py-14 px-6 lg:px-10">
+        <div className="max-w-7xl mx-auto space-y-10">
+          
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <span className="text-[11px] uppercase font-bold tracking-wider text-sky-700 font-mono">
+              Core System Architecture
             </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Integrated Outpatient Care Management
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600">
+              Designed according to Jakob Nielsen's usability heuristics to eliminate delays, prevent redundant checkups, and streamline patient triage.
+            </p>
           </div>
-          <p className="text-xs text-slate-400 text-center">
-            © {new Date().getFullYear()} Penang Centralized Smart Healthcare Gate. Built for the people of Penang.
-          </p>
-          <div className="flex gap-5">
-            <button onClick={onNavigateHospitals} className="text-xs text-slate-400 hover:text-teal-600 transition-colors font-medium">Hospitals</button>
-            <button onClick={onNavigateDoctors}   className="text-xs text-slate-400 hover:text-sky-600  transition-colors font-medium">Doctors</button>
-            <button onClick={onNavigateLogin}      className="text-xs text-slate-400 hover:text-slate-700 transition-colors font-medium">Sign In</button>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Feature 1: Intelligent Symptom Triage */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 space-y-3 hover:border-sky-300 transition group">
+              <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Stethoscope className="w-5 h-5 text-sky-600" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                Intelligent Symptom Triage
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Automated symptom questionnaire evaluates severity and duration, routing you to the appropriate medical specialty while actively screening for emergency red flags.
+              </p>
+              <div className="pt-2">
+                <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+                  Rule-based triage routing
+                </span>
+              </div>
+            </div>
+
+            {/* Feature 2: Proximity-Based Facility Discovery */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 space-y-3 hover:border-sky-300 transition group">
+              <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Compass className="w-5 h-5 text-sky-600" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                Proximity-Based Facility Discovery
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Client-side GPS location sorting uses the Haversine formula to pinpoint nearest hospitals and clinics across Penang without third-party mapping API fees.
+              </p>
+              <div className="pt-2">
+                <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+                  Zero-cost geospatial calculation
+                </span>
+              </div>
+            </div>
+
+            {/* Feature 3: Centralized Health Records */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 space-y-3 hover:border-sky-300 transition group">
+              <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <FileText className="w-5 h-5 text-sky-600" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                Centralized Health Records
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Unified access to historical consultation logs, digital medical certificates (MC), and e-prescriptions with patient-controlled cross-facility synchronisation.
+              </p>
+              <div className="pt-2">
+                <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+                  Multi-tenant sovereign records
+                </span>
+              </div>
+            </div>
+
           </div>
         </div>
-      </footer>
+      </section>
+
+      {/* ── 5. LIVE OUTPATIENT WAITING TIMES ── */}
+      <section id="facilities" className="py-14 px-6 lg:px-10 max-w-7xl mx-auto">
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-sky-700 font-mono">
+                Live Outpatient Telemetry
+              </span>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5">
+                Current Outpatient Waiting Times Across Penang
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Real-time queue estimates across participating private specialist hospitals.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onNavigateHospitals()}
+                className="text-xs font-bold text-sky-600 hover:text-sky-700 px-3 py-1.5 bg-sky-50 rounded-lg border border-sky-100 transition cursor-pointer"
+              >
+                Browse Facility Directory &rarr;
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {partnerFacilities.map((facility) => (
+              <div
+                key={facility.id}
+                className="bg-white border border-slate-200 rounded-2xl p-4.5 shadow-xs hover:shadow-sm hover:border-sky-300 transition"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                    {facility.status}
+                  </span>
+                </div>
+
+                <div className="mt-3">
+                  <h4 className="text-xs font-extrabold text-slate-900 line-clamp-1">{facility.name}</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{facility.area} • {facility.type}</p>
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-500">Live Outpatient Wait</span>
+                  <span className="text-xs font-bold text-sky-700 font-mono">{facility.waitTime}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }

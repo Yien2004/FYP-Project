@@ -344,10 +344,7 @@ export default function StaffSettings({ language, setLanguage }: StaffSettingsPr
               <Building2 className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
               <span className="truncate">{clinicName || 'General Staff'}</span>
             </div>
-            <div className="flex items-center gap-2.5 text-xs text-emerald-600 font-medium">
-              <Activity className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>EHR Server Online</span>
-            </div>
+
           </div>
         </div>
 

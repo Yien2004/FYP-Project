@@ -130,7 +130,10 @@ function mapAppointment(row: any) {
   let symptoms = row.symptoms ?? '';
   let clinic = '';
   let checkedIn = false;
+  let checkInTime = '';
+  let queueNumber = '';
   let shareHistory = true;
+  let syncCrossFacilityRecords = false;
   let requestRide = false;
   if (symptoms.startsWith('{') && symptoms.endsWith('}')) {
     try {
@@ -138,12 +141,22 @@ function mapAppointment(row: any) {
       symptoms = parsed.symptoms ?? '';
       clinic = parsed.clinic ?? '';
       checkedIn = !!parsed.checkedIn;
+      checkInTime = parsed.checkInTime ?? '';
+      queueNumber = parsed.queueNumber ?? '';
       shareHistory = parsed.shareHistory !== undefined ? !!parsed.shareHistory : true;
+      syncCrossFacilityRecords = !!parsed.syncCrossFacilityRecords;
       requestRide = !!parsed.requestRide;
     } catch (e) {
       // ignore
     }
   }
+
+  // Fallback deterministic queue number if missing
+  if (!queueNumber && row.id) {
+    const rawNum = parseInt(String(row.id).replace(/\D/g, "") || "101", 10);
+    queueNumber = `#Q-${100 + (rawNum % 899)}`;
+  }
+
   return {
     id:            row.id,
     patientId:     row.patient_id,
@@ -160,7 +173,10 @@ function mapAppointment(row: any) {
     remarks:       symptoms, // Map to remarks for staff system compatibility
     clinic:        clinic,
     checkedIn:     checkedIn,
+    checkInTime:   checkInTime,
+    queueNumber:   queueNumber || '#Q-101',
     shareHistory:  shareHistory,
+    syncCrossFacilityRecords: syncCrossFacilityRecords,
     requestRide:   requestRide,
     clinicalNotes: row.clinical_notes  ?? '',
     prescription:  row.prescription    ?? '',
@@ -603,10 +619,21 @@ export async function addAppointment(apt: any) {
   let symptoms = apt.symptoms || apt.remarks || '';
   const clinic = apt.clinic || apt.hospital || '';
   
+  // Generate deterministic/unique queue number if not provided
+  let queueNumber = apt.queueNumber;
+  if (!queueNumber) {
+    const randomSuffix = Math.floor(100 + Math.random() * 899);
+    queueNumber = `#Q-${randomSuffix}`;
+  }
+
   symptoms = JSON.stringify({
     symptoms: symptoms,
     clinic: clinic,
+    queueNumber: queueNumber,
+    checkedIn: !!apt.checkedIn,
+    checkInTime: apt.checkInTime || '',
     shareHistory: apt.shareHistory !== undefined ? !!apt.shareHistory : true,
+    syncCrossFacilityRecords: !!apt.syncCrossFacilityRecords,
     requestRide: !!apt.requestRide
   });
 
@@ -641,11 +668,24 @@ export async function updateAppointment(id: string, updates: any) {
   if (updates.date         !== undefined) dbRow.date          = updates.date;
   if (updates.status       !== undefined) dbRow.status        = updates.status;
   
-  if (updates.symptoms !== undefined || updates.remarks !== undefined || updates.clinic !== undefined || updates.checkedIn !== undefined || updates.shareHistory !== undefined || updates.requestRide !== undefined) {
+  if (
+    updates.symptoms !== undefined || 
+    updates.remarks !== undefined || 
+    updates.clinic !== undefined || 
+    updates.checkedIn !== undefined || 
+    updates.checkInTime !== undefined ||
+    updates.queueNumber !== undefined ||
+    updates.shareHistory !== undefined || 
+    updates.syncCrossFacilityRecords !== undefined ||
+    updates.requestRide !== undefined
+  ) {
     let existingSymptoms = '';
     let existingClinic = '';
     let existingCheckedIn = false;
+    let existingCheckInTime = '';
+    let existingQueueNumber = '';
     let existingShareHistory = true;
+    let existingSyncCrossFacilityRecords = false;
     let existingRequestRide = false;
     try {
       const { data: existingData } = await supabaseAdmin
@@ -660,7 +700,10 @@ export async function updateAppointment(id: string, updates: any) {
           existingSymptoms = parsed.symptoms ?? '';
           existingClinic = parsed.clinic ?? '';
           existingCheckedIn = !!parsed.checkedIn;
+          existingCheckInTime = parsed.checkInTime ?? '';
+          existingQueueNumber = parsed.queueNumber ?? '';
           existingShareHistory = parsed.shareHistory !== undefined ? !!parsed.shareHistory : true;
+          existingSyncCrossFacilityRecords = !!parsed.syncCrossFacilityRecords;
           existingRequestRide = !!parsed.requestRide;
         } else {
           existingSymptoms = sym;
@@ -672,14 +715,20 @@ export async function updateAppointment(id: string, updates: any) {
     const nextSymptoms = updates.symptoms !== undefined ? updates.symptoms : (updates.remarks !== undefined ? updates.remarks : existingSymptoms);
     const nextClinic = updates.clinic !== undefined ? updates.clinic : existingClinic;
     const nextCheckedIn = updates.checkedIn !== undefined ? updates.checkedIn : existingCheckedIn;
+    const nextCheckInTime = updates.checkInTime !== undefined ? updates.checkInTime : existingCheckInTime;
+    const nextQueueNumber = updates.queueNumber !== undefined ? updates.queueNumber : existingQueueNumber;
     const nextShareHistory = updates.shareHistory !== undefined ? !!updates.shareHistory : existingShareHistory;
+    const nextSyncCross = updates.syncCrossFacilityRecords !== undefined ? !!updates.syncCrossFacilityRecords : existingSyncCrossFacilityRecords;
     const nextRequestRide = updates.requestRide !== undefined ? !!updates.requestRide : existingRequestRide;
     
     dbRow.symptoms = JSON.stringify({
       symptoms: nextSymptoms,
       clinic: nextClinic,
+      queueNumber: nextQueueNumber,
       checkedIn: nextCheckedIn,
+      checkInTime: nextCheckInTime,
       shareHistory: nextShareHistory,
+      syncCrossFacilityRecords: nextSyncCross,
       requestRide: nextRequestRide
     });
   }

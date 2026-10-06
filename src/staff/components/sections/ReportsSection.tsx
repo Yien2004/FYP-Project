@@ -29,6 +29,7 @@ export default function ReportsSection() {
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [logFilter, setLogFilter] = useState<'ALL' | 'INFO' | 'WARNING' | 'CRITICAL'>('ALL');
+  const [hospitalFilter, setHospitalFilter] = useState<string>('ALL');
   const [logSearch, setLogSearch] = useState('');
 
   // Archive state
@@ -301,7 +302,10 @@ export default function ReportsSection() {
     const matchesFilter = logFilter === 'ALL' || log.level === logFilter;
     const matchesSearch = log.event.toLowerCase().includes(logSearch.toLowerCase()) || 
                           log.service.toLowerCase().includes(logSearch.toLowerCase());
-    return matchesFilter && matchesSearch;
+    const matchesHospital = hospitalFilter === 'ALL' ||
+                            log.event.toLowerCase().includes(hospitalFilter.toLowerCase()) ||
+                            log.service.toLowerCase().includes(hospitalFilter.toLowerCase());
+    return matchesFilter && matchesSearch && matchesHospital;
   });
 
   return (
@@ -393,10 +397,10 @@ export default function ReportsSection() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="w-full">
             
-            {/* Real-time logging table on Left */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs flex flex-col gap-5">
+            {/* Real-time logging table */}
+            <div className="w-full bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs flex flex-col gap-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-neutral-100 pb-4">
                 <div>
                   <h3 className="font-bold text-base text-neutral-900">Real-time System Logs</h3>
@@ -404,7 +408,7 @@ export default function ReportsSection() {
                 </div>
                 <button
                   onClick={handleTriggerSimulatedLog}
-                  className="p-2 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="p-2 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5 animate-spin-hover" />
                   Simulate Network Log
@@ -412,7 +416,7 @@ export default function ReportsSection() {
               </div>
 
               {/* Logs Search & Filters bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50 p-2 rounded-xl border border-neutral-200/60 text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200/60 text-xs">
                 {/* Search */}
                 <div className="relative flex-1">
                   <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -421,8 +425,24 @@ export default function ReportsSection() {
                     placeholder="Search query log messages..."
                     value={logSearch}
                     onChange={(e) => setLogSearch(e.target.value)}
-                    className="w-full bg-white border border-neutral-200 rounded-lg pl-8 pr-3 py-1 text-xs text-neutral-700 outline-none focus:ring-1 focus:ring-neutral-400"
+                    className="w-full bg-white border border-neutral-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-neutral-700 outline-none focus:ring-1 focus:ring-sky-400"
                   />
+                </div>
+
+                {/* Hospital Filter Dropdown */}
+                <div className="shrink-0">
+                  <select
+                    value={hospitalFilter}
+                    onChange={(e) => setHospitalFilter(e.target.value)}
+                    className="bg-white border border-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-700 outline-none focus:ring-1 focus:ring-sky-400 cursor-pointer font-medium"
+                  >
+                    <option value="ALL">All Facilities & Clusters</option>
+                    <option value="Pantai">Pantai Hospital Penang</option>
+                    <option value="Pulau Pinang">Hospital Pulau Pinang (HPP)</option>
+                    <option value="Seberang Jaya">Hospital Seberang Jaya</option>
+                    <option value="Gleneagles">Gleneagles Hospital Penang</option>
+                    <option value="Bayan Lepas">Klinik Kesihatan Bayan Lepas</option>
+                  </select>
                 </div>
 
                 {/* Severity Toggles */}
@@ -431,9 +451,9 @@ export default function ReportsSection() {
                     <button
                       key={lvl}
                       onClick={() => setLogFilter(lvl)}
-                      className={`px-2.5 py-1 rounded-md font-semibold font-sans tracking-wide ${
+                      className={`px-2.5 py-1 rounded-md font-semibold font-sans tracking-wide cursor-pointer ${
                         logFilter === lvl
-                          ? 'bg-neutral-905 text-white'
+                          ? 'bg-neutral-900 text-white'
                           : 'bg-white border border-neutral-200 text-neutral-500 hover:text-neutral-800'
                       }`}
                     >
@@ -483,7 +503,7 @@ export default function ReportsSection() {
                               </span>
                             </td>
                             <td className="py-2.5 font-bold text-neutral-900 whitespace-nowrap">{log.service}</td>
-                            <td className="py-2.5 pr-2 truncate max-w-sm font-sans" title={log.event}>{log.event}</td>
+                            <td className="py-2.5 pr-2 truncate max-w-xl font-sans" title={log.event}>{log.event}</td>
                             <td className="py-2.5 text-right font-medium text-neutral-500 whitespace-nowrap">{log.execTime}</td>
                           </tr>
                         );
@@ -491,39 +511,6 @@ export default function ReportsSection() {
                     )}
                   </tbody>
                 </table>
-              </div>
-            </div>
-
-            {/* Right Panel: Security Core Alerts */}
-            <div className="bg-neutral-900 text-neutral-100 rounded-2xl p-6 border border-neutral-800 shadow-xl self-start">
-              <div className="flex items-center gap-2.5 border-b border-neutral-800 pb-4 mb-4">
-                <ShieldAlert className="w-4.5 h-4.5 text-red-500" />
-                <div>
-                  <h3 className="font-bold text-sm text-white">Edge Security Alerts</h3>
-                  <p className="text-[10px] text-neutral-400 mt-0.5">Active web application firewall triggers.</p>
-                </div>
-              </div>
-
-              <div className="space-y-4 text-xs">
-                <div className="space-y-1.5 p-3 rounded-xl bg-red-950/40 border border-red-900/30 text-red-200">
-                  <div className="flex justify-between font-bold">
-                    <span>XSS Filter Alert</span>
-                    <span className="font-mono">12:35 PM</span>
-                  </div>
-                  <p className="text-[11px] leading-snug">Blocked malformed query payload injection testing inside client router endpoint.</p>
-                </div>
-
-                <div className="space-y-1.5 p-3 rounded-xl bg-amber-950/40 border border-amber-900/30 text-amber-200">
-                  <div className="flex justify-between font-bold">
-                    <span>Brute Force Alarm</span>
-                    <span className="font-mono">11:15 AM</span>
-                  </div>
-                  <p className="text-[11px] leading-snug">Continuous account auth failure (5 requests) from host IP 192.168.1.182.</p>
-                </div>
-
-                <div className="p-3 bg-neutral-800/50 border border-neutral-800 rounded-xl text-neutral-400 leading-snug text-[11px]">
-                  All database transaction tunnels encrypted on level AES-256. Primary TLS key authenticated and rotated 6 hours ago.
-                </div>
               </div>
             </div>
 

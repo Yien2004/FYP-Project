@@ -47,7 +47,12 @@ export default function App() {
     setRoute(url.pathname);
   };
 
-  const navigateToLogin     = () => navigate("/login");
+  const [authInitialMode, setAuthInitialMode] = useState<"login" | "register">("login");
+
+  const navigateToLogin     = (mode?: "login" | "register") => {
+    setAuthInitialMode(mode || "login");
+    navigate("/login");
+  };
   const navigateToHome      = () => navigate("/");
   const navigateToHospitals = (params?: string) => navigate(params ? `/hospitals?${params}` : "/hospitals");
   const navigateToDoctors   = (params?: string) => navigate(params ? `/doctors?${params}` : "/doctors");
@@ -99,7 +104,13 @@ export default function App() {
   if (!isLoggedIn) {
     switch (route) {
       case "/login":
-        return <UnifiedAuthentication onLoginSuccess={handleLoginSuccess} />;
+        return (
+          <UnifiedAuthentication
+            onLoginSuccess={handleLoginSuccess}
+            onNavigateBack={navigateToHome}
+            initialMode={authInitialMode}
+          />
+        );
 
       case "/hospitals":
         return (
@@ -125,6 +136,7 @@ export default function App() {
             onNavigateLogin={navigateToLogin}
             onNavigateHospitals={navigateToHospitals}
             onNavigateDoctors={navigateToDoctors}
+            onLoginSuccess={handleLoginSuccess}
           />
         );
     }

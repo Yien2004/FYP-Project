@@ -1050,10 +1050,7 @@ export default function UserSettings({
               <span className="font-bold text-slate-900 font-mono">{bloodType}</span>
             </div>
 
-            <div className="flex justify-between">
-              <span>{t("EHR Sync Status")}</span>
-              <span className="bg-emerald-50 text-emerald-700 border border-emerald-150 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">ENCRYPT_OK</span>
-            </div>
+
           </div>
 
           <div className="pt-2 border-t border-slate-100">

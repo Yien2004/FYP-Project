@@ -10,10 +10,12 @@ import PatientRegistration from "./screens/PatientRegistration";
 import Notifications from "./screens/Notifications";
 import UserSettings from "./screens/UserSettings";
 import HealthcareAnalytics from "./screens/HealthcareAnalytics";
+import WearableHealth from "./screens/WearableHealth";
 import FetchingTransit from "./screens/FetchingTransit";
 
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import EmergencySOS from "./components/EmergencySOS";
 
 import {
   PatientProfile,
@@ -202,6 +204,13 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           mergedNotifs.push(bNotif);
         }
       });
+
+      // Ensure example AI appointment reminder is always available in notification box
+      const hasAiReminder = mergedNotifs.some(n => n.id === "notif-ai-reminder" || n.category === "reminder");
+      if (!hasAiReminder && initialNotifications.length > 0) {
+        mergedNotifs.unshift(initialNotifications[0]);
+      }
+
       setNotifications(mergedNotifs);
 
     } catch (err) {
@@ -293,21 +302,22 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         setAppointments(prev => [saved, ...prev]);
 
         // Append local notification immediately
+        const arrivalNotice = `Please arrive at the clinic counter 5–10 minutes before your scheduled appointment time and present your Queue Number (${saved.queueNumber || 'assigned at counter'}) to the counter staff for on-site presence check-in. Make sure you have arrived in person to confirm your consultation slot.`;
         const newNotif = {
           id: "notif-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
-          title: "Booking Confirmed",
-          body: `Booking confirmed, ${saved.timeSlot} ${saved.clinic}`,
-          message: `Booking confirmed, ${saved.timeSlot} ${saved.clinic}`,
+          title: `Booking Confirmed (${saved.queueNumber || '#Q-100'})`,
+          body: `Booking confirmed for ${saved.timeSlot} at ${saved.clinic} with ${saved.doctorName || 'Specialist'}. ${arrivalNotice}`,
+          message: `Booking confirmed for ${saved.timeSlot} at ${saved.clinic} with ${saved.doctorName || 'Specialist'}. ${arrivalNotice}`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           timestamp: new Date().toISOString(),
           read: false,
-          category: "general" as any
+          category: "reminder" as any
         };
         const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
         setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
         setNotifications(prev => [newNotif, ...prev]);
 
-        alert(`SUCCESS: Booking confirmed at ${saved.clinic} with ${saved.doctorName || 'Specialist'} on ${saved.date} at ${saved.timeSlot}! A notification has been saved to your records.`);
+        alert(`SUCCESS: Booking confirmed at ${saved.clinic} on ${saved.date} at ${saved.timeSlot}!\nQueue Number: ${saved.queueNumber || '#Q-100'}\n\nPlease arrive 5–10 minutes early to check-in at the counter.`);
       } else {
         setAppointments(prev => [newAptWithPatient, ...prev]);
       }
@@ -603,7 +613,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
 
   // ─── Authenticated layout ─────────────────────────────────────────────────
   return (
-    <div id="carepoint-portal-layout" className="min-h-screen bg-slate-50 flex font-sans">
+    <div id="lifelink-portal-layout" className="min-h-screen bg-slate-50 flex font-sans">
 
       {/* Left sidebar navigation */}
       <Sidebar
@@ -643,6 +653,14 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
               <HealthcareAnalytics
                 patientProfile={patientProfile}
                 vitals={vitalsList}
+                appointments={appointments}
+                onSetScreen={setCurrentScreen}
+              />
+            )}
+
+            {currentScreen === "wearable-health" && (
+              <WearableHealth
+                patientProfile={patientProfile}
                 appointments={appointments}
                 onSetScreen={setCurrentScreen}
               />
@@ -738,6 +756,9 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           </div>
         </main>
       </div>
+
+      {/* Emergency SOS Floating Widget */}
+      <EmergencySOS patientProfile={patientProfile} />
     </div>
   );
 }

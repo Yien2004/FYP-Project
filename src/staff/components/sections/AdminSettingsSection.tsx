@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ShieldAlert, 
   Megaphone, 
   CheckCircle, 
   AlertTriangle, 
@@ -174,15 +173,6 @@ export default function AdminSettingsSection() {
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 font-sans leading-relaxed resize-none"
               ></textarea>
             </div>
-
-            {broadcastCategory === 'Emergency Alert' && (
-              <div className="bg-red-50 border border-red-150 rounded-xl p-4 flex items-start gap-3">
-                <ShieldAlert className="w-5 h-5 text-red-750 shrink-0 mt-0.5" />
-                <div className="text-[11px] text-red-800 leading-relaxed font-medium">
-                  <strong>🚨 CRITICAL ACTION PREVIEW:</strong> Choosing "Emergency Alert" highlights a prominent warning banner inside active patient screens and writes a red priority alarm flag to all clinician system audit logger engines.
-                </div>
-              </div>
-            )}
 
             <div className="flex justify-end pt-2 border-t border-neutral-100">
               <button

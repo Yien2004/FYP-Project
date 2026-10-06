@@ -266,7 +266,7 @@ export default function Authentication({
             {mode === 'update-password' && "Define New Password"}
           </h2>
           <p className="text-slate-600 text-xs">
-            {mode === 'login'           && "Access clinical appointments and CarePoint's intelligent health hub."}
+            {mode === 'login'           && "Access clinical appointments and LifeLink's integrated health network."}
             {mode === 'register'        && "Sign up for a new patient or staff account with optional email."}
             {mode === 'reset-password'  && "We will transmit recovery credentials to your email."}
             {mode === 'update-password' && "Establish a robust authorization password below."}
@@ -345,7 +345,7 @@ export default function Authentication({
             </button>
 
             <div className="pt-4 border-t border-slate-200 text-center">
-              <span className="text-xs text-slate-500">New to CarePoint? </span>
+              <span className="text-xs text-slate-500">New to LifeLink? </span>
               <button type="button" onClick={() => { setMode('register'); setErrorMessage(""); }}
                 className="text-teal-600 hover:text-teal-500 transition text-xs font-semibold">
                 Create an Account

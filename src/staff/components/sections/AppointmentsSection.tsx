@@ -333,7 +333,7 @@ export default function AppointmentsSection() {
               {selectedDay !== null && (
                 <button
                   onClick={() => setSelectedDay(null)}
-                  className="text-[10px] font-bold text-teal-600 hover:text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/40 cursor-pointer"
+                  className="text-[10px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/60 cursor-pointer"
                 >
                   Show All Dates
                 </button>
@@ -343,17 +343,19 @@ export default function AppointmentsSection() {
 
           {/* Quick tab filter & Hospital Selector */}
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={() => setShowIntakeModal(true)}
-              className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-teal-650/15 cursor-pointer h-9 shrink-0"
-            >
-              <Plus className="w-4 h-4" /> Telephone Booking
-            </button>
+            {!isAdmin && (
+              <button
+                onClick={() => setShowIntakeModal(true)}
+                className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer h-9 shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Telephone Booking
+              </button>
+            )}
             {isAdmin && (
               <select
                 value={selectedHospital}
                 onChange={(e) => setSelectedHospital(e.target.value)}
-                className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
+                className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 cursor-pointer"
               >
                 <option value="ALL">All Facilities</option>
                 <option value="Hospital Pulau Pinang">Hospital Pulau Pinang</option>
@@ -605,13 +607,13 @@ export default function AppointmentsSection() {
                   onClick={() => setSelectedDay(day)}
                   className={`p-1.5 font-bold rounded-lg relative text-xs flex flex-col items-center justify-center transition-all ${
                     isSelected
-                      ? 'bg-teal-600 text-white font-extrabold shadow-xs'
+                      ? 'bg-sky-600 text-white font-extrabold shadow-xs'
                       : 'text-neutral-700 hover:bg-neutral-50 bg-white border border-transparent'
                   }`}
                 >
                   <span>{day}</span>
                   {isScheduled && !isSelected && (
-                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-teal-500" />
+                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-sky-500" />
                   )}
                 </button>
               );
@@ -619,42 +621,6 @@ export default function AppointmentsSection() {
           </div>
         </div>
 
-        {/* Daily Time Slots list */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-3 mb-4">
-            <div>
-              <h4 className="font-bold text-xs text-neutral-900 uppercase tracking-widest">Today's Remaining Slots</h4>
-              <p className="text-[10px] text-neutral-400 mt-0.5">Triage desk buffer reservation rooms.</p>
-            </div>
-            <span className="text-[10px] font-bold text-red-650 bg-red-50 border border-red-100 px-2 py-0.5 rounded">3 Open</span>
-          </div>
-
-          <div className="space-y-2.5 text-xs">
-            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200/60 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-neutral-900">10:45 AM - Closed Consultation</p>
-                <p className="text-[10px] text-neutral-400 mt-0.5">Doctor Sarah Jenkins • Cardiac consult</p>
-              </div>
-              <span className="text-[10px] font-bold text-neutral-400 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-full uppercase">Full</span>
-            </div>
-
-            <div className="p-3 bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 flex items-center justify-between shadow-xs transition-colors">
-              <div>
-                <p className="font-bold text-neutral-900">01:15 PM - Open Patient Slot</p>
-                <p className="text-[10px] text-neutral-400 mt-0.5">Available for emergency walk-ins</p>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full uppercase font-mono">Open</span>
-            </div>
-
-            <div className="p-3 bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 flex items-center justify-between shadow-xs transition-colors">
-              <div>
-                <p className="font-bold text-neutral-900">03:45 PM - Open Patient Slot</p>
-                <p className="text-[10px] text-neutral-400 mt-0.5">Available for secondary assessment</p>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full uppercase font-mono">Open</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {editModalApt && (
@@ -747,7 +713,7 @@ export default function AppointmentsSection() {
         </div>
       )}
 
-      {showIntakeModal && (
+      {!isAdmin && showIntakeModal && (
         <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in font-sans">
           <div className="bg-white rounded-2xl max-w-md w-full border border-neutral-200 shadow-xl overflow-hidden">
             
@@ -773,7 +739,7 @@ export default function AppointmentsSection() {
                   onChange={(e) => setIntakePatientName(e.target.value)}
                   placeholder="e.g. John Doe"
                   required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-semibold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-semibold"
                 />
               </div>
 
@@ -785,7 +751,7 @@ export default function AppointmentsSection() {
                   onChange={(e) => setIntakePatientPhone(e.target.value)}
                   placeholder="e.g. 0123456789"
                   required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-semibold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-semibold"
                 />
               </div>
 
@@ -796,7 +762,7 @@ export default function AppointmentsSection() {
                   value={intakePatientEmail}
                   onChange={(e) => setIntakePatientEmail(e.target.value)}
                   placeholder="e.g. patient@gmail.com"
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-semibold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-semibold"
                 />
               </div>
 
@@ -806,7 +772,7 @@ export default function AppointmentsSection() {
                   value={intakeDoctorName}
                   onChange={(e) => setIntakeDoctorName(e.target.value)}
                   required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-bold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold"
                 >
                   <option value="">-- Select Clinician --</option>
                   {clinicians
@@ -825,7 +791,7 @@ export default function AppointmentsSection() {
                   value={intakeDate}
                   onChange={(e) => setIntakeDate(e.target.value)}
                   required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-bold font-mono"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold font-mono"
                 />
               </div>
 
@@ -835,7 +801,7 @@ export default function AppointmentsSection() {
                   value={intakeTimeSlot}
                   onChange={(e) => setIntakeTimeSlot(e.target.value)}
                   required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 font-bold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold"
                 >
                   {['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'].map(slot => (
                     <option key={slot} value={slot}>{slot}</option>
@@ -849,7 +815,7 @@ export default function AppointmentsSection() {
                   rows={2}
                   value={intakeRemarks}
                   onChange={(e) => setIntakeRemarks(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 leading-relaxed font-sans placeholder:text-neutral-400"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 leading-relaxed font-sans placeholder:text-neutral-400"
                   placeholder="Enter main symptoms reported over phone..."
                 />
               </div>
@@ -864,7 +830,7 @@ export default function AppointmentsSection() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
                 >
                   Book Appointment
                 </button>

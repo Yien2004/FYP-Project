@@ -362,7 +362,7 @@ export default function StaffApp({
         />
 
         {/* Dynamic Views Slot */}
-        <main className="flex-1 overflow-y-auto p-8 bg-neutral-50/40">
+        <main className="flex-1 overflow-y-auto p-8 bg-slate-50">
           <div className="max-w-[1450px] mx-auto min-h-full">
             {staffTab === 'dashboard' && <StaffDashboard onCallPatient={handleCallPatientGlobal} />}
             {staffTab === 'appointments' && <AppointmentsSection />}

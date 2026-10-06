@@ -174,15 +174,12 @@ export default function Sidebar({
         <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
           <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-white">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shadow-md shadow-teal-500/30 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-sky-600 flex items-center justify-center shadow-xs shrink-0">
                 <Activity className="w-4.5 h-4.5 text-white" />
               </div>
-              <div>
-                <span className="font-extrabold text-slate-900 text-md tracking-tight block">
-                  Penang<span className="text-teal-600">Health</span>
-                </span>
-                <span className="text-[9px] text-teal-655 font-mono tracking-widest uppercase font-bold block leading-none mt-0.5">MOH MALAYSIA</span>
-              </div>
+              <span className="font-extrabold text-slate-900 text-md tracking-tight block">
+                Penang<span className="text-sky-600">Health</span>
+              </span>
             </div>
             {onCloseMobileMenu && (
               <button 
@@ -207,12 +204,12 @@ export default function Sidebar({
                   }}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
                     portal === 'staff' 
-                      ? 'bg-teal-600 text-white shadow-sm shadow-teal-500/20' 
+                      ? 'bg-sky-600 text-white shadow-xs' 
                       : 'text-slate-655 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
                   <Users className="w-3.5 h-3.5" />
-                  Clinical Staff
+                  Clinic Operations
                 </button>
                 <button
                   id="sidebar-portal-toggle-admin"
@@ -222,7 +219,7 @@ export default function Sidebar({
                   }}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
                     portal === 'admin' 
-                      ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' 
+                      ? 'bg-sky-600 text-white shadow-xs' 
                       : 'text-slate-655 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
@@ -236,16 +233,18 @@ export default function Sidebar({
           {/* Doctor Summary Card */}
           <div className="px-5 pt-4 pb-2">
             <div className="bg-white border border-slate-205 p-3.5 rounded-2xl flex items-center gap-3 shadow-sm">
-              <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold text-xs shrink-0 select-none">
+              <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-extrabold text-xs shrink-0 select-none">
                 {userName ? userName.replace("Dr. ", "")[0] : "D"}
               </div>
               <div className="overflow-hidden">
                 <span className="font-extrabold text-slate-900 text-xs block leading-tight truncate">
-                  {userName || "Staff Member"}
+                  {userName || (portal === 'admin' ? "System Admin" : "Staff Member")}
                 </span>
-                <span className="text-[9px] text-teal-655 block font-mono mt-0.5 font-bold uppercase tracking-wider">
-                  {portal === 'admin' ? 'System Administrator' : 'Pantai Hospital Staff'}
-                </span>
+                {portal !== 'admin' && (
+                  <span className="text-[9px] text-sky-600 block font-mono mt-0.5 font-bold uppercase tracking-wider">
+                    Clinic Operations Staff
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -270,16 +269,16 @@ export default function Sidebar({
                     }}
                     className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-teal-50 text-teal-600 border-l-[3px] border-teal-500 pl-[11px]'
+                        ? 'bg-sky-50 text-sky-700 border-l-[3px] border-sky-600 pl-[11px]'
                         : 'text-slate-605 hover:text-slate-900 hover:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <IconComp className={`w-4 h-4 ${isActive ? 'text-teal-400' : 'text-neutral-450'}`} />
+                      <IconComp className={`w-4 h-4 ${isActive ? 'text-sky-600' : 'text-neutral-450'}`} />
                       <span>{t(item.label)}</span>
                     </div>
                     {item.count && item.count > 0 ? (
-                      <span className="bg-teal-500/20 text-teal-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-500/30">
+                      <span className="bg-sky-50 text-sky-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-200">
                         {item.count}
                       </span>
                     ) : null}
@@ -332,15 +331,6 @@ export default function Sidebar({
             <span>{t("Secure Sign Out")}</span>
           </button>
         )}
-
-        {/* Bottom Utility Controls */}
-        <div className="flex items-center justify-between px-2 text-xs text-neutral-500">
-          <div className="flex items-center gap-1 hover:text-neutral-700 cursor-pointer transition-colors">
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>{t("Support Suite")}</span>
-          </div>
-          <span className="text-[10px] text-neutral-600 font-mono">v4.14-Prod</span>
-        </div>
       </div>
     </div>
   </>

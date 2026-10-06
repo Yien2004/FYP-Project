@@ -49,7 +49,7 @@ export default function MedicalRecords({ vitalsList, onAddVitals, appointments }
       )}`;
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", jsonString);
-      downloadAnchor.setAttribute("download", "CarePoint_Medical_Record_Secure.json");
+      downloadAnchor.setAttribute("download", "LifeLink_Medical_Record_Secure.json");
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
@@ -340,7 +340,7 @@ export default function MedicalRecords({ vitalsList, onAddVitals, appointments }
                 </div>
 
                 <button 
-                  onClick={() => alert(`Report downloaded: CarePoint_${apt.id}_Clinical_Notes-MOH.pdf`)}
+                  onClick={() => alert(`Report downloaded: LifeLink_${apt.id}_Clinical_Notes-MOH.pdf`)}
                   className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1"
                 >
                   <Download className="w-3.5 h-3.5" /> Download Pdf
@@ -382,7 +382,7 @@ export default function MedicalRecords({ vitalsList, onAddVitals, appointments }
 
                 <div className="pt-2 flex items-center gap-2">
                   <button 
-                    onClick={() => alert(`Refill order committed securely via Carey API. Please approach nearest CarePoint Clinic Pharmacy DAMANSARA with token Rx-${apt.id}.`)}
+                    onClick={() => alert(`Refill order committed securely via LifeLink API. Please approach nearest LifeLink Hospital Pharmacy with token Rx-${apt.id}.`)}
                     className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition"
                   >
                     Order Refill & Drive-Thru pickup

@@ -363,14 +363,14 @@ export default function DataAnalyticsSection() {
               <p className="text-xs text-neutral-500 mt-1 font-medium">Export raw consultation registry datasets into standard CSV report files.</p>
             </div>
 
-            <div className="bg-neutral-50 border border-neutral-150 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="flex justify-between items-center text-neutral-600 font-medium">
+            <div className="bg-sky-50/50 border border-sky-100 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-600 font-medium">
                 <span>Active Data Source</span>
-                <span className="font-bold text-neutral-900 font-mono">SUPABASE DB</span>
+                <span className="font-semibold text-sky-900">PenangHealth Clinical EHR</span>
               </div>
-              <div className="flex justify-between items-center text-neutral-600 font-medium">
+              <div className="flex justify-between items-center text-slate-600 font-medium">
                 <span>Dataset Records</span>
-                <span className="font-bold text-neutral-900 font-mono">{appointments.length} Consults</span>
+                <span className="font-bold text-slate-900 font-mono">{appointments.length} Consultations</span>
               </div>
             </div>
           </div>

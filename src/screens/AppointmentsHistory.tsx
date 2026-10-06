@@ -46,26 +46,26 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search specialty, physician, symptom..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 font-medium"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-500 font-medium"
               />
             </div>
 
             <div className="flex gap-2 w-full sm:w-auto">
               <button 
                 onClick={() => setStatusFilter('All')}
-                className={`flex-1 sm:flex-none text-xs font-semibold px-4 py-2 rounded-xl transition ${statusFilter === 'All' ? 'bg-teal-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                className={`flex-1 sm:flex-none text-xs font-semibold px-4 py-2 rounded-xl transition ${statusFilter === 'All' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
               >
                 All
               </button>
               <button 
                 onClick={() => setStatusFilter('Upcoming')}
-                className={`flex-1 sm:flex-none text-xs font-semibold px-4 py-2 rounded-xl transition ${statusFilter === 'Upcoming' ? 'bg-teal-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                className={`flex-1 sm:flex-none text-xs font-semibold px-4 py-2 rounded-xl transition ${statusFilter === 'Upcoming' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
               >
                 Upcoming
               </button>
               <button 
                 onClick={() => setStatusFilter('Completed')}
-                className={`flex-1 sm:flex-none text-xs font-semibold px-4 py-2 rounded-xl transition ${statusFilter === 'Completed' ? 'bg-teal-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                className={`flex-1 sm:flex-none text-xs font-semibold px-4 py-2 rounded-xl transition ${statusFilter === 'Completed' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
               >
                 Completed
               </button>
@@ -83,7 +83,7 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                 <div 
                   key={apt.id} 
                   className={`bg-white border rounded-2xl p-5 hover:shadow-md transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-6 ${
-                    selectedApt?.id === apt.id ? 'border-teal-500 ring-1 ring-teal-505/20' : 'border-slate-150'
+                    selectedApt?.id === apt.id ? 'border-sky-500 ring-1 ring-sky-500/20' : 'border-slate-150'
                   }`}
                   onClick={() => setSelectedApt(apt)}
                 >
@@ -117,10 +117,10 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                   <div className="flex items-center gap-4 justify-between border-t md:border-t-0 pt-3 md:pt-0">
                     <div className="text-right font-mono text-[11px] text-slate-500">
                       <div className="flex items-center gap-1.5 justify-end">
-                        <Calendar className="w-3.5 h-3.5 text-teal-600" /> {apt.date}
+                        <Calendar className="w-3.5 h-3.5 text-sky-600" /> {apt.date}
                       </div>
                       <div className="flex items-center gap-1.5 justify-end mt-0.5">
-                        <Clock className="w-3.5 h-3.5 text-teal-600" /> {apt.timeSlot}
+                        <Clock className="w-3.5 h-3.5 text-sky-600" /> {apt.timeSlot}
                       </div>
                     </div>
 
@@ -135,10 +135,7 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
         {/* Right Part: Active Consultation Details Panel & Doctors Lists */}
         <div className="lg:col-span-4 space-y-6">
           {selectedApt ? (
-            <div className="bg-white border border-teal-500/30 rounded-3xl p-5 shadow-lg space-y-4 animate-fade-in relative">
-              <div className="absolute top-4 right-4 bg-teal-50 text-teal-700 text-[10px] font-bold px-2 py-1 rounded">
-                ID: {selectedApt.id}
-              </div>
+            <div className="bg-white border border-sky-200 rounded-3xl p-5 shadow-lg space-y-4 animate-fade-in relative">
 
               <div className="flex items-center gap-3">
                 <img 
@@ -170,9 +167,9 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                 )}
 
                 {selectedApt.prescription && (
-                  <div className="bg-teal-50/50 border border-teal-100 p-2.5 rounded-xl">
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-teal-700 block font-extrabold">Active Prescription</span>
-                    <p className="mt-1 leading-normal font-semibold text-teal-900 select-all text-[11px] font-mono">
+                  <div className="bg-sky-50/70 border border-sky-100 p-2.5 rounded-xl">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-sky-700 block font-extrabold">Active Prescription</span>
+                    <p className="mt-1 leading-normal font-semibold text-sky-900 select-all text-[11px] font-mono">
                       {selectedApt.prescription}
                     </p>
                   </div>
@@ -182,14 +179,14 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
               <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => onResubmitBooking(selectedApt)}
-                  className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   title="Resubmit previous parameters to a new booking"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Book Again
                 </button>
                 <button 
                   onClick={() => onSetScreen("communication")}
-                  className="border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition"
+                  className="border border-slate-200 hover:border-sky-500 hover:text-sky-700 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition cursor-pointer"
                 >
                   Contact Clinic
                 </button>
@@ -216,7 +213,7 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                     />
                     <div>
                       <span className="font-bold text-slate-900 text-xs block leading-tight">{doc.name}</span>
-                      <span className="text-[10px] text-teal-650 font-semibold block mt-0.5">{doc.specialty}</span>
+                      <span className="text-[10px] text-sky-600 font-semibold block mt-0.5">{doc.specialty}</span>
                       <span className="text-[9px] text-slate-400 font-mono block mt-0.5">{doc.hospital}</span>
                     </div>
                   </div>

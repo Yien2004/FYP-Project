@@ -986,6 +986,8 @@ export default function DoctorsPage({
       onSearch={setSearch}
       onSelectSpecialty={openSpecialty}
       onNavigateBack={onNavigateBack}
+      onNavigateHospitals={() => onNavigateHospitals()}
+      onNavigateLogin={onNavigateLogin}
     />
   );
 }
@@ -1000,6 +1002,8 @@ interface SpecialtyListViewProps {
   onSearch: (v: string) => void;
   onSelectSpecialty: (s: Specialty) => void;
   onNavigateBack: () => void;
+  onNavigateHospitals: () => void;
+  onNavigateLogin: () => void;
 }
 
 function SpecialtyListView({
@@ -1009,55 +1013,71 @@ function SpecialtyListView({
   onSearch,
   onSelectSpecialty,
   onNavigateBack,
+  onNavigateHospitals,
+  onNavigateLogin,
 }: SpecialtyListViewProps) {
   const totalDoctors = allSpecialties.reduce((acc, s) => acc + s.doctors.length, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 font-sans">
       {/* Sticky top bar */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <button
             onClick={onNavigateBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors font-medium"
+            className="flex items-center gap-1.5 text-slate-600 hover:text-sky-600 transition-colors font-bold text-xs cursor-pointer"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-sky-600 rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-xs">
+              <Activity className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-gray-900 text-lg">MedConnect</span>
+            <span className="font-extrabold text-slate-900 text-sm">PenangHealth</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onNavigateHospitals}
+              className="flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3.5 py-1.5 rounded-xl transition cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5 text-sky-600" />
+              <span>Hospitals &amp; Clinics</span>
+            </button>
+            <button
+              onClick={onNavigateLogin}
+              className="text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 px-4 py-1.5 rounded-xl transition cursor-pointer shadow-xs"
+            >
+              Sign In
+            </button>
           </div>
         </div>
       </div>
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-teal-600 via-teal-500 to-sky-500 py-16 px-4">
+      <div className="bg-gradient-to-br from-sky-500 via-sky-600 to-blue-600 py-14 px-4 text-white">
         <div className="max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-5">
+          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4 border border-white/20">
             <Stethoscope className="w-4 h-4 text-white" />
-            <span className="text-white text-sm font-medium">
+            <span className="text-white text-xs font-bold">
               {allSpecialties.length} Specialties · {totalDoctors} Doctors
             </span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight">
-            Find Your Specialist
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-3 tracking-tight">
+            Find Your Specialist Doctor
           </h1>
-          <p className="text-teal-100 text-lg max-w-2xl mx-auto mb-10">
-            Browse medical specialties and connect with experienced doctors across Penang's top
-            hospitals and clinics.
+          <p className="text-sky-100 text-sm max-w-2xl mx-auto mb-8 font-medium">
+            Browse medical specialties and connect with credentialed doctors across Penang's accredited private hospitals.
           </p>
           {/* Search */}
           <div className="relative max-w-xl mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
             <input
               type="text"
               placeholder="Search specialties or doctor names…"
               value={search}
               onChange={(e) => onSearch(e.target.value)}
-              className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white shadow-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400 text-base"
+              className="w-full pl-11 pr-5 py-3.5 rounded-2xl bg-white shadow-md text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 text-xs sm:text-sm font-medium"
             />
           </div>
         </div>
@@ -1472,39 +1492,39 @@ function HospitalDoctorsListView({
   onNavigateLogin,
 }: HospitalDoctorsListViewProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 font-sans">
       {/* Sticky top bar */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <button
             onClick={onNavigateBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors font-medium text-sm"
+            className="flex items-center gap-1.5 text-slate-600 hover:text-sky-600 transition-colors font-bold text-xs cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Home</span>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-sky-600 rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-xs">
+              <Activity className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-gray-900 text-lg">MedConnect</span>
+            <span className="font-extrabold text-slate-900 text-sm">PenangHealth</span>
           </div>
         </div>
       </div>
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-teal-600 via-teal-500 to-sky-500 py-16 px-4">
+      <div className="bg-gradient-to-br from-sky-500 via-sky-600 to-blue-600 py-14 px-4 text-white">
         <div className="max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-5">
+          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4 border border-white/20">
             <Building2 className="w-4 h-4 text-white" />
-            <span className="text-white text-sm font-medium">
+            <span className="text-white text-xs font-bold">
               {hospitalName}
             </span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-4 leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-3 tracking-tight">
             Clinical Specialists
           </h1>
-          <p className="text-teal-100 text-base max-w-xl mx-auto mb-8">
+          <p className="text-sky-100 text-xs sm:text-sm max-w-xl mx-auto mb-6 font-medium">
             Consult with available doctors practicing at this facility. Clear filter to view all specialties.
           </p>
           <button

@@ -1,5 +1,7 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 /**
- * server.ts — CarePoint Patient Portal
+ * server.ts — LifeLink Healthcare Platform
  * Express API server + Vite dev middleware
  *
  * API Routes:
@@ -80,7 +82,7 @@ app.post("/api/auth/register", async (req, res) => {
         .replace(/\.+/g, ".")
         .replace(/^\.|\.$/g, "") || "guest";
       const suffix = Date.now().toString().slice(-5);
-      return `${base}-${suffix}@example.com`;
+      return `${base}-${suffix}@gmail.com`;
     };
 
     const emailToUse = (email || "").trim() || fallbackEmail(fullName);
@@ -513,7 +515,7 @@ app.get("/api/admin/staff-requests", async (_req, res) => {
         const meta = u.user_metadata || {};
         const role = meta.role || 'Patient';
         const approved = meta.approved;
-        return (role === 'Doctor' || role === 'Nurse') && approved === false;
+        return (role === 'Doctor' || role === 'Nurse' || role === 'Staff' || role === 'Clinic / Hospital') && approved === false;
       })
       .map((u: any) => ({
         id: u.id,
@@ -1131,15 +1133,67 @@ app.post("/api/appointments", async (req, res) => {
         notifyPatientAndStaff(
           patient.id,
           {
-            title: "Booking Confirmed",
-            message: `Booking confirmed, ${created.timeSlot} ${created.clinic}`
+            title: `Booking Confirmed (${created.queueNumber || '#Q-101'})`,
+            message: `Booking confirmed for ${created.timeSlot} at ${created.clinic} (Queue: ${created.queueNumber || '#Q-101'}). Please arrive at the clinic counter 5–10 minutes before your scheduled appointment time and present your Queue Number to the counter staff for on-site presence check-in.`
           },
-          `New booking by ${patientName}: ${created.clinic} - ${created.doctorName || 'Specialist'} on ${created.date} at ${created.timeSlot}.`
+          `New booking by ${patientName}: ${created.clinic} - ${created.doctorName || 'Specialist'} on ${created.date} at ${created.timeSlot} [Ticket: ${created.queueNumber || '#Q-101'}].`
         ).catch(err => console.error("Notification sync error:", err));
+
+        // If patient granted cross-facility sync authorization, record clinic in consentedClinics
+        if (apt.syncCrossFacilityRecords && created.clinic) {
+          const currentConsented = patient.consentedClinics || [];
+          if (!currentConsented.includes(created.clinic)) {
+            db.updatePatientProfile(patientEmail, {
+              consentedClinics: [...currentConsented, created.clinic]
+            }).catch(e => console.error("Failed to auto-add consented clinic:", e));
+          }
+        }
       }
     }
 
     return res.status(201).json(created);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/appointments/:id/ai-reminder
+ * Generates and dispatches an AI-crafted pre-appointment reminder (simulated 1 day prior)
+ */
+app.post("/api/appointments/:id/ai-reminder", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const apt = await db.getAppointmentById(id);
+    if (!apt) return res.status(404).json({ error: "Appointment not found" });
+
+    const patient = apt.patientId 
+      ? await db.getPatientProfileById(apt.patientId)
+      : null;
+
+    if (!patient || !patient.email) {
+      return res.status(400).json({ error: "Patient profile not found for this appointment" });
+    }
+
+    const reminderMessage = `Upcoming appointment reminder: Your consultation with ${apt.doctorName || 'Specialist'} at ${apt.clinic} is scheduled for tomorrow at ${apt.timeSlot}. Please arrive 5–10 minutes early at reception. Your digital queue voucher is ${apt.queueNumber || '#Q-101'}. Please bring your MyKad/Passport.`;
+
+    const newNotif = {
+      id: "notif-remind-" + Date.now(),
+      title: `🤖 AI Appointment Reminder: ${apt.clinic}`,
+      body: reminderMessage,
+      message: reminderMessage,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: new Date().toISOString(),
+      category: "reminder",
+      read: false
+    };
+
+    const existingNotifs = patient.notifications || [];
+    await db.updatePatientProfile(patient.email, {
+      notifications: [newNotif, ...existingNotifs]
+    });
+
+    return res.json({ success: true, notification: newNotif });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

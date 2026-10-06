@@ -14,7 +14,8 @@ import {
   TrendingDown,
   User,
   FileText,
-  Bookmark
+  Bookmark,
+  Scale
 } from 'lucide-react';
 import { Appointment, PatientProfile, VitalSign } from '../types';
 
@@ -31,7 +32,7 @@ export default function HealthcareAnalytics({
   appointments,
   onSetScreen
 }: HealthcareAnalyticsProps) {
-  // Whether real vitals data exists
+  // Whether real clinical vitals data exists
   const hasVitals = vitals && vitals.length > 0;
 
   // 1. Calculate Average Vitals — null when no data
@@ -59,7 +60,7 @@ export default function HealthcareAnalytics({
     };
   }, [vitals, hasVitals]);
 
-  // 2. Status flags based on average vitals (only computed when data exists)
+  // 2. Status flags based on average vitals
   const healthStatus = useMemo(() => {
     if (!avgVitals) return null;
     const sys = avgVitals.bpSys;
@@ -67,7 +68,7 @@ export default function HealthcareAnalytics({
     const hr = avgVitals.heartRate;
     const o2 = avgVitals.oxygen;
 
-    let bpStatus = { label: 'Optimal', color: 'text-teal-600 bg-teal-50 border-teal-100', desc: 'Blood pressure is in a healthy range.' };
+    let bpStatus = { label: 'Optimal', color: 'text-sky-600 bg-sky-50 border-sky-100', desc: 'Blood pressure is in a healthy range.' };
     if (sys >= 140 || dia >= 90) {
       bpStatus = { label: 'Hypertension Stage 2', color: 'text-red-600 bg-red-50 border-red-100', desc: 'High blood pressure. Please consult a doctor.' };
     } else if (sys >= 130 || dia >= 80) {
@@ -76,14 +77,14 @@ export default function HealthcareAnalytics({
       bpStatus = { label: 'Elevated', color: 'text-amber-600 bg-amber-50 border-amber-100', desc: 'Slightly elevated. Maintain healthy lifestyle.' };
     }
 
-    let hrStatus = { label: 'Normal', color: 'text-teal-600 bg-teal-50 border-teal-100' };
+    let hrStatus = { label: 'Normal', color: 'text-sky-600 bg-sky-50 border-sky-100' };
     if (hr > 100) {
       hrStatus = { label: 'Tachycardia', color: 'text-red-650 bg-red-50 border-red-100' };
     } else if (hr < 60) {
       hrStatus = { label: 'Bradycardia', color: 'text-amber-600 bg-amber-50 border-amber-100' };
     }
 
-    let o2Status = { label: 'Healthy', color: 'text-teal-600 bg-teal-50 border-teal-100' };
+    let o2Status = { label: 'Healthy', color: 'text-sky-600 bg-sky-50 border-sky-100' };
     if (o2 < 95) {
       o2Status = { label: 'Low Saturation', color: 'text-red-600 bg-red-50 border-red-100' };
     }
@@ -95,14 +96,13 @@ export default function HealthcareAnalytics({
   const lastReport = useMemo(() => {
     const completed = appointments.filter(a => a.status === 'Completed');
     if (completed.length === 0) return null;
-    // Sort by date descending
     return [...completed].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   }, [appointments]);
 
-  // 4. Cardiovascular Risk Score Estimator (only when vitals exist)
+  // 4. Cardiovascular Risk Score Estimator
   const cvdRiskScore = useMemo(() => {
     if (!avgVitals) return null;
-    let score = 5; // Base risk%
+    let score = 5;
     if (patientProfile.chronicConditions && patientProfile.chronicConditions.some(c => c.toLowerCase().includes('diabetes') || c.toLowerCase().includes('hypertension'))) {
       score += 8;
     }
@@ -110,7 +110,6 @@ export default function HealthcareAnalytics({
     if (avgVitals.heartRate > 85) score += 2;
     if (patientProfile.gender === 'Male') score += 2;
     
-    // Age factor
     if (patientProfile.dateOfBirth) {
       const age = new Date().getFullYear() - new Date(patientProfile.dateOfBirth).getFullYear();
       if (age > 50) score += 6;
@@ -121,39 +120,30 @@ export default function HealthcareAnalytics({
 
   const riskTier = useMemo(() => {
     if (cvdRiskScore === null) return null;
-    if (cvdRiskScore < 10) return { label: 'Low Risk', color: 'text-teal-600 bg-teal-50 border-teal-100', progress: 'bg-teal-500' };
+    if (cvdRiskScore < 10) return { label: 'Low Risk', color: 'text-sky-600 bg-sky-50 border-sky-100', progress: 'bg-sky-500' };
     if (cvdRiskScore < 20) return { label: 'Moderate Risk', color: 'text-amber-600 bg-amber-50 border-amber-100', progress: 'bg-amber-500' };
     return { label: 'High Risk', color: 'text-red-600 bg-red-50 border-red-100', progress: 'bg-red-500' };
   }, [cvdRiskScore]);
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-teal-600 to-sky-600 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-2xl" />
+    <div id="healthcare-analytics-view" className="py-6 space-y-8 max-w-7xl mx-auto font-sans text-neutral-800">
+      
+      {/* 1. Header Banner */}
+      <div className="bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-xs font-semibold">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Interactive Health Dashboard</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Healthcare Analytics</h1>
-            <p className="text-teal-100 text-sm max-w-xl leading-relaxed">
-              Track clinical trends, review average diagnostic vitals, and explore your cardiovascular wellness index.
+            <p className="text-sky-100 text-sm max-w-xl leading-relaxed font-medium">
+              Diagnostic vital signs, clinical laboratory trends, and cardiovascular health risk index recorded by healthcare providers and attending physicians.
             </p>
           </div>
-          <button
-            onClick={() => onSetScreen('medical-records')}
-            className="px-6 py-3 rounded-2xl bg-white text-teal-700 hover:bg-teal-50 text-sm font-bold shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
-          >
-            Update Vitals Logs
-          </button>
         </div>
       </div>
 
-      {/* Grid of Averages (Diagnostic Cards) */}
+      {/* 2. Grid of Clinical Vitals Averages */}
       {hasVitals && avgVitals && healthStatus ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Blood Pressure Card */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
@@ -181,15 +171,15 @@ export default function HealthcareAnalytics({
           {/* Heart Rate Card */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center">
-                <Activity className="w-5 h-5 text-teal-600" />
+              <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-sky-600" />
               </div>
               <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border ${healthStatus.hrStatus.color}`}>
                 {healthStatus.hrStatus.label}
               </span>
             </div>
             <div>
-              <span className="text-xs text-gray-400 font-medium block">Average Pulse</span>
+              <span className="text-xs text-gray-400 font-medium block">Average Pulse Rate</span>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-3xl font-extrabold text-gray-900">{avgVitals.heartRate}</span>
                 <span className="text-xs text-gray-500 font-medium ml-1">BPM</span>
@@ -203,8 +193,8 @@ export default function HealthcareAnalytics({
           {/* Oxygen Saturation Card */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-sky-500" />
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-blue-500" />
               </div>
               <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border ${healthStatus.o2Status.color}`}>
                 {healthStatus.o2Status.label}
@@ -217,22 +207,44 @@ export default function HealthcareAnalytics({
                 <span className="text-xs text-gray-500 font-medium ml-1">SpO2</span>
               </div>
               <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                Maintains cell oxygenation. Values above 95% indicate healthy lung efficiency.
+                Maintains cellular oxygenation. Values above 95% indicate healthy lung efficiency.
+              </p>
+            </div>
+          </div>
+
+          {/* Body Weight Card */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                <Scale className="w-5 h-5 text-indigo-600" />
+              </div>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border text-indigo-700 bg-indigo-50 border-indigo-100">
+                Logged
+              </span>
+            </div>
+            <div>
+              <span className="text-xs text-gray-400 font-medium block">Body Weight</span>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-3xl font-extrabold text-gray-900">{avgVitals.weight || 70}</span>
+                <span className="text-xs text-gray-500 font-medium ml-1">kg</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                Last logged: {vitals[vitals.length - 1]?.timestamp || '14 June 2026'}
               </p>
             </div>
           </div>
         </div>
       ) : (
-        /* Empty State — Awaiting Staff Data Entry */
+        /* Empty State — Awaiting Clinic Entry */
         <div className="bg-white rounded-3xl border border-dashed border-gray-200 shadow-sm p-8 sm:p-10">
           <div className="text-center space-y-4 max-w-md mx-auto">
             <div className="w-16 h-16 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto">
               <Activity className="w-7 h-7 text-slate-300" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-extrabold text-gray-900 text-lg">No Vitals Data Recorded Yet</h3>
+              <h3 className="font-extrabold text-gray-900 text-lg">No Clinical Vitals Recorded Yet</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Your diagnostic vitals (Blood Pressure, Heart Rate, SpO₂) will appear here after the medical staff updates your clinical report during or after your visit.
+                Your diagnostic vitals (Blood Pressure, Heart Rate, SpO₂) will appear here after clinic staff updates your clinical report during or after your visit.
               </p>
             </div>
             <div className="flex items-center justify-center gap-2 pt-2">
@@ -245,10 +257,10 @@ export default function HealthcareAnalytics({
         </div>
       )}
 
-      {/* Main 2-Column Section */}
+      {/* 3. Main 2-Column Section: CVD Risk & Historic Logs + Doctor Report & Medications */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left 2 Columns: Risk Indices and Historic Vitals Details */}
+        {/* Left 2 Columns */}
         <div className="lg:col-span-2 space-y-8">
           
           {/* Cardiovascular Risk Predictor */}
@@ -257,7 +269,7 @@ export default function HealthcareAnalytics({
               <div>
                 <h2 className="font-extrabold text-gray-900 text-lg sm:text-xl">Cardiovascular Health Predictor</h2>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Estimates your relative 10-year risk of cardiovascular disease based on clinical statistics.
+                  Estimates your relative 10-year risk of cardiovascular disease based on clinical statistics and vital history.
                 </p>
               </div>
               {riskTier ? (
@@ -285,11 +297,11 @@ export default function HealthcareAnalytics({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3 text-xs text-slate-600">
-                    <Award className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                    <Award className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold text-slate-800">Healthy Habits Advantage</p>
                       <p className="mt-1 leading-relaxed text-slate-500">
-                        A diet rich in soluble fibers can reduce cardiovascular risk markers by up to 15%.
+                        A diet rich in soluble fibers and regular checkups can reduce cardiovascular risk markers by up to 15%.
                       </p>
                     </div>
                   </div>
@@ -321,7 +333,7 @@ export default function HealthcareAnalytics({
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between border-b border-gray-50 pb-4">
               <h2 className="font-extrabold text-gray-900 text-lg sm:text-xl">Vitals Historical Logs</h2>
-              <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
+              <span className="text-xs font-bold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-full">
                 {vitals.length} Entries
               </span>
             </div>
@@ -331,7 +343,7 @@ export default function HealthcareAnalytics({
                 <p>No historical vitals found. Add entries in the Medical Records section.</p>
                 <button
                   onClick={() => onSetScreen('medical-records')}
-                  className="text-teal-600 hover:underline font-bold"
+                  className="text-sky-600 hover:underline font-bold cursor-pointer"
                 >
                   Go to Medical Records
                 </button>
@@ -367,13 +379,13 @@ export default function HealthcareAnalytics({
           </div>
         </div>
 
-        {/* Right 1 Column: Last Body Check and Active Reminders */}
+        {/* Right 1 Column: Last Body Check and Active Prescriptions */}
         <div className="space-y-8">
           
           {/* Last Completed Body Check */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
             <h3 className="font-extrabold text-gray-900 text-base flex items-center gap-2">
-              <FileText className="w-4.5 h-4.5 text-teal-600" />
+              <FileText className="w-4.5 h-4.5 text-sky-600" />
               <span>Last Medical Report</span>
             </h3>
 

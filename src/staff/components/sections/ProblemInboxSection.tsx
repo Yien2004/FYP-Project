@@ -54,7 +54,7 @@ export default function ProblemInboxSection() {
       level: log.level,
       rawMessage: msg,
       senderName: fromMatch ? fromMatch[1].trim() : 'Unknown Staff',
-      senderEmail: fromMatch ? fromMatch[2].trim() : 'unknown@carepoint.com',
+      senderEmail: fromMatch ? fromMatch[2].trim() : 'unknown@lifelink.org',
       clinicName: clinicMatch ? clinicMatch[1].trim() : 'General Facility',
       category: categoryMatch ? categoryMatch[1].trim() : 'System Issue',
       severity: ['Critical', 'High', 'Medium', 'Low'].includes(severity) ? severity : 'Medium',

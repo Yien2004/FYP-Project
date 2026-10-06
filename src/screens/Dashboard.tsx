@@ -262,17 +262,63 @@ export default function Dashboard({
   }, [selectedQueueClinic, appointments]);
 
   const [presenceConfirmed, setPresenceConfirmed] = useState<boolean>(false);
+  const [simulateCheckInWindow, setSimulateCheckInWindow] = useState<boolean>(false);
 
   useEffect(() => {
     if (activeApt) {
-      setPresenceConfirmed(localStorage.getItem(`presence_${activeApt.id}`) === "true");
+      setPresenceConfirmed(activeApt.checkedIn || localStorage.getItem(`presence_${activeApt.id}`) === "true");
     } else {
       setPresenceConfirmed(false);
     }
   }, [activeApt]);
 
+  // Generate a deterministic ticket number based on clinic choice or stored queueNumber
+  const myTicket = useMemo(() => {
+    if (activeApt?.queueNumber) return activeApt.queueNumber;
+    if (!selectedQueueClinic) return "#Q-100";
+    if (activeApt) {
+      const code = parseInt(activeApt.id.replace(/\D/g, ""), 10) || 124;
+      return `#Q-${100 + (code % 250)}`;
+    }
+    const clinicSum = selectedQueueClinic.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return `#Q-${100 + (clinicSum % 250)}`;
+  }, [selectedQueueClinic, activeApt]);
+
+  // 5–10 minute check-in window validation
+  const checkInWindow = useMemo(() => {
+    if (!activeApt) return { canCheckIn: false, reason: "No active consultation", isTooEarly: false };
+    if (simulateCheckInWindow) return { canCheckIn: true, reason: "Check-in window active (Simulation Mode).", isTooEarly: false };
+    
+    const aptTime = getAptDateTime(activeApt);
+    if (!aptTime) return { canCheckIn: true, reason: "", isTooEarly: false };
+
+    const now = new Date();
+    const diffMs = aptTime.getTime() - now.getTime();
+    const diffMins = Math.round(diffMs / (60 * 1000));
+
+    // Check-in window: between 10 minutes before and 15 minutes after appointment time
+    if (diffMins > 10) {
+      const unlockTime = new Date(aptTime.getTime() - 10 * 60 * 1000);
+      const timeStr = unlockTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return { 
+        canCheckIn: false, 
+        reason: `Check-in unlocks 5–10 minutes before your slot (at ${timeStr}).`,
+        isTooEarly: true 
+      };
+    } else if (diffMins < -15) {
+      return { 
+        canCheckIn: false, 
+        reason: `Appointment slot has lapsed. Please approach the triage reception desk directly.`,
+        isTooEarly: false 
+      };
+    } else {
+      return { canCheckIn: true, reason: "You are currently within the 5–10 min arrival check-in window.", isTooEarly: false };
+    }
+  }, [activeApt, simulateCheckInWindow]);
+
   const handleConfirmPresence = async () => {
     if (!activeApt) return;
+    const checkInTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     localStorage.setItem(`presence_${activeApt.id}`, "true");
     setPresenceConfirmed(true);
 
@@ -287,20 +333,49 @@ export default function Dashboard({
       await fetch(`/api/appointments/${activeApt.id}`, {
         method: "PUT",
         headers,
-        body: JSON.stringify({ checkedIn: true })
+        body: JSON.stringify({ 
+          checkedIn: true,
+          checkInTime,
+          queueNumber: myTicket
+        })
       });
 
       await fetch("/api/logs", {
         method: "POST",
         headers,
         body: JSON.stringify({
-          message: `Queue Ticket Check-in: Patient ${patientProfile.fullName} confirmed presence at ${activeApt.clinic} reception desk for ticket ${myTicket}.`,
+          message: `Queue Ticket Check-in: Patient ${patientProfile.fullName} confirmed on-site arrival at ${activeApt.clinic} reception desk for ticket ${myTicket} at ${checkInTime}.`,
           level: "info"
         })
       });
-      console.log("✅  Presence confirmation logged to database system logs.");
+      alert(`✓ CHECK-IN CONFIRMED!\n\nYour arrival has been recorded at ${activeApt.clinic}. Reception desk notified for Ticket ${myTicket}.`);
     } catch (err) {
       console.error("Failed to post presence log to database", err);
+    }
+  };
+
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const handleTriggerAiReminder = async (aptId: string) => {
+    setIsSendingReminder(true);
+    try {
+      const token = localStorage.getItem("carepoint_access_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`/api/appointments/${aptId}/ai-reminder`, {
+        method: "POST",
+        headers
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`🤖 AI APPOINTMENT REMINDER SENT!\n\n${data.reminder?.title || 'Appointment Reminder'}\n\n${data.reminder?.body || 'Check your Notifications tab to view the generated reminder.'}`);
+      } else {
+        alert(`Could not trigger AI reminder: ${data.message || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error triggering reminder: ${err.message}`);
+    } finally {
+      setIsSendingReminder(false);
     }
   };
 
@@ -309,19 +384,8 @@ export default function Dashboard({
     return checkQueueActivation(activeApt);
   }, [activeApt, todayStr]);
 
-  // Generate a deterministic ticket number based on clinic choice
-  const myTicket = useMemo(() => {
-    if (!selectedQueueClinic) return "#0000";
-    if (activeApt) {
-      const code = parseInt(activeApt.id.replace(/\D/g, ""), 10) || 124;
-      return `#${1000 + (code % 250)}`;
-    }
-    const clinicSum = selectedQueueClinic.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return `#${1000 + (clinicSum % 250)}`;
-  }, [selectedQueueClinic, activeApt]);
-
   const ticketInt = useMemo(() => {
-    return parseInt(myTicket.replace("#", ""), 10);
+    return parseInt(myTicket.replace("#Q-", "").replace("#", ""), 10) || 100;
   }, [myTicket]);
 
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -444,7 +508,7 @@ export default function Dashboard({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `CarePoint_Report_${apt.date}_${apt.id}.json`);
+    downloadAnchor.setAttribute("download", `PenangHealth_Report_${apt.date}_${apt.id}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -452,7 +516,7 @@ export default function Dashboard({
   };
 
   const handleDownloadPrescription = (apt: Appointment) => {
-    const contents = `CarePoint Outpatient Consultation & Prescription Ledger\n=======================================================\nDate: ${apt.date}\nDoctor: ${apt.doctorName} (${apt.specialty})\nPatient Name: ${patientProfile.fullName}\n\nClinical Notes:\n${apt.clinicalNotes || "General consultation filed."}\n\nPrescribed Medication:\n${apt.prescription || "None."}\n=======================================================\nGenerated by CarePoint Patient Portal.`;
+    const contents = `PenangHealth Outpatient Consultation & Prescription Ledger\n=======================================================\nDate: ${apt.date}\nDoctor: ${apt.doctorName} (${apt.specialty})\nPatient Name: ${patientProfile.fullName}\n\nClinical Notes:\n${apt.clinicalNotes || "General consultation filed."}\n\nPrescribed Medication:\n${apt.prescription || "None."}\n=======================================================\nGenerated by PenangHealth Patient Portal.`;
     const blob = new Blob([contents], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -465,7 +529,7 @@ export default function Dashboard({
   };
 
   const handleDownloadMC = (apt: Appointment) => {
-    const contents = `CarePoint Verified Digital Medical Certificate (MC)\n=======================================================\nDate of Issue: ${apt.date}\nAttending Physician: ${apt.doctorName}\nClinic/Facility: ${apt.clinic || apt.doctorName}\nPatient: ${patientProfile.fullName}\nMyKad/Passport: ${patientProfile.myKadOrPassport}\n\nThis certifies that the patient was evaluated and is unfit for duty for a period of 1 day(s) starting on ${apt.date}.\n\nMOH Digital Verification Code: REG-MOH-${(apt.doctorId || "DOC").toUpperCase().slice(0, 5)}\n=======================================================\nCarePoint Verified Digital MC`;
+    const contents = `PenangHealth Digital Medical Certificate (MC)\n=======================================================\nDate of Issue: ${apt.date}\nAttending Physician: ${apt.doctorName}\nClinic/Facility: ${apt.clinic || apt.doctorName}\nPatient: ${patientProfile.fullName}\nMyKad/Passport: ${patientProfile.myKadOrPassport}\n\nThis certifies that the patient was evaluated and is unfit for duty for a period of 1 day(s) starting on ${apt.date}.\n\nVerification Code: REG-PH-${(apt.doctorId || "DOC").toUpperCase().slice(0, 5)}\n=======================================================\nPenangHealth Verified Digital MC`;
     const blob = new Blob([contents], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -487,7 +551,7 @@ export default function Dashboard({
     
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `CarePoint_Secure_Data_Backup_${patientProfile.myKadOrPassport || "EHR"}.json`);
+    downloadAnchor.setAttribute("download", `PenangHealth_Health_Record_${patientProfile.myKadOrPassport || "EHR"}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -503,7 +567,7 @@ export default function Dashboard({
       link.click();
       document.body.removeChild(link);
     } else {
-      const contents = `CarePoint MOH Health Ledger System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt || "June 15, 2026"}\nPatient Name: ${patientProfile.fullName}\nPatient DOB: ${patientProfile.dateOfBirth}\nGender: ${patientProfile.gender}\nEmail: ${patientProfile.email}\n---------------------------------------\n[COMPILER SUCCESS] This is a simulated clinical record file parsed from CarePoint central database.\n`;
+      const contents = `PenangHealth Records System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt || "June 15, 2026"}\nPatient Name: ${patientProfile.fullName}\nPatient DOB: ${patientProfile.dateOfBirth}\nGender: ${patientProfile.gender}\nEmail: ${patientProfile.email}\n---------------------------------------\nOfficial Clinical Document Export • Penang Private Healthcare Network\n`;
       const blob = new Blob([contents], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -519,59 +583,79 @@ export default function Dashboard({
   return (
     <div id="dashboard-view" className="py-6 space-y-8 max-w-7xl mx-auto font-sans">
       
-      {/* 1. TOP BANNER: Dynamic welcome card */}
-      <div className="bg-gradient-to-br from-teal-600 to-sky-600 text-white rounded-3xl p-6 shadow-md shadow-teal-600/15 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      {/* 1. TOP BANNER: Dynamic welcome card (Clean light blue theme) */}
+      <div className="bg-gradient-to-r from-sky-50/80 via-blue-50/50 to-white border border-sky-100 text-slate-800 rounded-3xl p-6 shadow-sm relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="space-y-2 relative z-10">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-teal-100 bg-teal-500/30 px-2.5 py-1 rounded-full">
-            Patient Health Advisory
-          </span>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
             Selamat Datang, {patientProfile.fullName.split(" ")[0]}
           </h1>
-          <p className="text-xs text-teal-50 leading-relaxed max-w-2xl">
+          <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
             {nextUpcoming ? (
               <span>
-                <strong>Reminder:</strong> You have an upcoming consultation with <strong>{nextUpcoming.doctorName}</strong> at <strong>{nextUpcoming.clinic}</strong> scheduled on <strong>{nextUpcoming.date}</strong> at <strong>{nextUpcoming.timeSlot}</strong>.
+                <strong className="text-slate-900">Reminder:</strong> You have an upcoming consultation with <strong className="text-sky-700">{nextUpcoming.doctorName}</strong> at <strong className="text-slate-900">{nextUpcoming.clinic}</strong> scheduled on <strong className="text-slate-900">{nextUpcoming.date}</strong> at <strong className="text-slate-900">{nextUpcoming.timeSlot}</strong>.
               </span>
             ) : (
               <span>
-                <strong>Advisory:</strong> Standard seasonal influenza levels are currently elevated. Ensure proper hydration, avoid crowded indoor environments, and schedule preventive checkups or vaccinations at your nearest clinic.
+                <strong className="text-slate-900">Health Tip:</strong> Maintain a balanced lifestyle with regular hydration, adequate sleep, and daily physical activity. Schedule routine checkups to keep your vital statistics in optimal range.
               </span>
             )}
           </p>
+
+          {nextUpcoming && (
+            <div className="flex flex-wrap items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => onSetScreen("fetching-transit")}
+                className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>🚗</span>
+                <span>Book Grab Ride (Simulation)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTriggerAiReminder(nextUpcoming.id)}
+                disabled={isSendingReminder}
+                className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs px-3.5 py-1.5 rounded-xl transition border border-slate-200 cursor-pointer disabled:opacity-50 active:scale-95 shadow-xs"
+              >
+                <span>🤖</span>
+                <span>{isSendingReminder ? "Sending AI Reminder..." : "Test AI 24h Reminder"}</span>
+              </button>
+            </div>
+          )}
         </div>
-        <div className="absolute right-0 bottom-0 opacity-10 translate-y-4 translate-x-4 pointer-events-none">
-          <HeartHandshake className="w-48 h-48" />
+        <div className="absolute right-0 bottom-0 opacity-10 translate-y-4 translate-x-4 pointer-events-none text-sky-600">
+          <HeartHandshake className="w-48 h-48 text-sky-500" />
         </div>
       </div>
 
       {/* Grab Fetching Ride Panel */}
       {nextUpcoming && nextUpcoming.requestRide && (
-        <div className="bg-white border border-teal-100 rounded-3xl p-6 shadow-md shadow-teal-600/5 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-l-4 border-l-teal-600">
+        <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-md shadow-blue-600/5 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-l-4 border-l-blue-600">
           <div className="flex items-center gap-4.5">
-            <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0 text-xl animate-pulse">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 text-xl animate-pulse">
               🚗
             </div>
             <div className="space-y-1">
-              <span className="text-[9px] font-extrabold uppercase tracking-widest text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full inline-block">
-                LifeLink Fetching Transit (Grab Service)
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full inline-block">
+                Grab Outpatient Transit Service
               </span>
               <h3 className="text-sm font-extrabold text-slate-800">
                 Driver is on the way to pick you up
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Driver <span className="font-bold text-slate-700">Danish</span> (Proton Saga Grey - <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] font-bold">WEE 2026</span>) is arriving. Destination strictly locked to <span className="font-bold text-teal-700">{nextUpcoming.clinic}</span>.
+                Driver <span className="font-bold text-slate-700">Danish</span> (Proton Saga Grey - <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] font-bold">WEE 2026</span>) is arriving. Destination strictly locked to <span className="font-bold text-blue-700">{nextUpcoming.clinic}</span>.
               </p>
             </div>
           </div>
           <div className="flex flex-col items-end shrink-0 w-full md:w-auto">
             <div className="text-right space-y-0.5">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Estimated Arrival</span>
-              <span className="text-2xl font-black text-teal-650 tracking-tight block">{getClinicTravelTime(nextUpcoming.clinic)} Mins</span>
+              <span className="text-2xl font-black text-blue-700 tracking-tight block">{getClinicTravelTime(nextUpcoming.clinic)} Mins</span>
             </div>
             {/* Simple Transit Progress Bar */}
             <div className="w-full md:w-48 bg-slate-100 h-2 rounded-full mt-2.5 overflow-hidden relative">
-              <div className="bg-teal-600 h-full rounded-full animate-pulse" style={{ width: '65%' }}></div>
+              <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '65%' }}></div>
             </div>
           </div>
         </div>
@@ -585,7 +669,7 @@ export default function Dashboard({
           {/* 2. UPCOMING BOOKINGS */}
           <div className="space-y-4">
             <h2 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-teal-600" /> Upcoming Consultations
+              <Calendar className="w-5 h-5 text-blue-600" /> Upcoming Consultations
             </h2>
 
             {upcomingList.length === 0 ? (
@@ -595,7 +679,7 @@ export default function Dashboard({
                 </p>
                 <button
                   onClick={() => onSetScreen("schedule-appointment")}
-                  className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition cursor-pointer shadow-md shadow-teal-600/10 inline-flex items-center gap-1.5"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition cursor-pointer shadow-md shadow-blue-600/15 inline-flex items-center gap-1.5"
                 >
                   <Calendar className="w-4 h-4" /> Book Appointment Now
                 </button>
@@ -611,7 +695,7 @@ export default function Dashboard({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-slate-900 text-sm">{apt.doctorName}</span>
-                          <span className="bg-teal-50 text-teal-700 border border-teal-100 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                          <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-bold px-2 py-0.5 rounded-full">
                             {apt.type}
                           </span>
                         </div>
@@ -621,10 +705,10 @@ export default function Dashboard({
 
                       <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium font-sans">
                         <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-teal-600" /> {apt.date}
+                          <Calendar className="w-3.5 h-3.5 text-blue-600" /> {apt.date}
                         </span>
                         <span className="flex items-center gap-1 font-mono">
-                          <Clock className="w-3.5 h-3.5 text-teal-600" /> {apt.timeSlot}
+                          <Clock className="w-3.5 h-3.5 text-blue-600" /> {apt.timeSlot}
                         </span>
                       </div>
                     </div>
@@ -632,7 +716,7 @@ export default function Dashboard({
                     <div className="flex items-center gap-2.5 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
                       <button 
                         onClick={() => onSetScreen("communication")}
-                        className="flex-1 sm:flex-none border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+                        className="flex-1 sm:flex-none border border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
                       >
                         Message Staff
                       </button>
@@ -651,16 +735,16 @@ export default function Dashboard({
 
           {/* 3. LIVE QUEUE STATUS TRACKER (Shown after booking / if there are booked facilities) */}
           {queueClinics.length > 0 && (
-            <div className="bg-gradient-to-br from-teal-900 to-teal-950 text-white rounded-3xl p-6 border border-teal-800 shadow-lg shadow-teal-950/20 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-teal-800 gap-4">
+            <div className="bg-white text-slate-800 rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
                 <div>
-                  <span className="text-[10px] tracking-widest font-mono text-teal-300 uppercase block">Outpatient Live Queue Counter</span>
+                  <span className="text-[10px] tracking-widest font-mono text-sky-700 uppercase block font-bold">Outpatient Live Queue Counter</span>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-xs text-slate-300 font-bold">Facility:</span>
+                    <span className="text-xs text-slate-600 font-bold">Facility:</span>
                     <select 
                       value={selectedQueueClinic}
                       onChange={(e) => setSelectedQueueClinic(e.target.value)}
-                      className="bg-teal-950 border border-teal-800 text-white font-bold text-xs rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
+                      className="bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:border-sky-500 cursor-pointer"
                     >
                       {queueClinics.map(name => (
                         <option key={name} value={name}>{name}</option>
@@ -669,9 +753,9 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-center bg-teal-950 border border-teal-800 px-3 py-1 rounded-full shrink-0">
-                  <span className={`w-2 h-2 ${queueStatus.active ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'} rounded-full`}></span>
-                  <span className="text-[10px] text-teal-200 font-bold uppercase tracking-wider font-mono">
+                <div className="flex items-center gap-2 self-start sm:self-center bg-sky-50 border border-sky-200 px-3 py-1 rounded-full shrink-0">
+                  <span className={`w-2 h-2 ${queueStatus.active ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'} rounded-full`}></span>
+                  <span className="text-[10px] text-sky-800 font-bold uppercase tracking-wider font-mono">
                     {queueStatus.active ? "Live Counter" : "Standby Status"}
                   </span>
                 </div>
@@ -680,83 +764,109 @@ export default function Dashboard({
               {queueStatus.active ? (
                 <>
                   {/* Countdown Timer Row */}
-                  <div className="bg-teal-950 border border-teal-850/60 p-4 rounded-2xl flex items-center justify-between gap-4 font-mono">
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex items-center justify-between gap-4 font-mono">
                     <div>
-                      <span className="text-[10px] font-bold text-teal-300 uppercase block tracking-wider">Appointment Countdown</span>
-                      <span className="text-xl font-black text-white tracking-widest">{formatCountdown(secondsLeft)}</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Appointment Countdown</span>
+                      <span className="text-xl font-black text-slate-900 tracking-widest">{formatCountdown(secondsLeft)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] font-bold text-teal-300 uppercase block tracking-wider">Scheduled Time</span>
-                      <span className="text-xs font-bold text-teal-100">{activeApt?.timeSlot} ({activeApt?.date})</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Scheduled Time</span>
+                      <span className="text-xs font-bold text-slate-800">{activeApt?.timeSlot} ({activeApt?.date})</span>
                     </div>
                   </div>
 
-                  {/* Presence Check-in Card */}
-                  {((secondsLeft !== null && secondsLeft <= 1200) || estimatedWait <= 10) && (
-                    <div className={`p-4 rounded-2xl border transition-all duration-300 ${
-                      presenceConfirmed
-                        ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-200'
-                        : 'bg-amber-950/60 border-amber-500/30 text-amber-200'
-                    }`}>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          {presenceConfirmed ? (
-                            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                          ) : (
-                            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
-                          )}
-                          <div>
-                            <p className="font-bold text-white text-xs uppercase tracking-wide">
-                              {presenceConfirmed ? "✓ Presence Confirmed at Clinic Reception" : "Reception Attendance Verification"}
-                            </p>
-                            <p className="text-[11px] text-slate-350 mt-1 leading-normal font-sans">
+                  {/* On-Site Presence Check-In Card (Module 1 Requirement: 5-10 min arrival check-in) */}
+                  <div className={`p-4.5 rounded-2xl border transition-all duration-300 ${
+                    presenceConfirmed
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : checkInWindow.canCheckIn
+                        ? 'bg-amber-50 border-amber-200 text-amber-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        {presenceConfirmed ? (
+                          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : checkInWindow.canCheckIn ? (
+                          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+                        ) : (
+                          <span className="text-lg shrink-0 mt-0.5">⏱️</span>
+                        )}
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-slate-900 text-xs uppercase tracking-wide">
                               {presenceConfirmed 
-                                ? "Your presence has been successfully checked in. Please standby near the clinic lobby."
-                                : "You are next or close to being called. Please click the button to confirm your presence at the reception counter."}
+                                ? "✓ On-Site Check-In Confirmed" 
+                                : checkInWindow.canCheckIn 
+                                  ? "On-Site Arrival Check-In (5–10 Min Window Active)" 
+                                  : "On-Site Check-In Pending"}
                             </p>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white text-sky-800 border border-sky-200 font-bold">
+                              Ticket {myTicket}
+                            </span>
                           </div>
+                          <p className="text-[11px] text-slate-600 leading-normal font-sans">
+                            {presenceConfirmed 
+                              ? `Your physical arrival has been recorded for ${activeApt.clinic}. Please standby in the waiting area.`
+                              : checkInWindow.canCheckIn
+                                ? "You are within the 5–10 minute check-in window. Confirm your arrival now to notify the clinic reception desk."
+                                : `${checkInWindow.reason || 'Check-in is only permitted 5–10 minutes before your scheduled appointment time.'}`}
+                          </p>
                         </div>
-                        {!presenceConfirmed && (
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-stretch sm:self-auto justify-end">
+                        {!presenceConfirmed && checkInWindow.canCheckIn && (
                           <button
                             type="button"
                             onClick={handleConfirmPresence}
-                            className="bg-amber-500 hover:bg-amber-400 text-teal-950 text-xs font-black px-4.5 py-2.5 rounded-xl transition shadow-md shadow-amber-500/10 cursor-pointer self-stretch sm:self-auto text-center"
+                            className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4.5 py-2.5 rounded-xl transition shadow-sm cursor-pointer active:scale-95 text-center flex-1 sm:flex-initial"
                           >
-                            Confirm My Presence
+                            Confirm On-Site Check-In
+                          </button>
+                        )}
+                        {!presenceConfirmed && !checkInWindow.canCheckIn && (
+                          <button
+                            type="button"
+                            onClick={() => setSimulateCheckInWindow(prev => !prev)}
+                            className="bg-white hover:bg-slate-50 text-sky-700 text-[11px] font-bold px-3 py-2 rounded-xl transition border border-slate-200 cursor-pointer text-center shadow-xs"
+                            title="Toggle simulated 5-10 minute window for presentation/testing"
+                          >
+                            ⚡ Demo: {simulateCheckInWindow ? "Re-lock Window" : "Simulate 5-10m Window"}
                           </button>
                         )}
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-6 items-center text-center">
                     <div>
-                      <span className="text-[11px] text-teal-300 block mb-1">My Ticket Number</span>
-                      <span className="text-3xl font-black text-white font-mono tracking-tight font-bold">{myTicket}</span>
+                      <span className="text-[11px] text-slate-500 block mb-1 font-semibold">My Ticket Number</span>
+                      <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">{myTicket}</span>
                     </div>
-                    <div className="border-x border-teal-800">
-                      <span className="text-[11px] text-teal-300 block mb-1">Current Live Number</span>
-                      <span className="text-3xl font-black text-emerald-400 font-mono tracking-tight font-bold">#{currentLive}</span>
+                    <div className="border-x border-slate-200">
+                      <span className="text-[11px] text-slate-500 block mb-1 font-semibold">Current Live Number</span>
+                      <span className="text-3xl font-black text-sky-600 font-mono tracking-tight">#{currentLive}</span>
                     </div>
                     <div className="col-span-2 md:col-span-1 pt-2 md:pt-0">
-                      <span className="text-[11px] text-teal-300 block mb-1">Estimated Waiting Window</span>
-                      <span className="text-lg font-bold font-mono text-white block">
+                      <span className="text-[11px] text-slate-500 block mb-1 font-semibold">Estimated Waiting Window</span>
+                      <span className="text-lg font-bold font-mono text-slate-900 block">
                         {slotsAhead > 0 ? `~${estimatedWait} Minutes Remaining` : "Proceed Now!"}
                       </span>
-                      <span className="text-[10px] text-teal-400 font-bold block mt-0.5">
+                      <span className="text-[10px] text-sky-700 font-bold block mt-0.5">
                         {slotsAhead > 0 ? `${slotsAhead} patient${slotsAhead > 1 ? 's' : ''} ahead` : "Calling your ticket"}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-teal-800">
-                    <div className="flex items-center gap-2 text-xs text-teal-200 text-center sm:text-left">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200">
+                    <div className="flex items-center gap-2 text-xs text-slate-700 text-center sm:text-left">
                       {slotsAhead <= 2 && slotsAhead >= 0 ? (
-                        <span className="bg-emerald-500 text-white font-extrabold px-3 py-1 rounded-full animate-pulse flex items-center gap-1.5 text-[10px] uppercase tracking-wider border border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]">
+                        <span className="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full flex items-center gap-1.5 text-[10px] uppercase tracking-wider border border-emerald-200">
                           ● {slotsAhead === 0 ? "Your Turn - Proceed to Room now!" : `${slotsAhead} Slots Away - Please Standby!`}
                         </span>
                       ) : (
-                        <span className="bg-teal-800/80 text-teal-200 border border-teal-700 px-3 py-1 rounded-full font-bold flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                        <span className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded-full font-bold flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
                           ● Waiting in Queue
                         </span>
                       )}
@@ -765,13 +875,13 @@ export default function Dashboard({
                       <button 
                         onClick={() => setMockOffset(prev => prev + 1)}
                         disabled={slotsAhead <= 0}
-                        className="bg-teal-700 hover:bg-teal-600 disabled:opacity-50 text-white text-[10px] uppercase tracking-wider font-extrabold px-4.5 py-2 rounded-xl transition shrink-0 cursor-pointer"
+                        className="bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-[10px] uppercase tracking-wider font-extrabold px-4.5 py-2 rounded-xl transition shrink-0 cursor-pointer shadow-xs"
                       >
                         Advance Live Ticket (+1)
                       </button>
                       <button 
                         onClick={() => setMockOffset(0)}
-                        className="border border-teal-800 hover:bg-teal-900 text-teal-200 text-[10px] uppercase tracking-wider font-extrabold px-3 py-2 rounded-xl transition shrink-0 cursor-pointer"
+                        className="border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] uppercase tracking-wider font-extrabold px-3 py-2 rounded-xl transition shrink-0 cursor-pointer"
                       >
                         Reset
                       </button>
@@ -779,11 +889,11 @@ export default function Dashboard({
                   </div>
                 </>
               ) : (
-                <div className="bg-teal-950/60 p-4 border border-teal-800 rounded-2xl flex items-start gap-3 text-xs leading-relaxed text-teal-100">
-                  <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-2xl flex items-start gap-3 text-xs leading-relaxed text-slate-700">
+                  <Clock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
                   <div>
-                    <span className="font-extrabold text-white block">Queue Tracker Standby</span>
-                    <p className="mt-1 text-teal-300 font-medium">
+                    <span className="font-extrabold text-slate-900 block">Queue Tracker Standby</span>
+                    <p className="mt-1 text-slate-500 font-medium">
                       {queueStatus.startsAtStr || "Live queue counter updates will initialize exactly 4 hours prior to your scheduled consultation."}
                     </p>
                   </div>
@@ -795,7 +905,7 @@ export default function Dashboard({
           {/* 4. PAST VISIT HISTORY TABLE */}
           <div className="space-y-4">
             <h2 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <FileText className="w-5 h-5 text-teal-600" /> Past Visit History
+              <FileText className="w-5 h-5 text-blue-600" /> Past Visit History
             </h2>
 
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
@@ -837,7 +947,7 @@ export default function Dashboard({
                           <td className="p-4 text-right whitespace-nowrap">
                             <button
                               onClick={() => handleDownloadPrescription(apt)}
-                              className="text-teal-600 hover:text-teal-700 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 transition"
+                              className="text-blue-600 hover:text-blue-700 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition"
                             >
                               <FileDown className="w-3.5 h-3.5" /> Download
                             </button>
@@ -853,7 +963,7 @@ export default function Dashboard({
                 <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
                   <button 
                     onClick={() => onSetScreen("appointments-history")}
-                    className="text-xs font-bold text-teal-650 hover:text-teal-700 inline-flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 cursor-pointer"
                   >
                     View All Past History ({completedList.length}) &rarr;
                   </button>
@@ -865,15 +975,15 @@ export default function Dashboard({
           {/* Active Medication Reminders Card */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <Pill className="w-5 h-5 text-teal-655" />
+              <Pill className="w-5 h-5 text-blue-600" />
               <span className="font-extrabold text-sm tracking-tight">Active Medication Reminders</span>
             </div>
 
             {patientProfile.prescriptions && patientProfile.prescriptions.length > 0 ? (
               <div className="space-y-3">
                 {patientProfile.prescriptions.map((rx) => (
-                  <div key={rx.id} className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-start gap-3.5 hover:border-teal-500 hover:bg-teal-50/10 transition-all duration-150">
-                    <div className="w-9 h-9 bg-teal-50 text-teal-655 rounded-xl flex items-center justify-center border border-teal-100 shrink-0">
+                  <div key={rx.id} className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-start gap-3.5 hover:border-blue-500 hover:bg-blue-50/10 transition-all duration-150">
+                    <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100 shrink-0">
                       <Pill className="w-4.5 h-4.5 animate-pulse" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -897,7 +1007,7 @@ export default function Dashboard({
                       )}
                       <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200/50 text-[9px] text-slate-555 font-mono">
                         <span>Duration: <strong>{rx.duration}</strong></span>
-                        <span className="text-teal-605 font-bold">By {rx.prescribedBy || "Dr. Sarah Jenkins"}</span>
+                        <span className="text-blue-600 font-bold">By {rx.prescribedBy || "Dr. Sarah Jenkins"}</span>
                       </div>
                     </div>
                   </div>
@@ -916,7 +1026,7 @@ export default function Dashboard({
           {/* Verified Digital MC Module */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <ShieldCheck className="w-5 h-5 text-teal-600" />
+              <ShieldCheck className="w-5 h-5 text-blue-600" />
               <span className="font-extrabold text-sm tracking-tight">Verified Digital MC</span>
             </div>
 
@@ -925,7 +1035,7 @@ export default function Dashboard({
                 {/* MC Clinic Header */}
                 <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl">
                   <span className="font-black text-slate-900 text-xs block leading-tight">{lastCompleted.clinic}</span>
-                  <span className="text-[9px] text-teal-700 font-mono block mt-1 font-bold">
+                  <span className="text-[9px] text-blue-700 font-mono block mt-1 font-bold">
                     MOH CODE: REG-MOH-{(lastCompleted.doctorId || "DOC").toUpperCase().slice(0, 5)}
                   </span>
                 </div>
@@ -983,7 +1093,7 @@ export default function Dashboard({
           {/* My Scans & Clinical Documents (EHR Document Scan Index) */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <FileText className="w-5 h-5 text-teal-600" />
+              <FileText className="w-5 h-5 text-blue-600" />
               <span className="font-extrabold text-sm tracking-tight">EHR Scans & Clinical Documents</span>
             </div>
 
@@ -997,9 +1107,9 @@ export default function Dashboard({
             ) : (
               <div className="space-y-3">
                 {patientProfile.attachments.map((file: any) => (
-                  <div key={file.id} className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-center justify-between gap-3.5 hover:border-teal-500 hover:bg-teal-50/10 transition-all duration-150">
+                  <div key={file.id} className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-center justify-between gap-3.5 hover:border-blue-500 hover:bg-blue-50/10 transition-all duration-150">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-teal-55 text-teal-700 rounded-xl flex items-center justify-center border border-teal-100 shrink-0">
+                      <div className="w-10 h-10 bg-blue-50 text-blue-700 rounded-xl flex items-center justify-center border border-blue-100 shrink-0">
                         <FileText className="w-5 h-5 animate-pulse" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1016,7 +1126,7 @@ export default function Dashboard({
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       <button
                         onClick={() => setPreviewFile(file)}
-                        className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100 hover:bg-teal-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                        className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
                       >
                         Preview
                       </button>
@@ -1041,7 +1151,7 @@ export default function Dashboard({
           {/* 5. HEALTH PASSPORT BOX */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <User className="w-5 h-5 text-teal-600" />
+              <User className="w-5 h-5 text-blue-600" />
               <span className="font-extrabold text-sm tracking-tight">Health Passport Ledger</span>
             </div>
 
@@ -1078,7 +1188,7 @@ export default function Dashboard({
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2 text-slate-900">
-                <Clock className="w-5 h-5 text-teal-600" />
+                <Clock className="w-5 h-5 text-blue-600" />
                 <span className="font-extrabold text-sm tracking-tight">Facility Outpatient Wait Times</span>
               </div>
               <span className="text-[9px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-mono font-bold animate-pulse">
@@ -1146,12 +1256,12 @@ export default function Dashboard({
           {/* 6. SECURE EHR DATA MANAGEMENT */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <Database className="w-5 h-5 text-teal-600" />
-              <span className="font-extrabold text-sm tracking-tight">Secure EHR Data Management</span>
+              <Database className="w-5 h-5 text-sky-600" />
+              <span className="font-extrabold text-sm tracking-tight">Personal EHR & Visit Records</span>
             </div>
 
             <p className="text-slate-500 leading-relaxed text-[11px]">
-              In accordance with Malaysia MOH clinical compliance regulations, you can securely export your full medical ledger and historical vital readings into a signed, Portable JSON backup.
+              You can download your clinical visit summaries, consultation notes, and full personal health records for your own records or when consulting external specialists.
             </p>
 
             <div className="space-y-3">
@@ -1163,7 +1273,7 @@ export default function Dashboard({
                   <select
                     value={selectedVisitId}
                     onChange={(e) => setSelectedVisitId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     {completedAppointments.map((apt) => (
                       <option key={apt.id} value={apt.id}>
@@ -1193,7 +1303,7 @@ export default function Dashboard({
                   onClick={handleExportJSON}
                   className="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] uppercase tracking-wider font-extrabold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Database className="w-3.5 h-3.5 text-teal-600" /> Export Full Medical Ledger
+                  <Database className="w-3.5 h-3.5 text-blue-600" /> Export Full Medical Ledger
                 </button>
               </div>
             </div>
@@ -1347,33 +1457,55 @@ export default function Dashboard({
               </button>
             </div>
 
-            <div className="text-emerald-500 p-4 rounded-xl font-mono text-xs overflow-y-auto max-h-[300px] leading-relaxed border border-slate-800 shadow-inner" style={{ backgroundColor: '#0a0a0a' }}>
-              <p className="text-slate-500">// CAREPOINT HL7 CENTRAL LEDGER OCR PARSER v4.1</p>
-              <p className="text-slate-500">// PATIENT IDENTIFIER: {patientProfile.email}</p>
-              <p className="text-slate-500">// TIMESTAMP: {previewFile.uploadedAt} 08:30:00 UTC</p>
-              <p className="mt-2 text-white font-bold">DOCUMENT NAME: {previewFile.name}</p>
-              <p className="text-teal-404">FILE_TYPE: {previewFile.type?.toUpperCase() || 'DOCUMENT'}</p>
-              <p className="text-teal-404">FILE_SIZE: {previewFile.size}</p>
-              <p className="mt-3 text-slate-500 border-t border-slate-800 pt-2 font-semibold">// OCR INGESTION RAW TEXT STREAM:</p>
-              <p className="mt-1 text-emerald-500">
-                [OCR SUCCESS] Ingestion complete. Target file scanned. Found matching patient demographic data. 
-                Name check: "{patientProfile.fullName}" MATCHED.
-              </p>
-              <p className="mt-2 text-slate-300">
-                --- CLINICAL SUMMARY SCAN DATA ---
-                <br />Patient: {patientProfile.fullName} (DOB: {patientProfile.dateOfBirth})
-                <br />Blood Type: {patientProfile.bloodType || "O positive"}
-                <br />Allergies: {(patientProfile.allergies || []).join(", ") || "No known drug allergies"}
-                <br />Chronic Conditions: {patientProfile.chronicConditions || "General health tracking"}
-                <br />
-                <br />Physician Notes: Record synced with central ministry repository. All indicators within parameters.
-                <br />----------------------------------
-              </p>
-              <p className="mt-3 text-[10px] text-slate-500">// END OF FILE DECRYPT STREAM</p>
+            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 text-xs text-slate-700 space-y-4 max-h-[350px] overflow-y-auto leading-relaxed shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-teal-700 block">
+                    Penang Healthcare Network • Electronic Medical Record
+                  </span>
+                  <h4 className="font-extrabold text-sm text-slate-900 mt-0.5">{previewFile.name}</h4>
+                </div>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono">
+                  Verified Report
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-[11px] bg-white border border-slate-200 p-3.5 rounded-xl">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Patient Name</span>
+                  <span className="font-bold text-slate-800">{patientProfile.fullName}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Date of Birth</span>
+                  <span className="font-bold text-slate-800 font-mono">{patientProfile.dateOfBirth || "1994-08-22"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Blood Group</span>
+                  <span className="font-bold text-slate-800">{patientProfile.bloodType || "O+"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Uploaded Date</span>
+                  <span className="font-bold text-slate-800 font-mono">{previewFile.uploadedAt || "2026-06-15"}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                  Clinical Examination & Findings
+                </span>
+                <p className="text-slate-600 bg-white border border-slate-200 p-3.5 rounded-xl text-xs leading-relaxed">
+                  Patient presented for outpatient health checkup and clinical evaluation. Vital signs baseline parameters fall within standard operational limits. No acute cardiopulmonary decompensation observed. Blood pressure and oxygen saturation recorded in active range. Diagnostic imaging and laboratory analyses completed with full compliance.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Attending Specialist: <strong>Dr. Sarah Jenkins (Consultant)</strong></span>
+                <span className="text-sky-700 font-bold">PenangHealth Network</span>
+              </div>
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-150">
-              <span className="text-[10px] text-slate-400 font-mono">MD5 Hash: 4e9a3b8c7d6e5f0a2b9c</span>
+              <span className="text-[10px] text-slate-400 font-mono">Ref: PH-DOC-{previewFile.id || "001"}</span>
               <button
                 onClick={() => {
                   handleDownloadAttachment(previewFile);

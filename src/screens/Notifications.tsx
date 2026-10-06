@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Bell, HeartPulse, ShieldAlert, Check, Trash, CheckSquare, Clock, Filter, AlertTriangle } from "lucide-react";
+import { Bell, HeartPulse, ShieldAlert, Check, Trash, CheckSquare, Clock, Filter, AlertTriangle, Calendar, Bot } from "lucide-react";
 import { AppNotification } from "../types";
 import { initialNotifications } from "../mockData";
 
@@ -11,7 +11,7 @@ interface NotificationsProps {
 }
 
 export default function Notifications({ notifications, onMarkRead, onMarkAllRead, onDeleteNotif }: NotificationsProps) {
-  const [filterCategory, setFilterCategory] = useState<'all' | 'lab' | 'medication' | 'general'>('all');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'reminder' | 'lab' | 'medication' | 'general'>('all');
 
   const filtered = notifications.filter(n => {
     if (filterCategory === 'all') return true;
@@ -52,6 +52,16 @@ export default function Notifications({ notifications, onMarkRead, onMarkAllRead
               >
                 <span>All Alerts</span>
                 <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{notifications.length}</span>
+              </button>
+
+              <button 
+                onClick={() => setFilterCategory('reminder')} 
+                className={`p-3 rounded-xl transition text-left flex items-center justify-between ${
+                  filterCategory === 'reminder' ? 'bg-teal-50 text-teal-700' : 'hover:bg-slate-50 text-slate-600'
+                }`}
+              >
+                <span>AI Reminders</span>
+                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{notifications.filter(n=>n.category==='reminder').length}</span>
               </button>
 
               <button 
@@ -104,10 +114,12 @@ export default function Notifications({ notifications, onMarkRead, onMarkAllRead
               >
                 <div className="flex gap-4">
                   <div className={`p-2.5 rounded-xl shrink-0 ${
+                    not.category === 'reminder' ? 'bg-emerald-50 text-emerald-700 font-bold' :
                     not.category === 'lab' ? 'bg-indigo-50 text-indigo-700' :
                     not.category === 'medication' ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-slate-50 text-teal-700'
                   }`}>
-                    {not.category === 'lab' ? <HeartPulse className="w-5 h-5 animate-pulse" /> : 
+                    {not.category === 'reminder' ? <Bot className="w-5 h-5 text-emerald-600" /> :
+                     not.category === 'lab' ? <HeartPulse className="w-5 h-5 animate-pulse" /> : 
                      not.category === 'medication' ? <AlertTriangle className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
                   </div>
 

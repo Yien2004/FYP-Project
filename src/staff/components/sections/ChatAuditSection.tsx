@@ -246,7 +246,7 @@ export default function ChatAuditSection() {
 
   const handleDownloadTranscript = () => {
     if (!activeThread) return;
-    const header = `CarePoint Audit Transcript — SECURE SYSTEM FILE\n` +
+    const header = `LifeLink Audit Transcript — SECURE SYSTEM FILE\n` +
                    `==================================================\n` +
                    `Facility audited: ${selectedFacilityName}\n` +
                    `Patient Name:     ${activeThread.senderName}\n` +
@@ -455,14 +455,6 @@ export default function ChatAuditSection() {
                       );
                     })
                   )}
-                </div>
-
-                {/* Audited Footer Notice */}
-                <div className="p-4 bg-amber-50 border-t border-amber-100 flex items-center gap-3 shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
-                  <p className="text-[10px] text-amber-800 font-medium leading-relaxed">
-                    <strong>Audit Compliance:</strong> Every record shown is fetched directly from the database under HL7 specifications. Recalled messages are excluded from this viewport.
-                  </p>
                 </div>
               </div>
             ) : (

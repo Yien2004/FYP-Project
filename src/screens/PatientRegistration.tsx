@@ -160,7 +160,7 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
-                  placeholder="name@carepoint.my"
+                  placeholder="patient@gmail.com"
                   required
                 />
               </div>

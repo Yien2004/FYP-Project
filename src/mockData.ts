@@ -6,7 +6,7 @@ export const initialPatientProfile: PatientProfile = {
   dateOfBirth: "1994-08-22",
   gender: "Male",
   phone: "+60 12-345 6789",
-  email: "ahmad.danish@carepoint.my",
+  email: "ahmad.danish@gmail.com",
   nationality: "Malaysian",
   bloodType: "O+",
   allergies: ["Penicillin", "Peanuts"],
@@ -213,6 +213,14 @@ export const mockAppointments: Appointment[] = [
 
 export const initialNotifications: AppNotification[] = [
   {
+    id: "notif-ai-reminder",
+    title: "🤖 AI Appointment Reminder: Tomorrow at 10:30 AM",
+    body: "Health Assistant Pre-Consultation Reminder: You have an upcoming consultation with Dr. Sarah Lim at O2 Klinik scheduled for tomorrow at 10:30 AM. Please arrive 5–10 minutes early for on-site queue ticket verification (#Q-124) and reception check-in.",
+    time: "Today, 8:00 AM",
+    category: "reminder",
+    read: false
+  },
+  {
     id: "notif-1",
     title: "Urgent Lab Results Ready",
     body: "Your comprehensive biochemical and blood screening tests from June 1st have been processed. Report and clinical feedback are compiled.",
@@ -223,7 +231,7 @@ export const initialNotifications: AppNotification[] = [
   {
     id: "notif-2",
     title: "Medication Renewal Alert",
-    body: "Your Ventolin Inhaler prescription is down to its final scheduled refill. Please renew via Carey AI or schedule a physical consultation.",
+    body: "Your Ventolin Inhaler prescription is down to its final scheduled refill. Please renew via Health Assistant or schedule a physical consultation.",
     time: "Yesterday, 3:30 PM",
     category: "medication",
     read: false
@@ -239,7 +247,7 @@ export const initialNotifications: AppNotification[] = [
   {
     id: "notif-4",
     title: "Upcoming Appointment Confirm",
-    body: "Your consultation with Dr. Mitchell is locked for Tuesday, Oct 12 at 10:30 AM at CarePoint Specialist KL.",
+    body: "Your consultation with Dr. Mitchell is confirmed for Tuesday, Oct 12 at 10:30 AM at Pantai Hospital Penang.",
     time: "3 days ago",
     category: "general",
     read: true

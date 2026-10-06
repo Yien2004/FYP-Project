@@ -18,10 +18,15 @@ import {
   Check,
   AlertCircle,
   HelpCircle,
-  AlertTriangle
+  AlertTriangle,
+  ShieldCheck,
+  Car,
+  Sparkles,
+  Share2,
+  FileText
 } from "lucide-react";
 import { Appointment } from "../types";
-import { publicHospitals, privateHospitals, privateClinics, Hospital } from "./HospitalsPage";
+import { privateHospitals, privateClinics, Hospital } from "./HospitalsPage";
 import { specialties, Specialty, Doctor as DocPageDoctor } from "./DoctorsPage";
 
 interface ScheduleAppointmentProps {
@@ -33,7 +38,8 @@ interface ScheduleAppointmentProps {
   onRescheduleAppointment: (id: string, date: string, timeSlot: string) => void;
 }
 
-const allFacilities: Hospital[] = [...publicHospitals, ...privateHospitals, ...privateClinics];
+// All facilities on appointment page are strictly private hospitals and private clinics
+const allFacilities: Hospital[] = [...privateHospitals, ...privateClinics];
 
 // Symptom options mapping to specialty IDs in DoctorsPage
 const symptomOptions = [
@@ -48,6 +54,155 @@ const symptomOptions = [
   { id: "general", label: "General Checkup / Refill Refills", specialtyId: "gp-family", icon: Stethoscope, iconColor: "text-sky-600", bg: "bg-sky-50", border: "border-sky-100" },
   { id: "other", label: "Other / Not Sure (General Triage)", specialtyId: "gp-family", icon: HelpCircle, iconColor: "text-slate-500", bg: "bg-slate-100", border: "border-slate-200" }
 ];
+
+function getFacilityVisual(facility: Hospital) {
+  const id = facility.id.toLowerCase();
+  const isClinic = facility.type.toLowerCase().includes("clinic");
+
+  if (id === "pantai") {
+    return {
+      gradient: "from-rose-500 to-red-600",
+      bgLight: "bg-rose-50",
+      textCol: "text-rose-600",
+      borderCol: "border-rose-200",
+      badgeCol: "bg-rose-100 text-rose-800",
+      code: "PHP",
+      emoji: "🏥",
+      highlights: "Tertiary Cardiology & Oncology",
+    };
+  }
+  if (id === "lwe") {
+    return {
+      gradient: "from-amber-500 to-orange-600",
+      bgLight: "bg-amber-50",
+      textCol: "text-amber-600",
+      borderCol: "border-amber-200",
+      badgeCol: "bg-amber-100 text-amber-800",
+      code: "HLW",
+      emoji: "🏥",
+      highlights: "Trusted Community Laparoscopic Surgery",
+    };
+  }
+  if (id === "gleneagles") {
+    return {
+      gradient: "from-indigo-500 to-blue-600",
+      bgLight: "bg-indigo-50",
+      textCol: "text-indigo-600",
+      borderCol: "border-indigo-200",
+      badgeCol: "bg-indigo-100 text-indigo-800",
+      code: "GHP",
+      emoji: "🏥",
+      highlights: "International JCI Specialist Care",
+    };
+  }
+  if (id === "island") {
+    return {
+      gradient: "from-teal-500 to-cyan-600",
+      bgLight: "bg-teal-50",
+      textCol: "text-teal-600",
+      borderCol: "border-teal-200",
+      badgeCol: "bg-teal-100 text-teal-800",
+      code: "ISL",
+      emoji: "🏥",
+      highlights: "Award-winning Gastroenterology & Pediatrics",
+    };
+  }
+  if (id === "adv") {
+    return {
+      gradient: "from-blue-600 to-indigo-700",
+      bgLight: "bg-blue-50",
+      textCol: "text-blue-600",
+      borderCol: "border-blue-200",
+      badgeCol: "bg-blue-100 text-blue-800",
+      code: "PAH",
+      emoji: "🏥",
+      highlights: "Cardiac Vascular & Oncology Network",
+    };
+  }
+  if (id === "loh") {
+    return {
+      gradient: "from-fuchsia-600 to-purple-700",
+      bgLight: "bg-fuchsia-50",
+      textCol: "text-fuchsia-600",
+      borderCol: "border-fuchsia-200",
+      badgeCol: "bg-fuchsia-100 text-fuchsia-800",
+      code: "LGL",
+      emoji: "🏥",
+      highlights: "ENT, Fertility & Diagnostic Imaging",
+    };
+  }
+  if (id === "kpj") {
+    return {
+      gradient: "from-emerald-600 to-teal-700",
+      bgLight: "bg-emerald-50",
+      textCol: "text-emerald-600",
+      borderCol: "border-emerald-200",
+      badgeCol: "bg-emerald-100 text-emerald-800",
+      code: "KPJ",
+      emoji: "🏥",
+      highlights: "Perai Specialist & Emergency Services",
+    };
+  }
+  if (id === "mmc") {
+    return {
+      gradient: "from-purple-600 to-pink-600",
+      bgLight: "bg-purple-50",
+      textCol: "text-purple-600",
+      borderCol: "border-purple-200",
+      badgeCol: "bg-purple-100 text-purple-800",
+      code: "MMC",
+      emoji: "🎗️",
+      highlights: "Specialist Oncology & Radiotherapy",
+    };
+  }
+  if (id === "o2") {
+    return {
+      gradient: "from-sky-500 to-teal-600",
+      bgLight: "bg-sky-50",
+      textCol: "text-sky-600",
+      borderCol: "border-sky-200",
+      badgeCol: "bg-sky-100 text-sky-800",
+      code: "O2",
+      emoji: "🩺",
+      highlights: "Modern Family Medicine & Preventive Screenings",
+    };
+  }
+  if (id === "ks") {
+    return {
+      gradient: "from-teal-600 to-emerald-600",
+      bgLight: "bg-teal-50",
+      textCol: "text-teal-600",
+      borderCol: "border-teal-200",
+      badgeCol: "bg-teal-100 text-teal-800",
+      code: "KS",
+      emoji: "🩺",
+      highlights: "Georgetown General Practice & Minor Procedures",
+    };
+  }
+  if (id === "pp") {
+    return {
+      gradient: "from-cyan-600 to-blue-600",
+      bgLight: "bg-cyan-50",
+      textCol: "text-cyan-600",
+      borderCol: "border-cyan-200",
+      badgeCol: "bg-cyan-100 text-cyan-800",
+      code: "PP",
+      emoji: "🩺",
+      highlights: "Walk-in Consultations & Chronic Care Monitoring",
+    };
+  }
+
+  return {
+    gradient: isClinic ? "from-sky-500 to-teal-600" : "from-teal-600 to-cyan-700",
+    bgLight: isClinic ? "bg-sky-50" : "bg-teal-50",
+    textCol: isClinic ? "text-sky-600" : "text-teal-600",
+    borderCol: "border-slate-200",
+    badgeCol: isClinic ? "bg-sky-100 text-sky-800" : "bg-teal-100 text-teal-800",
+    code: facility.name.substring(0, 3).toUpperCase(),
+    emoji: isClinic ? "🩺" : "🏥",
+    highlights: facility.tag || facility.type,
+  };
+}
 
 interface BookingHours {
   startHour: number;
@@ -146,7 +301,7 @@ export default function ScheduleAppointment({
   onCancelAppointment,
   onRescheduleAppointment
 }: ScheduleAppointmentProps) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   // Step 1 states
   const [careTrackFilter, setCareTrackFilter] = useState<'all' | 'public' | 'private'>('all');
@@ -172,12 +327,17 @@ export default function ScheduleAppointment({
     return null;
   });
 
-  // Step 4 states
+  // Step 4 & 5 states
   const [selectedDate, setSelectedDate] = useState(prefilledApt?.date ?? "2026-10-12");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(prefilledApt?.timeSlot ?? "");
   const [remarks, setRemarks] = useState(prefilledApt?.symptoms ?? "");
-  const [shareHistory, setShareHistory] = useState(true);
+  
+  // Module 4: Not default selected as requested
+  const [shareHistory, setShareHistory] = useState(false);
+  const [syncCrossFacilityRecords, setSyncCrossFacilityRecords] = useState(false);
+  const [showSyncCategories, setShowSyncCategories] = useState(true);
   const [requestRide, setRequestRide] = useState(false);
+  const [lastCreatedVoucher, setLastCreatedVoucher] = useState<Appointment | null>(null);
   const consultType = 'In-Clinic';
   
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
@@ -276,16 +436,10 @@ export default function ScheduleAppointment({
     }
   }, [selectedSymptom, customSymptomText, prefilledApt]);
 
-  // Filter facilities based on care track
+  // Filter facilities: all facilities are strictly private hospitals and private clinics
   const filteredFacilities = useMemo(() => {
-    if (careTrackFilter === 'public') {
-      return publicHospitals;
-    }
-    if (careTrackFilter === 'private') {
-      return [...privateHospitals, ...privateClinics];
-    }
     return allFacilities;
-  }, [careTrackFilter]);
+  }, []);
 
   // Get matching doctors based on clinic and symptom
   const matchingDoctors = useMemo(() => {
@@ -501,7 +655,7 @@ export default function ScheduleAppointment({
     );
   };
 
-  const currentStepLabel = ["Facility", "Symptoms", "Doctor", "Details"] as const;
+  const currentStepLabel = ["Facility", "Symptoms", "Doctor", "Schedule", "Preferences"] as const;
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -513,6 +667,10 @@ export default function ScheduleAppointment({
 
     // Create unique doctor ID based on name
     const doctorId = selectedDoctor.name.toLowerCase().replace(/[^a-z0-9]/g, "-");
+
+    // Auto-generate unique Queue Number
+    const randomSuffix = Math.floor(100 + Math.random() * 899);
+    const queueNumber = `#Q-${randomSuffix}`;
 
     const newAppointment: Appointment = {
       id: prefilledApt?.id ?? `apt-${Math.floor(Math.random() * 900000 + 1000)}`,
@@ -526,16 +684,15 @@ export default function ScheduleAppointment({
       type: consultType,
       clinic: selectedClinic.name,
       symptoms: remarks || `${selectedSymptom.label} Consultation`,
+      queueNumber,
       shareHistory,
+      syncCrossFacilityRecords,
       requestRide
     };
 
     onAddAppointment(newAppointment);
+    setLastCreatedVoucher(newAppointment);
     setBookingConfirmed(true);
-    setTimeout(() => {
-      setBookingConfirmed(false);
-      onSetScreen("dashboard");
-    }, 1800);
   };
 
   return (
@@ -547,13 +704,13 @@ export default function ScheduleAppointment({
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Schedule Appointment</h1>
             <p className="text-sm text-slate-500 mt-2 max-w-2xl leading-relaxed">
-              Book consultations across Penang's government and private clinics. Choose where you want to go, select symptoms, pick your doctor, and choose a date.
+              Book consultations across Penang's private specialist hospitals and clinics. Choose where you want to go, select symptoms, pick your doctor, select your slot, and manage record sharing preferences.
             </p>
           </div>
         </div>
 
         {/* Steps indicator */}
-        <div className="grid grid-cols-4 gap-3 text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">
+        <div className="grid grid-cols-5 gap-2 text-[9px] uppercase tracking-[0.16em] font-bold text-slate-500">
           {currentStepLabel.map((label, index) => {
             const stepNumber = index + 1;
             const isActive = step === stepNumber;
@@ -561,11 +718,11 @@ export default function ScheduleAppointment({
             return (
               <div
                 key={label}
-                className={`rounded-2xl py-3.5 text-center font-sans tracking-widest transition-all duration-300 ${
+                className={`rounded-2xl py-3 text-center font-sans tracking-widest transition-all duration-300 ${
                   isActive
-                    ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                     : isComplete
-                    ? 'bg-teal-50 text-teal-700 border border-teal-100'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-100'
                     : 'bg-white border border-slate-200 text-slate-400'
                 }`}
               >
@@ -576,15 +733,113 @@ export default function ScheduleAppointment({
         </div>
       </div>
 
-      {bookingConfirmed ? (
-        <div className="bg-emerald-50 border border-emerald-200 p-10 rounded-3xl text-center shadow-xl max-w-2xl mx-auto animate-fade-in">
-          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
-            <Check className="w-9 h-9 text-white stroke-[3px]" />
+      {bookingConfirmed && (lastCreatedVoucher || upcomingAppointment) ? (
+        <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+          {/* DIGITAL APPOINTMENT VOUCHER & QUEUE TICKET */}
+          <div className="bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white rounded-3xl p-7 shadow-2xl border border-blue-900/60 relative overflow-hidden">
+            {/* Background watermark badge */}
+            <div className="absolute -right-8 -bottom-8 opacity-10 text-[140px] font-black pointer-events-none select-none">
+              TICKET
+            </div>
+
+            <div className="flex items-center justify-between border-b border-blue-800/60 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-blue-500/20 border border-blue-400/30 rounded-2xl flex items-center justify-center text-blue-300">
+                  <Check className="w-6 h-6 stroke-[3px]" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-blue-300 block font-bold">Official Digital Voucher</span>
+                  <h2 className="text-xl font-black tracking-tight text-white">Appointment Confirmed & Registered</h2>
+                </div>
+              </div>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-mono font-bold">
+                VALID
+              </span>
+            </div>
+
+            {/* Main Queue Number display */}
+            <div className="my-6 p-5 bg-blue-950/80 border border-blue-800/60 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+              <div>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-blue-300 font-bold block">Assigned Queue Number (排队号码)</span>
+                <div className="text-4xl sm:text-5xl font-black text-amber-400 font-mono tracking-wider mt-1 drop-shadow-sm">
+                  {lastCreatedVoucher?.queueNumber || upcomingAppointment?.queueNumber || "#Q-104"}
+                </div>
+                <span className="text-xs text-slate-300 block mt-1">
+                  Present this number at the reception desk upon physical arrival.
+                </span>
+              </div>
+              <div className="text-right sm:border-l sm:border-blue-900 sm:pl-5 shrink-0">
+                <span className="text-[10px] uppercase font-mono text-blue-300 font-bold block">Arrival Check-in Rule</span>
+                <div className="bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold mt-1 inline-block">
+                  ⏱️ 5–10 mins before slot
+                </div>
+              </div>
+            </div>
+
+            {/* MANDATORY ON-SITE ARRIVAL NOTICE (Requested by user) */}
+            <div className="my-5 p-4 bg-amber-400/15 border border-amber-400/40 rounded-2xl flex items-start gap-3 text-amber-200">
+              <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs leading-relaxed">
+                <span className="font-extrabold text-amber-300 uppercase tracking-wider block text-sm">
+                  ⚠️ Important Check-In Notice (现场报到凭证须知)
+                </span>
+                <p className="text-amber-100">
+                  Please arrive at the clinic counter <strong>5–10 minutes before your appointment time ({lastCreatedVoucher?.timeSlot || upcomingAppointment?.timeSlot})</strong> and present your Queue Number (<strong className="font-mono text-amber-300 text-sm">{lastCreatedVoucher?.queueNumber || upcomingAppointment?.queueNumber}</strong>) to the counter staff for on-site presence check-in. Make sure you have arrived in person to confirm your consultation slot!
+                </p>
+              </div>
+            </div>
+
+            {/* Consultation details grid */}
+            <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-2 border-t border-blue-800/60 text-slate-200">
+              <div>
+                <span className="text-[9px] uppercase tracking-wider text-blue-300/80 block">Facility / Hospital</span>
+                <span className="font-bold text-white text-sm block truncate">{lastCreatedVoucher?.clinic || upcomingAppointment?.clinic}</span>
+              </div>
+              <div>
+                <span className="text-[9px] uppercase tracking-wider text-blue-300/80 block">Specialist Clinician</span>
+                <span className="font-bold text-white text-sm block truncate">{lastCreatedVoucher?.doctorName || upcomingAppointment?.doctorName}</span>
+              </div>
+              <div>
+                <span className="text-[9px] uppercase tracking-wider text-blue-300/80 block">Scheduled Date</span>
+                <span className="font-bold text-amber-300 text-sm block">{lastCreatedVoucher?.date || upcomingAppointment?.date}</span>
+              </div>
+              <div>
+                <span className="text-[9px] uppercase tracking-wider text-blue-300/80 block">Scheduled Time Slot</span>
+                <span className="font-bold text-amber-300 text-sm block">{lastCreatedVoucher?.timeSlot || upcomingAppointment?.timeSlot}</span>
+              </div>
+            </div>
+
+            {/* Cross-Facility Synchronization Badge */}
+            {(lastCreatedVoucher?.syncCrossFacilityRecords || upcomingAppointment?.syncCrossFacilityRecords) && (
+              <div className="mt-4 p-3 bg-blue-900/40 border border-blue-700/40 rounded-xl flex items-center gap-2.5 text-xs text-blue-200">
+                <span className="text-base">🔗</span>
+                <span>Cross-Facility Medical Record Sync is <strong>Active</strong> for this consultation.</span>
+              </div>
+            )}
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Appointment Saved!</h2>
-          <p className="mt-2.5 text-slate-600 text-sm leading-relaxed max-w-md mx-auto">
-            Your consultation has been successfully stored in Supabase. Check your dashboard for queue credentials and status updates.
-          </p>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <button
+              type="button"
+              onClick={() => onSetScreen("fetching-transit")}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-2xl transition shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              <span>🚗</span>
+              <span>Book Ride to Clinic (Grab Simulation)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBookingConfirmed(false);
+                onSetScreen("dashboard");
+              }}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-5 rounded-2xl transition flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              <span>🏠</span>
+              <span>Go to Home Dashboard</span>
+            </button>
+          </div>
         </div>
       ) : upcomingAppointment && !isRescheduling ? (
         <div className="max-w-2xl mx-auto bg-white border border-slate-200 p-8 rounded-3xl shadow-md space-y-6 animate-fade-in">
@@ -633,7 +888,7 @@ export default function ScheduleAppointment({
             <button
               type="button"
               onClick={handleStartReschedule}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-teal-600/10"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/10"
             >
               <Clock className="w-4 h-4" /> Reschedule Appointment
             </button>
@@ -657,67 +912,66 @@ export default function ScheduleAppointment({
               <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3 text-slate-800">
-                    <Building2 className="w-5.5 h-5.5 text-teal-600" />
+                    <Building2 className="w-5.5 h-5.5 text-blue-600" />
                     <div>
-                      <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-teal-600 block">Step 1</span>
-                      <h2 className="text-lg font-bold text-slate-900">Select Facility: Where</h2>
+                      <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-blue-600 block">Step 1</span>
+                      <h2 className="text-lg font-bold text-slate-900">Select Private Healthcare Facility</h2>
                     </div>
                   </div>
 
-                  {/* Care track filters */}
-                  <div className="flex bg-slate-100 rounded-xl p-1 shrink-0">
-                    {[
-                      { id: 'all', label: 'All' },
-                      { id: 'public', label: 'Public' },
-                      { id: 'private', label: 'Private' }
-                    ].map(tab => (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setCareTrackFilter(tab.id as any)}
-                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                          careTrackFilter === tab.id
-                            ? 'bg-white text-slate-800 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
+                  <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                    {filteredFacilities.length} Private Facilities
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[460px] overflow-y-auto pr-1">
+                <div className="flex flex-col space-y-3 max-h-[500px] overflow-y-auto pr-1">
                   {filteredFacilities.map((facility) => {
                     const selected = selectedClinic?.id === facility.id;
-                    const isGov = facility.type.toLowerCase().includes("government");
+                    const visual = getFacilityVisual(facility);
                     return (
                       <button
                         key={facility.id}
                         type="button"
                         onClick={() => { setSelectedClinic(facility); setSelectedDoctor(null); }}
-                        className={`rounded-2xl border p-4 text-left transition-all duration-200 ${
+                        className={`w-full rounded-2xl border p-4 text-left transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer ${
                           selected
-                            ? 'border-teal-500 bg-teal-50/50 ring-2 ring-teal-500/20'
-                            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                            ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/25 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <h3 className="font-bold text-slate-900 text-sm leading-snug group-hover:text-teal-600">
-                            {facility.name}
-                          </h3>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                            isGov ? 'bg-teal-100 text-teal-800' : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {isGov ? 'Public' : 'Private'}
-                          </span>
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${visual.gradient} text-white font-black flex flex-col items-center justify-center shrink-0 shadow-md shadow-slate-900/10 relative overflow-hidden`}>
+                            <span className="text-sm tracking-tight font-mono font-black">{visual.code}</span>
+                            <span className="absolute bottom-0 right-0 text-[10px] leading-none px-1 py-0.5 bg-black/25 rounded-tl font-sans">{visual.emoji}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-extrabold text-slate-900 text-sm leading-snug">
+                                {facility.name}
+                              </h3>
+                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${visual.badgeCol}`}>
+                                {facility.type}
+                              </span>
+                              <span className="text-[10px] font-semibold text-slate-500 hidden sm:inline-block">
+                                • {visual.highlights}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono tracking-tight truncate mt-0.5">
+                              📍 {facility.address}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1 font-mono tracking-tight leading-snug">
-                          {facility.address}
-                        </p>
-                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{facility.hours}</span>
+
+                        <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{facility.hours}</span>
+                          </div>
+                          <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition ${
+                            selected ? 'border-blue-600 bg-blue-600 text-white shadow-xs' : 'border-slate-300 bg-slate-50'
+                          }`}>
+                            {selected && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                          </div>
                         </div>
                       </button>
                     );
@@ -729,7 +983,7 @@ export default function ScheduleAppointment({
                     type="button"
                     disabled={!selectedClinic}
                     onClick={() => setStep(2)}
-                    className="rounded-xl bg-teal-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-blue-600/15"
                   >
                     Continue to Symptoms
                   </button>
@@ -741,9 +995,9 @@ export default function ScheduleAppointment({
             {step === 2 && (
               <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-4 text-slate-800">
-                  <ClipboardList className="w-5.5 h-5.5 text-teal-600" />
+                  <ClipboardList className="w-5.5 h-5.5 text-blue-600" />
                   <div>
-                    <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-teal-600 block">Step 2</span>
+                    <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-blue-600 block">Step 2</span>
                     <h2 className="text-lg font-bold text-slate-900">Input Symptoms: What's wrong</h2>
                   </div>
                 </div>
@@ -758,9 +1012,9 @@ export default function ScheduleAppointment({
                         key={opt.id}
                         type="button"
                         onClick={() => setSelectedSymptomId(opt.id)}
-                        className={`rounded-2xl border p-4 text-left transition-all duration-200 flex items-start gap-4 ${
+                        className={`rounded-2xl border p-4 text-left transition-all duration-200 flex items-start gap-4 cursor-pointer ${
                           isSelected
-                            ? 'border-teal-500 bg-teal-50/50 ring-2 ring-teal-500/20'
+                            ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
                             : 'border-slate-200 bg-white hover:border-slate-300'
                         }`}
                       >
@@ -772,7 +1026,7 @@ export default function ScheduleAppointment({
                           <p className="text-xs text-slate-400 mt-1 capitalize">Specialty: {opt.specialtyId.replace("-", " ")}</p>
                         </div>
                         <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                          isSelected ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300'
+                          isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
                         }`}>
                           {isSelected && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
                         </div>
@@ -801,7 +1055,7 @@ export default function ScheduleAppointment({
                     onChange={(e) => setCustomSymptomText(e.target.value)}
                     rows={4}
                     placeholder="Provide additional details regarding symptoms, duration, or specific requests..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-teal-500"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -838,7 +1092,7 @@ export default function ScheduleAppointment({
                     <button
                       type="button"
                       onClick={() => setStep(3)}
-                      className="rounded-xl bg-teal-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 cursor-pointer"
+                      className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 cursor-pointer shadow-md shadow-blue-600/15"
                     >
                       Continue to Choose Doctor
                     </button>
@@ -851,9 +1105,9 @@ export default function ScheduleAppointment({
             {step === 3 && (
               <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-4 text-slate-800">
-                  <Stethoscope className="w-5.5 h-5.5 text-teal-600" />
+                  <Stethoscope className="w-5.5 h-5.5 text-blue-600" />
                   <div>
-                    <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-teal-600 block">Step 3</span>
+                    <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-blue-600 block">Step 3</span>
                     <h2 className="text-lg font-bold text-slate-900">Choose Doctor: Who</h2>
                   </div>
                 </div>
@@ -869,18 +1123,18 @@ export default function ScheduleAppointment({
                             key={doctor.name}
                             type="button"
                             onClick={() => setSelectedDoctor(doctor)}
-                            className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4 text-left transition-all duration-200 ${
+                            className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4 text-left transition-all duration-200 cursor-pointer ${
                               selected
-                                ? 'border-teal-500 bg-teal-50/50 ring-2 ring-teal-500/20'
+                                ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
                                 : 'border-slate-200 bg-white hover:border-slate-300'
                             }`}
                           >
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center font-bold text-white text-lg shrink-0 shadow-sm">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center font-bold text-white text-lg shrink-0 shadow-sm">
                               {doctor.avatar}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-bold text-slate-900 text-sm leading-snug">{doctor.name}</p>
-                              <p className="text-xs text-teal-600 font-semibold mt-0.5">{doctor.title}</p>
+                              <p className="text-xs text-blue-600 font-semibold mt-0.5">{doctor.title}</p>
                               <p className="text-[11px] text-slate-500 mt-1">{doctor.specialty} · {doctor.experience} experience</p>
                               <p className="text-[11px] font-bold text-slate-600 mt-2 font-mono">{doctor.availability}</p>
                             </div>
@@ -889,7 +1143,7 @@ export default function ScheduleAppointment({
                                 ★ {doctor.rating}
                               </div>
                               <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                                selected ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300'
+                                selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
                               }`}>
                                 {selected && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
                               </div>
@@ -926,7 +1180,7 @@ export default function ScheduleAppointment({
                               <button
                                 type="button"
                                 onClick={() => { setSelectedClinic(facility); setSelectedDoctor(null); }}
-                                className="bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold px-3.5 py-2 rounded-xl transition self-start cursor-pointer"
+                                className="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold px-3.5 py-2 rounded-xl transition self-start cursor-pointer"
                               >
                                 Switch to this facility
                               </button>
@@ -948,9 +1202,9 @@ export default function ScheduleAppointment({
                                 key={gp.name}
                                 type="button"
                                 onClick={() => setSelectedDoctor(gp)}
-                                className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4 text-left transition-all duration-200 ${
+                                className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4 text-left transition-all duration-200 cursor-pointer ${
                                   selected
-                                    ? 'border-teal-500 bg-teal-50/50 ring-2 ring-teal-500/20'
+                                    ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
                                     : 'border-slate-200 bg-white hover:border-slate-300'
                                 }`}
                               >
@@ -964,7 +1218,7 @@ export default function ScheduleAppointment({
                                 <div className="flex items-center gap-3">
                                   <div className="text-[11px] font-semibold text-slate-500 font-mono">{gp.availability}</div>
                                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                                    selected ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300'
+                                    selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
                                   }`}>
                                     {selected && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
                                   </div>
@@ -990,7 +1244,7 @@ export default function ScheduleAppointment({
                     type="button"
                     onClick={() => setStep(4)}
                     disabled={!selectedDoctor}
-                    className="rounded-xl bg-teal-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-blue-600/15"
                   >
                     Continue to Schedule
                   </button>
@@ -1002,9 +1256,9 @@ export default function ScheduleAppointment({
             {step === 4 && (
               <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-4 text-slate-800">
-                  <Calendar className="w-5.5 h-5.5 text-teal-600" />
+                  <Calendar className="w-5.5 h-5.5 text-blue-600" />
                   <div>
-                    <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-teal-600 block">Step 4</span>
+                    <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-blue-600 block">Step 4</span>
                     <h2 className="text-lg font-bold text-slate-900">Date, Time & Remarks: When & Details</h2>
                   </div>
                 </div>
@@ -1071,7 +1325,7 @@ export default function ScheduleAppointment({
 
                               setSelectedDate(val);
                             }}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-bold"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-bold"
                             min={(() => {
                               const d = new Date();
                               const offset = d.getTimezoneOffset();
@@ -1118,7 +1372,7 @@ export default function ScheduleAppointment({
                       ) : (
                         <div className="space-y-4">
                           {isLoadingAppointments && (
-                            <div className="text-xs text-teal-600 animate-pulse flex items-center gap-1.5">
+                            <div className="text-xs text-blue-600 animate-pulse flex items-center gap-1.5">
                               <Clock className="w-4 h-4 animate-spin" /> Checking slot availability...
                             </div>
                           )}
@@ -1132,9 +1386,9 @@ export default function ScheduleAppointment({
                                   type="button"
                                   disabled={booked}
                                   onClick={() => setSelectedTimeSlot(slot)}
-                                  className={`rounded-2xl border px-3 py-2.5 text-xs font-bold transition ${
+                                  className={`rounded-2xl border px-3 py-2.5 text-xs font-bold transition cursor-pointer ${
                                     selected
-                                      ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                                       : booked
                                       ? 'bg-slate-200 border-slate-200 text-slate-400 cursor-not-allowed'
                                       : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
@@ -1151,7 +1405,7 @@ export default function ScheduleAppointment({
                               <button
                                 type="button"
                                 onClick={() => setShowAllSlots(!showAllSlots)}
-                                className="text-xs font-bold text-teal-600 hover:text-teal-700 transition flex items-center gap-1 cursor-pointer"
+                                className="text-xs font-bold text-blue-600 hover:text-blue-700 transition flex items-center gap-1 cursor-pointer"
                               >
                                 {showAllSlots ? "Show Less" : `View All Slots (${generatedSlots.length})`}
                               </button>
@@ -1172,48 +1426,11 @@ export default function ScheduleAppointment({
                     rows={4}
                     placeholder={selectedSymptomId === "emergency-symptom" ? "Please remarks the details here so our clinical team can prepare for your arrival..." : "Enter any additional instructions or medication requests..."}
                     required={selectedSymptomId === "emergency-symptom"}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-teal-500 font-semibold"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-blue-500 font-semibold"
                   />
                 </div>
 
-                {/* Consent & Ride Option Form Controls */}
-                <div className="space-y-3.5 pt-2 border-t border-slate-100">
-                  {/* Consent Checkbox */}
-                  <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-250 rounded-2xl cursor-pointer transition">
-                    <input
-                      type="checkbox"
-                      checked={shareHistory}
-                      onChange={(e) => setShareHistory(e.target.checked)}
-                      className="mt-1 w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 accent-teal-600 cursor-pointer"
-                    />
-                    <div className="text-xs">
-                      <p className="font-bold text-slate-800">Share Previous Medical History</p>
-                      <p className="text-slate-500 mt-0.5 leading-relaxed">
-                        Allow the attending clinician at <span className="font-bold text-slate-700">{selectedClinic?.name}</span> to access your past consultation logs and file uploads from other hospitals.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Grab Fetching Checkbox */}
-                  <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-250 rounded-2xl cursor-pointer transition">
-                    <input
-                      type="checkbox"
-                      checked={requestRide}
-                      onChange={(e) => setRequestRide(e.target.checked)}
-                      className="mt-1 w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 accent-teal-600 cursor-pointer"
-                    />
-                    <div className="text-xs">
-                      <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                        🚗 Request LifeLink Fetching Transport (Grab-Style)
-                      </p>
-                      <p className="text-slate-500 mt-0.5 leading-relaxed">
-                        Request a third-party transit driver to pick you up and fetch you safely to the facility for your scheduled appointment time slot.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="flex justify-between pt-2">
+                <div className="flex justify-between pt-4 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => {
@@ -1229,12 +1446,245 @@ export default function ScheduleAppointment({
                   >
                     {isRescheduling ? "Cancel Reschedule" : selectedSymptomId === "emergency-symptom" ? "Back to Symptoms" : "Back to Doctor"}
                   </button>
+                  {isRescheduling ? (
+                    <button
+                      type="submit"
+                      disabled={!selectedDoctor || !selectedClinic || !selectedTimeSlot}
+                      className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/20"
+                    >
+                      Confirm Reschedule
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!selectedDate || !selectedTimeSlot}
+                      onClick={() => setStep(5)}
+                      className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-md shadow-blue-600/20"
+                    >
+                      Continue to Authorizations & Transit
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* STEP 5: Authorizations & Transit Preferences */}
+            {step === 5 && (
+              <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3 text-slate-800">
+                    <ShieldCheck className="w-5.5 h-5.5 text-blue-600" />
+                    <div>
+                      <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-blue-600 block">Step 5</span>
+                      <h2 className="text-lg font-bold text-slate-900">Authorizations & Transit Preferences</h2>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100">
+                    Final Step
+                  </span>
+                </div>
+
+                {/* Section 1: Conspicuous Cross-Facility Synchronisation */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <span>🔗</span>
+                      <span>Authorize Cross-Facility Medical Record Synchronisation (跨医疗机构资料同步)</span>
+                    </label>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                      Step Required
+                    </span>
+                  </div>
+
+                  {/* Option 1: Yes, Authorize (Recommended) */}
+                  <div
+                    onClick={() => {
+                      setSyncCrossFacilityRecords(true);
+                      setShareHistory(true);
+                    }}
+                    className={`p-5 rounded-2xl border-2 transition cursor-pointer relative ${
+                      syncCrossFacilityRecords
+                        ? 'bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border-blue-500 shadow-md shadow-blue-600/10 ring-2 ring-blue-500/20'
+                        : 'bg-white border-slate-250 hover:border-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
+                        syncCrossFacilityRecords ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-400 bg-white'
+                      }`}>
+                        {syncCrossFacilityRecords && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                      </div>
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-slate-900 text-sm">
+                            Yes, Authorize Cross-Facility Synchronisation (同意授权跨机构同步)
+                          </span>
+                          <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                            Recommended
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          I agree to securely synchronize my past medical history generated across other clinics/hospitals to <strong className="text-slate-900 font-bold">{selectedClinic?.name || "the selected facility"}</strong> to prevent duplicate checkups and reduce redundant examinations.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 8 Categories Breakdown */}
+                    <div className="mt-4 pt-3.5 border-t border-blue-200/70">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          View Synchronized Record Categories (8 Types Included):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowSyncCategories(!showSyncCategories);
+                          }}
+                          className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline cursor-pointer"
+                        >
+                          {showSyncCategories ? "Hide Synchronized Categories ▲" : "View Synchronized Record Categories (8 Types) ▼"}
+                        </button>
+                      </div>
+
+                      {showSyncCategories && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-700 bg-white/95 border border-blue-200 rounded-xl p-3.5 animate-fade-in">
+                          <div>1. Past Visit Records</div>
+                          <div>2. Symptoms & Diagnoses</div>
+                          <div>3. Past Illnesses</div>
+                          <div>4. X-ray / MRI Imaging</div>
+                          <div>5. Blood & Lab Tests</div>
+                          <div>6. Past Treatments</div>
+                          <div>7. Prescriptions & Drugs</div>
+                          <div>8. Doctor Clinical Notes</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Option 2: No, Keep Records Local Only */}
+                  <div
+                    onClick={() => {
+                      setSyncCrossFacilityRecords(false);
+                      setShareHistory(false);
+                    }}
+                    className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
+                      !syncCrossFacilityRecords
+                        ? 'bg-slate-50 border-slate-500 shadow-sm ring-2 ring-slate-400/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
+                        !syncCrossFacilityRecords ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {!syncCrossFacilityRecords && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="font-bold text-slate-800 text-sm">
+                          No, Keep Records Local Only (不进行跨机构同步，仅限本院独立记录)
+                        </span>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          Your medical history from other healthcare providers will not be synchronized to <span className="font-medium text-slate-700">{selectedClinic?.name}</span>.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Grab Ride Transit Selection */}
+                <div className="space-y-3 pt-3 border-t border-slate-100">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <span>🚗</span>
+                    <span>Transportation & Clinic Fetching (出行接送偏好)</span>
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Option 1: Request Grab ride */}
+                    <div
+                      onClick={() => setRequestRide(true)}
+                      className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
+                        requestRide
+                          ? 'bg-blue-50/80 border-blue-500 shadow-sm ring-2 ring-blue-500/20'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                          requestRide ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                        }`}>
+                          {requestRide && <Check className="w-3 h-3 stroke-[3px]" />}
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-slate-900 text-xs block">
+                            🚗 Request Grab-Style Fetching Ride
+                          </span>
+                          <span className="text-[11px] text-slate-500 block mt-1 leading-snug">
+                            Auto-dispatches simulated on-demand vehicle to escort you safely to {selectedClinic?.name}.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Option 2: Self-Arranged */}
+                    <div
+                      onClick={() => setRequestRide(false)}
+                      className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
+                        !requestRide
+                          ? 'bg-slate-50 border-slate-500 shadow-sm ring-2 ring-slate-400/20'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                          !requestRide ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300'
+                        }`}>
+                          {!requestRide && <Check className="w-3 h-3 stroke-[3px]" />}
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-slate-900 text-xs block">
+                            🚶 Self-Arranged Transport (自行前往)
+                          </span>
+                          <span className="text-[11px] text-slate-500 block mt-1 leading-snug">
+                            I will drive, take public bus, or arrange personal transit to reach the clinic counter on time.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: MANDATORY 5-10 MINUTE ON-SITE ARRIVAL NOTICE (Requested by user) */}
+                <div className="p-4 bg-amber-500/10 border-2 border-amber-400/60 rounded-2xl flex items-start gap-3.5 text-amber-900">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs leading-relaxed">
+                    <span className="font-black text-amber-900 uppercase tracking-wider block text-xs">
+                      ⚠️ Mandatory Counter Arrival Check-in Notice (请务必在就诊前5分钟到达柜台报到)
+                    </span>
+                    <p className="text-amber-850 font-medium">
+                      Please arrive at <strong>{selectedClinic?.name}</strong> counter at least <strong>5–10 minutes before your scheduled appointment time ({selectedTimeSlot})</strong> and present your assigned <strong>Queue Number</strong> to the counter staff. Make sure you have arrived in person to confirm your consultation slot!
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 5 Navigation Buttons */}
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(4)}
+                    className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" /> Back to Date & Time
+                  </button>
                   <button
                     type="submit"
                     disabled={!selectedDoctor || !selectedClinic || !selectedTimeSlot}
-                    className="rounded-xl bg-teal-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                    className="rounded-xl bg-blue-600 px-7 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-lg shadow-blue-600/20"
                   >
-                    {isRescheduling ? "Confirm Reschedule" : "Confirm Booking"}
+                    Confirm Booking & Generate Queue Voucher
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1255,7 +1705,7 @@ export default function ScheduleAppointment({
                   <span className="text-slate-400 block uppercase font-bold text-[9px] tracking-wider mb-1">Facility</span>
                   {selectedClinic ? (
                     <div className="flex items-start gap-2 bg-slate-50 border border-slate-100 rounded-xl p-2.5">
-                      <Building2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                      <Building2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                       <div>
                         <span className="font-bold text-slate-800 text-[11px] block leading-snug">{selectedClinic.name}</span>
                         <span className="text-[10px] text-slate-400 block mt-0.5">{selectedClinic.type}</span>
@@ -1287,12 +1737,12 @@ export default function ScheduleAppointment({
                   <span className="text-slate-400 block uppercase font-bold text-[9px] tracking-wider mb-1">Assigned Clinician</span>
                   {selectedDoctor ? (
                     <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-100 rounded-xl p-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                         {selectedDoctor.avatar}
                       </div>
                       <div>
                         <span className="font-bold text-slate-800 text-[11px] block leading-snug">{selectedDoctor.name}</span>
-                        <span className="text-[10px] text-teal-600 block mt-0.5">{selectedDoctor.title}</span>
+                        <span className="text-[10px] text-blue-600 block mt-0.5">{selectedDoctor.title}</span>
                       </div>
                     </div>
                   ) : (
@@ -1351,7 +1801,7 @@ export default function ScheduleAppointment({
                       lastBooking.status === "Upcoming"
                         ? "bg-amber-100 text-amber-800"
                         : lastBooking.status === "Completed"
-                        ? "bg-teal-100 text-teal-850"
+                        ? "bg-emerald-100 text-emerald-800"
                         : "bg-red-50 text-red-700"
                     }`}>
                       {lastBooking.status}
@@ -1360,16 +1810,6 @@ export default function ScheduleAppointment({
                 </div>
               </div>
             )}
-
-            {/* Quick tips */}
-            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 text-xs text-slate-600 space-y-3">
-              <div className="font-bold text-slate-900 uppercase tracking-[0.1em] text-[10px]">Guidelines</div>
-              <ul className="space-y-2 list-disc list-inside text-slate-500 font-sans">
-                <li>Double check medical allergies match record details.</li>
-                <li>Present proof of identity (MyKad / passport) at clinic registration desk.</li>
-                <li>Reach the facility 10 minutes early for triage sorting.</li>
-              </ul>
-            </div>
           </aside>
 
         </form>

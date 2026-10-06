@@ -1,20 +1,17 @@
 import React from "react";
 import { 
-  Activity, 
   MapPin, 
   Bot, 
-  FileText, 
   Calendar, 
   FolderHeart, 
   Sliders, 
-  Bell, 
-  ShieldCheck, 
   LogOut, 
-  Heart,
-  Home,
-  MessageSquare,
-  TrendingUp,
-  Car
+  Home, 
+  MessageSquare, 
+  TrendingUp, 
+  Car, 
+  Watch, 
+  Activity 
 } from "lucide-react";
 import { AppNotification, PatientProfile } from "../types";
 
@@ -38,8 +35,8 @@ const translations: Record<string, Record<string, string>> = {
     "Fetching Transit": "Fetching Transit",
     "Messages": "Messages",
     "Profile": "Profile",
-    "Exit Portal Sessions": "Exit Portal Sessions",
-    "Secure Sandbox node v12": "Secure Sandbox node v12",
+    "Sign Out": "Sign Out",
+    "Emergency": "Emergency",
     "Patient": "Patient"
   },
   "Bahasa Malaysia": {
@@ -52,8 +49,8 @@ const translations: Record<string, Record<string, string>> = {
     "Fetching Transit": "Transit Pengambilan",
     "Messages": "Mesej",
     "Profile": "Profil",
-    "Exit Portal Sessions": "Log Keluar Portal",
-    "Secure Sandbox node v12": "Nod Sandbox Selamat v12",
+    "Sign Out": "Log Keluar",
+    "Emergency": "Kecemasan",
     "Patient": "Pesakit"
   }
 };
@@ -66,22 +63,32 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
     return translations[lang]?.[key] || key;
   };
 
-  const menuItems: Array<{
-    id: string;
-    label: string;
-    icon: React.ReactNode;
-    highlight?: boolean;
-    badge?: number;
-  }> = [
-    { id: "dashboard", label: "Home", icon: <Home className="w-5 h-5" /> },
-    { id: "healthcare-analytics", label: "Health Analytics", icon: <TrendingUp className="w-5 h-5" /> },
-    { id: "schedule-appointment", label: "Book Appointment", icon: <Calendar className="w-5 h-5" /> },
-    { id: "ai-consultation", label: "AI Consultation", icon: <Bot className="w-5 h-5" /> },
-    { id: "appointments-history", label: "My Appointments", icon: <FolderHeart className="w-5 h-5" /> },
-    { id: "clinic-search", label: "Clinic Locator", icon: <MapPin className="w-5 h-5" /> },
-    { id: "fetching-transit", label: "Fetching Transit", icon: <Car className="w-5 h-5" /> },
-    { id: "communication", label: "Messages", icon: <MessageSquare className="w-5 h-5" />, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined },
-    { id: "user-settings", label: "Profile", icon: <Sliders className="w-5 h-5" /> }
+  const navSections = [
+    {
+      title: "Outpatient Care",
+      items: [
+        { id: "dashboard", label: "Home", icon: <Home className="w-4.5 h-4.5" /> },
+        { id: "schedule-appointment", label: "Book Appointment", icon: <Calendar className="w-4.5 h-4.5" /> },
+        { id: "clinic-search", label: "Clinic Locator", icon: <MapPin className="w-4.5 h-4.5" /> },
+        { id: "fetching-transit", label: "Ride Booking", icon: <Car className="w-4.5 h-4.5" /> },
+      ]
+    },
+    {
+      title: "Clinical Telemetry & AI",
+      items: [
+        { id: "healthcare-analytics", label: "Health Analytics", icon: <TrendingUp className="w-4.5 h-4.5" /> },
+        { id: "wearable-health", label: "Wearable Monitor", icon: <Watch className="w-4.5 h-4.5" /> },
+        { id: "ai-consultation", label: "AI Consultation", icon: <Bot className="w-4.5 h-4.5" /> },
+      ]
+    },
+    {
+      title: "Records & Account",
+      items: [
+        { id: "appointments-history", label: "My Appointments", icon: <FolderHeart className="w-4.5 h-4.5" /> },
+        { id: "communication", label: "Messages", icon: <MessageSquare className="w-4.5 h-4.5" />, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined },
+        { id: "user-settings", label: "Profile", icon: <Sliders className="w-4.5 h-4.5" /> },
+      ]
+    }
   ];
 
   let nationalityDisplay = patientProfile.nationality || "Malaysian";
@@ -90,82 +97,69 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
   }
 
   return (
-    <aside id="portal-sidebar" className="w-64 bg-white border-r border-slate-200 text-slate-700 font-sans flex flex-col justify-between py-6 shrink-0 relative shadow-sm">
-      {/* Dynamic background glow */}
-      <div className="absolute top-0 left-0 w-24 h-24 bg-teal-200/30 rounded-full blur-2xl pointer-events-none"></div>
-
-      <div className="space-y-6">
-        {/* Brand Banner */}
+    <aside id="portal-sidebar" className="w-64 bg-white border-r border-slate-200 text-slate-700 font-sans flex flex-col justify-between py-6 shrink-0 relative shadow-xs">
+      
+      <div className="space-y-5">
+        {/* Brand Banner - Previous Logo and Name Only */}
         <div className="px-6 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shadow-md shadow-teal-500/30 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 shrink-0">
             <Activity className="w-4.5 h-4.5 text-white" />
           </div>
-          <div>
-            <span className="font-extrabold text-slate-900 text-md tracking-tight block">
-              Penang<span className="text-teal-600">Health</span>
-            </span>
-            <span className="text-[9px] text-teal-600 font-mono tracking-widest uppercase font-bold block leading-none mt-0.5">MOH MALAYSIA</span>
-          </div>
+          <span className="font-extrabold text-slate-900 text-lg tracking-tight block">
+            Penang<span className="text-sky-600">Health</span>
+          </span>
         </div>
 
-        {/* Small Patient quick summary card */}
-        <div className="px-5">
-          <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl flex items-center gap-3 shadow-sm">
-            <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-xs">
-              {patientName ? patientName[0] : "P"}
-            </div>
-            <div className="overflow-hidden">
-              <span className="font-extrabold text-slate-900 text-xs block leading-tight truncate">{patientName || "Patient"}</span>
-              <span className="text-[9px] text-slate-500 block font-mono mt-0.5">{nationalityDisplay} {t("Patient")}</span>
-            </div>
-          </div>
-        </div>
+        {/* Navigation list grouped by clinical sections */}
+        <nav className="space-y-4 px-3 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-thin">
+          {navSections.map((section, sIdx) => (
+            <div key={sIdx} className="space-y-1">
+              <span className="text-[9px] uppercase font-extrabold text-slate-400 font-mono tracking-wider px-3 block mb-1">
+                {section.title}
+              </span>
+              {section.items.map((item) => {
+                const isActive = currentScreen === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onSetScreen(item.id)}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center justify-between transition-all group cursor-pointer ${
+                      isActive 
+                        ? 'bg-sky-600 text-white shadow-md shadow-sky-600/15' 
+                        : 'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-sky-600'} transition-colors`}>
+                        {item.icon}
+                      </span>
+                      <span>{t(item.label)}</span>
+                    </div>
 
-        {/* Navigation list */}
-        <nav className="space-y-1.5 px-3">
-          {menuItems.map((item) => {
-            const isActive = currentScreen === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSetScreen(item.id)}
-                className={`w-full py-2.5 px-4.5 rounded-2xl text-xs font-semibold leading-none flex items-center justify-between transition-all group ${
-                  isActive 
-                    ? 'bg-teal-600 border border-teal-600 text-white shadow-md shadow-teal-600/10' 
-                    : 'bg-transparent text-slate-650 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-teal-400'} transition-colors`}>
-                    {item.icon}
-                  </span>
-                  <span>{t(item.label)}</span>
-                </div>
-
-                {item.badge !== undefined && (
-                  <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[9px] font-black font-mono">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                    {item.badge !== undefined && (
+                      <span className="bg-rose-600 text-white rounded-full px-1.5 py-0.5 text-[9px] font-black font-mono">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </div>
 
       {/* Logout footer block */}
-      <div className="px-3 space-y-4">
+      <div className="px-4 space-y-2 pt-3 border-t border-slate-100">
         <button 
           onClick={onLogout}
-          className="w-full py-2.5 px-4 rounded-xl text-xs font-bold leading-none flex items-center gap-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
+          className="w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer border border-transparent hover:border-rose-100"
         >
-          <LogOut className="w-5 h-5" />
-          <span>{t("Exit Portal Sessions")}</span>
+          <LogOut className="w-4 h-4" />
+          <span>{t("Sign Out")}</span>
         </button>
 
-        <div className="border-t border-slate-850 pt-4 text-center">
-          <span className="text-[10px] text-slate-600 font-mono tracking-wide uppercase font-bold block">{t("Secure Sandbox node v12")}</span>
-        </div>
+
       </div>
     </aside>
   );

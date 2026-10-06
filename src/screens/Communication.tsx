@@ -583,7 +583,7 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
     if (isRateLimitExceeded) return;
 
     // Prefix the content with the channel/clinic ID
-    const prefixedContent = `[${activeInboxId}]: Forwarded Carey AI symptom check diagnostic report file.`;
+    const prefixedContent = `[${activeInboxId}]: Forwarded Health Assistant symptom check diagnostic report file.`;
 
     const attachMsg: Message = {
       id: "msg-attach-" + Date.now(),
@@ -591,7 +591,7 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
       senderName: "User (Ahmad Danish)",
       content: prefixedContent,
       timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      attachmentName: "Carey_Triage_Summary_Secure.pdf",
+      attachmentName: "Health_Assistant_Triage_Summary.pdf",
       attachmentType: "document"
     };
     (attachMsg as any).sentAt = Date.now();
@@ -608,14 +608,14 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch h-[550px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch h-[560px]">
         
         {/* Left Side: Inbox List */}
-        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl p-4 flex flex-col justify-between overflow-y-auto font-sans">
+        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl p-4 flex flex-col justify-between overflow-y-auto font-sans shadow-xs">
           <div className="space-y-4">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold block px-2.5">Active Providers & Staff</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block px-2.5">Active Providers & Staff</span>
             
-            <div className="space-y-2 font-sans">
+            <div className="space-y-1.5 font-sans">
               {channels.map((ch) => {
                 const isActive = ch.id === activeInboxId;
                 return (
@@ -623,20 +623,20 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
                     key={ch.id}
                     onClick={() => setActiveInboxId(ch.id)}
                     className={`p-3 rounded-2xl flex gap-3 items-center justify-between cursor-pointer transition ${
-                      isActive ? 'bg-teal-50 border border-teal-100 text-teal-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                      isActive ? 'bg-sky-50 border border-sky-200 text-sky-950 font-bold shadow-xs' : 'hover:bg-slate-50 text-slate-700 border border-transparent'
                     }`}
                   >
                     <div className="flex gap-2.5 items-center">
                       {ch.image ? (
-                        <img src={ch.image} alt={ch.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                        <img src={ch.image} alt={ch.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200" />
                       ) : (
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-xs shrink-0 font-mono">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-bold text-white text-xs shrink-0 font-mono shadow-xs">
                           {ch.avatarInitials}
                         </div>
                       )}
                       <div>
-                        <span className="text-xs font-extrabold text-slate-900 block leading-none">{ch.name}</span>
-                        <span className="text-[10px] text-slate-400 font-mono block mt-1 leading-normal">{ch.subtitle}</span>
+                        <span className="text-xs font-extrabold text-slate-900 block leading-tight">{ch.name}</span>
+                        <span className="text-[10px] text-slate-500 font-medium block mt-1 leading-normal">{ch.subtitle}</span>
                       </div>
                     </div>
                   </div>
@@ -645,41 +645,47 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
             </div>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-2xl text-xs space-y-1 mt-6">
-            <span className="font-bold text-slate-900 block">General Support Rules</span>
+          <div className="bg-slate-50 border border-slate-200/60 p-3.5 rounded-2xl text-xs space-y-1 mt-4">
+            <span className="font-bold text-slate-800 text-[11px] block">Messaging Guidelines</span>
             <p className="text-[10px] text-slate-500 leading-normal">
-              - Limit of 5 messages per hour before a staff member responds.<br />
-              - Maximum message length is 20 words.
+              • Limit: 5 messages per hour before a staff member responds.<br />
+              • Message length max 20 words for rapid triage response.
             </p>
           </div>
         </div>
 
         {/* Right Side: Conversation Thread Window */}
         {activeChannel ? (
-          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl flex flex-col justify-between relative overflow-hidden">
+          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl flex flex-col justify-between relative overflow-hidden shadow-xs">
             
             {/* Active Provider Header Panel */}
-            <div className="bg-slate-50 border-b border-slate-100 p-4.5 flex items-center justify-between shrink-0">
+            <div className="bg-slate-50/80 border-b border-slate-200/80 p-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 {activeChannel.image ? (
-                  <img src={activeChannel.image} alt={activeChannel.name} className="w-11 h-11 rounded-xl object-cover border border-slate-100" />
+                  <img src={activeChannel.image} alt={activeChannel.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200" />
                 ) : (
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-sm shrink-0 border border-slate-100 font-mono">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-bold text-white text-sm shrink-0 border border-slate-100 font-mono shadow-xs">
                     {activeChannel.avatarInitials}
                   </div>
                 )}
                 <div>
-                  <span className="font-extrabold text-sm text-slate-900 block leading-tight">{activeChannel.name}</span>
-                  <span className="text-[10px] text-teal-700 font-semibold block font-mono">
-                    Facility Support & Triage Desk
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-900 leading-tight">{activeChannel.name}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Verified
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-sky-700 font-semibold block mt-0.5">
+                    Facility Support &amp; Outpatient Triage Desk
                   </span>
                 </div>
               </div>
 
-              <div className="flex gap-2.5">
+              <div className="flex gap-2">
                 <button 
                   onClick={() => onSetScreen("schedule-appointment")}
-                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition"
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
                 >
                   Book Appointment
                 </button>
@@ -687,51 +693,35 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
             </div>
 
             {/* Active messages timeline */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-4 max-h-[320px] scrollbar-thin">
+            <div className="flex-1 p-5 overflow-y-auto space-y-3.5 max-h-[340px] scrollbar-thin bg-slate-50/30">
               {activeMessages.map((m) => {
                 const isUser = m.sender === 'user';
                 return (
                   <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                    <div className={`max-w-[80%] rounded-2xl p-4 text-xs leading-relaxed space-y-1.5 ${
+                    <div className={`max-w-[78%] rounded-2xl p-3.5 text-xs leading-relaxed space-y-1.5 ${
                       isUser 
-                        ? 'bg-slate-900 text-white rounded-br-none shadow font-mono' 
-                        : 'bg-teal-50/50 border border-teal-100/70 text-slate-800 rounded-bl-none shadow-sm'
+                        ? 'bg-sky-600 text-white rounded-br-xs shadow-xs' 
+                        : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-xs'
                     }`}>
-                      <div className="flex justify-between gap-6 text-[9px] opacity-75 font-mono">
-                        <span className="font-bold">{isUser ? 'Patient (You)' : m.senderName}</span>
+                      <div className={`flex justify-between gap-6 text-[9.5px] ${isUser ? 'text-sky-100' : 'text-slate-400'} font-medium`}>
+                        <span className="font-bold">{isUser ? 'You' : m.senderName}</span>
                         <span>{m.timestamp}</span>
                       </div>
 
-                      <p className="leading-relaxed text-[11.5px] whitespace-pre-line font-medium font-sans">
+                      <p className={`leading-relaxed text-[12px] whitespace-pre-line font-medium ${isUser ? 'text-white' : 'text-slate-800'}`}>
                         {m.content}
                       </p>
 
-                      {translatedMessages[m.id] && (
-                        <p className="mt-2 pt-2 border-t border-slate-200/30 italic text-[11px] text-teal-600 font-semibold font-sans">
-                          {translatedMessages[m.id]}
-                        </p>
-                      )}
-
-                      <div className="flex justify-start pt-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleTranslateMessage(m.id, m.content)}
-                          className="text-[9px] font-bold text-teal-600 hover:underline cursor-pointer"
-                        >
-                          {translatedMessages[m.id] ? "Show Original" : "🌐 Translate"}
-                        </button>
-                      </div>
-
                       {/* Document attachments bubble */}
                       {m.attachmentName && (
-                        <div className="bg-white text-slate-800 p-2.5 rounded-xl flex items-center justify-between border border-slate-150 shadow-inner mt-2 gap-4">
+                        <div className="bg-white/95 text-slate-800 p-2.5 rounded-xl flex items-center justify-between border border-slate-200 shadow-xs mt-2 gap-3">
                           <div className="flex items-center gap-2">
-                            <Paperclip className="w-4.5 h-4.5 text-teal-600" />
-                            <span className="font-semibold text-[10.5px] truncate max-w-[150px] font-mono">{m.attachmentName}</span>
+                            <Paperclip className="w-4 h-4 text-sky-600" />
+                            <span className="font-semibold text-[10.5px] truncate max-w-[150px]">{m.attachmentName}</span>
                           </div>
                           <button 
                             onClick={() => alert(`Secure report PDF content fetched: ${m.attachmentName}`)}
-                            className="bg-slate-100 hover:bg-slate-200 text-teal-800 font-bold p-1 px-2.5 rounded text-[10px] transition flex items-center gap-1"
+                            className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold px-2 py-1 rounded-lg text-[10px] transition flex items-center gap-1 border border-sky-100"
                           >
                             <FileDown className="w-3.5 h-3.5" /> Open
                           </button>
@@ -745,7 +735,7 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
             </div>
 
             {/* Form and Limits Panel */}
-            <div className="bg-slate-50 border-t border-slate-100 flex flex-col shrink-0">
+            <div className="bg-white border-t border-slate-200 flex flex-col shrink-0">
               {/* Warnings Area */}
               {(isWordLimitExceeded || isRateLimitExceeded) && (
                 <div className="px-4 py-2 bg-rose-50 border-b border-rose-100 flex items-center gap-2 text-rose-800 text-[11px] font-medium leading-relaxed">
@@ -758,32 +748,39 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
               )}
               
               {/* Compose message form */}
-              <form onSubmit={handleSend} className="p-4 flex gap-2">
+              <form onSubmit={handleSend} className="p-3.5 flex items-center gap-2">
                 <button 
                   type="button"
                   onClick={handleAttachReport}
                   disabled={isRateLimitExceeded}
-                  className="p-3 border border-slate-200 hover:border-teal-500 bg-white hover:text-teal-600 rounded-xl text-slate-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Forward Carey AI diagnostic report attachment"
+                  className="p-2.5 border border-slate-200 hover:border-sky-500 bg-white hover:text-sky-600 rounded-xl text-slate-400 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                  title="Forward Health Assistant diagnostic report attachment"
                 >
-                  <Paperclip className="w-4.5 h-4.5" />
+                  <Paperclip className="w-4 h-4" />
                 </button>
 
-                <input 
-                  id="message-input-doc"
-                  type="text" 
-                  value={textInput}
-                  disabled={isRateLimitExceeded}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder={isRateLimitExceeded ? "Rate limit reached. Please wait for a reply..." : `Message ${activeChannel.name}...`}
-                  className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs placeholder-slate-400 focus:outline-none focus:border-teal-500 font-bold disabled:bg-slate-100 disabled:text-slate-400"
-                />
+                <div className="flex-1 relative">
+                  <input 
+                    id="message-input-doc"
+                    type="text" 
+                    value={textInput}
+                    disabled={isRateLimitExceeded}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder={isRateLimitExceeded ? "Rate limit reached. Please wait for a reply..." : `Message ${activeChannel.name}...`}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white font-medium disabled:bg-slate-100 disabled:text-slate-400 transition"
+                  />
+                  {textInput.trim() && (
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold ${isWordLimitExceeded ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
+                      {wordCount}/20w
+                    </span>
+                  )}
+                </div>
 
                 <button 
                   id="message-btn-send"
                   type="submit"
                   disabled={!textInput.trim() || isWordLimitExceeded || isRateLimitExceeded}
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs p-3 px-4.5 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs p-2.5 px-4 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs active:scale-98"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -792,19 +789,19 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
 
           </div>
         ) : (
-          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl flex flex-col items-center justify-center p-8 text-center space-y-4 animate-fade-in font-sans">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-400">
+          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl flex flex-col items-center justify-center p-8 text-center space-y-4 animate-fade-in font-sans shadow-xs">
+            <div className="w-16 h-16 bg-sky-50 text-sky-600 rounded-full flex items-center justify-center">
               <Mail className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900">No Support Chat Active</h3>
+              <h3 className="font-extrabold text-slate-900">No Support Chat Selected</h3>
               <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
-                Active nursing and triage chat channels are generated automatically once you book an appointment at any of our facilities.
+                Choose a channel from the left or book an appointment to communicate directly with our clinical triage desk.
               </p>
             </div>
             <button
               onClick={() => onSetScreen("schedule-appointment")}
-              className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-xs"
             >
               Book Appointment Now
             </button>

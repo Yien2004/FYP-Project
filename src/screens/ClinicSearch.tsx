@@ -135,8 +135,8 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Category states matching appointment selection
-  const [categoryFilter, setCategoryFilter] = useState<"All" | "Public" | "Private">("All");
+  // Category states matching appointment selection (Private facilities only)
+  const [categoryFilter, setCategoryFilter] = useState<"All" | "Hospitals" | "Clinics">("All");
 
   // Coordinates state for mapping
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -173,7 +173,13 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     }
   };
 
-  // Load facilities from backend API on mount
+  const isPublicFacility = (name: string) =>
+    name.includes("Klinik Kesihatan") ||
+    name.includes("Hospital Pulau Pinang") ||
+    name.includes("Hospital Seberang Jaya") ||
+    name.includes("Hospital Bukit Mertajam");
+
+  // Load facilities from backend API on mount (Private facilities only)
   useEffect(() => {
     fetch("/api/facilities")
       .then((res) => {
@@ -181,8 +187,10 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
         return res.json();
       })
       .then((data: Clinic[]) => {
-        // Filter out non-Penang clinics (Penang is roughly lat 5.1 to 5.5, lng 100.1 to 100.6)
-        const penangClinics = data.filter(c => c.lat > 5.0 && c.lat < 5.8 && c.lng > 100.0 && c.lng < 100.8);
+        // Filter to Penang private clinics only
+        const penangClinics = data.filter(c => 
+          c.lat > 5.0 && c.lat < 5.8 && c.lng > 100.0 && c.lng < 100.8 && !isPublicFacility(c.name)
+        );
 
         setClinics(penangClinics);
         setFilteredClinics(penangClinics);
@@ -193,9 +201,11 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
       })
       .catch((err) => {
         console.warn("Facilities API failed, using fallback mock data:", err);
-        // Fallback to local mock clinics filtered to Penang coordinates
-        const penangMocks = mockClinics.filter(c => c.lat > 5.0 && c.lat < 5.8 && c.lng > 100.0 && c.lng < 100.8);
-        const fallbackList = penangMocks.length > 0 ? penangMocks : mockClinics;
+        // Fallback to local mock clinics filtered to private Penang facilities
+        const penangMocks = mockClinics.filter(c => 
+          c.lat > 5.0 && c.lat < 5.8 && c.lng > 100.0 && c.lng < 100.8 && !isPublicFacility(c.name)
+        );
+        const fallbackList = penangMocks.length > 0 ? penangMocks : mockClinics.filter(c => !isPublicFacility(c.name));
         setClinics(fallbackList);
         setFilteredClinics(fallbackList);
         setSelectedClinic(null);
@@ -427,19 +437,23 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     };
   }, []);
 
-  // Unified Filtering logic for Search + Categories
-  const applyFilter = (category: "All" | "Public" | "Private", searchVal: string) => {
+  // Unified Filtering logic for Search + Categories (Private facilities only)
+  const applyFilter = (category: "All" | "Hospitals" | "Clinics", searchVal: string) => {
     let result = clinics;
 
     // 1. Filter by category type
-    if (category !== "All") {
-      result = result.filter(c => {
-        // Public checks name starting with Klinik Kesihatan or exact public hospitals
-        const isPublic = c.name.includes("Klinik Kesihatan") || 
-                         c.name.includes("Hospital Pulau Pinang") || 
-                         c.name.includes("Hospital Seberang Jaya");
-        return category === "Public" ? isPublic : !isPublic;
-      });
+    if (category === "Hospitals") {
+      result = result.filter(c => 
+        c.name.toLowerCase().includes("hospital") || 
+        c.name.toLowerCase().includes("centre") || 
+        c.name.toLowerCase().includes("center")
+      );
+    } else if (category === "Clinics") {
+      result = result.filter(c => 
+        c.name.toLowerCase().includes("klinik") || 
+        c.name.toLowerCase().includes("clinic") || 
+        c.name.toLowerCase().includes("poliklinik")
+      );
     }
 
     // 2. Filter by search input
@@ -589,7 +603,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Select Facility:</span>
               <div className="flex gap-1.5">
-                {(["All", "Public", "Private"] as const).map((cat) => (
+                {(["All", "Hospitals", "Clinics"] as const).map((cat) => (
                   <button
                     key={cat}
                     type="button"
@@ -599,7 +613,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                     }}
                     className={`text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer ${
                       categoryFilter === cat
-                        ? "bg-teal-600 text-white shadow shadow-teal-500/20"
+                        ? "bg-sky-600 text-white shadow shadow-sky-500/20"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
@@ -621,13 +635,13 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                       setZipInput(e.target.value);
                       applyFilter(categoryFilter, e.target.value);
                     }}
-                    placeholder="e.g. 10150, Bayan Baru, Georgetown..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 font-bold"
+                    placeholder="e.g. 10450, Bayan Lepas, Georgetown..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-500 font-bold"
                   />
                 </div>
                 <button 
                   type="submit"
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer"
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer shadow-xs"
                 >
                   Search
                 </button>
@@ -833,12 +847,12 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
               onClick={handleLocateUser}
               className={`absolute top-4 right-4 p-2.5 rounded-xl border shadow-md transition z-[1000] cursor-pointer flex items-center gap-1.5 text-xs font-bold font-sans animate-fade-in ${
                 isTrackingGps
-                  ? "bg-teal-655 border-teal-600 text-white shadow shadow-teal-550/30"
+                  ? "bg-sky-600 border-sky-600 text-white shadow shadow-sky-500/30"
                   : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50"
               }`}
               title={isTrackingGps ? "Stop Tracking Position" : "Track My Position (Real-time)"}
             >
-              <Navigation className={`w-4 h-4 ${isTrackingGps ? "text-white animate-pulse" : "text-teal-650 fill-teal-150"}`} />
+              <Navigation className={`w-4 h-4 ${isTrackingGps ? "text-white animate-pulse" : "text-sky-600 fill-sky-100"}`} />
               {isTrackingGps ? "Tracking Live" : "Locate Me"}
             </button>
 
@@ -847,27 +861,6 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                 ⚠️ Simulated GPS in Penang
               </div>
             )}
-          </div>
-
-          {/* Map legend and services summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border border-slate-150 p-4 rounded-3xl text-xs text-slate-600 shadow-sm leading-normal">
-            <div>
-              <span className="font-bold text-slate-900 block mb-1 font-sans">Clinic Legend</span>
-              <div className="space-y-1 font-mono text-[10px]">
-                <div className="flex items-center gap-1.5"><span className="w-2 h-2 bg-teal-500 rounded-full" /> Featured Fast queue</div>
-                <div className="flex items-center gap-1.5"><span className="w-2 h-2 bg-slate-700 rounded-full" /> Outpatient Consultation</div>
-              </div>
-            </div>
-
-            <div>
-              <span className="font-bold text-slate-900 block mb-1 font-sans">Immediate Dispatch</span>
-              <p className="text-[11px] text-slate-500">Selected branch supports fast drive-thru medicine collection with pre-authorized ticket Rx codes.</p>
-            </div>
-
-            <div>
-              <span className="font-bold text-slate-900 block mb-1 font-sans">Central Emergency dispatch</span>
-              <p className="text-[11px] text-slate-500">Contact ambulance dispatch via our <strong>Ambulance SOS Tracker</strong> in your central workspace Hub.</p>
-            </div>
           </div>
         </div>
       </div>

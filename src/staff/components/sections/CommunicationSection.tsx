@@ -828,21 +828,21 @@ export default function CommunicationSection() {
                 key={t.id}
                 id={`chat-thread-btn-${t.id}`}
                 onClick={() => selectThread(t.id)}
-                className={`w-full p-4 text-left transition-colors flex items-start gap-3 relative ${
+                className={`w-full p-4 text-left transition-colors flex items-start gap-3 relative cursor-pointer ${
                   isActive
-                    ? 'bg-red-50/50'
-                    : 'hover:bg-neutral-100/30'
+                    ? 'bg-sky-50/80 border-r-2 border-r-sky-600'
+                    : 'hover:bg-slate-50'
                 }`}
               >
                 {/* Active Left Indicator Bar */}
                 {isActive && (
-                  <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-red-500 rounded-r-lg"></span>
+                  <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-sky-600 rounded-r-lg"></span>
                 )}
 
                 {t.senderAvatar ? (
-                  <img src={t.senderAvatar} alt={t.senderName} className="w-9 h-9 rounded-full object-cover border border-neutral-200" />
+                  <img src={t.senderAvatar} alt={t.senderName} className="w-9 h-9 rounded-full object-cover border border-neutral-200 shadow-xs" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center shrink-0 border border-red-200">
+                  <div className="w-9 h-9 rounded-full bg-sky-100 text-sky-700 font-bold text-xs flex items-center justify-center shrink-0 border border-sky-200 shadow-xs">
                     {initials}
                   </div>
                 )}
@@ -856,7 +856,7 @@ export default function CommunicationSection() {
                 </div>
 
                 {t.unread && (
-                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-2 animate-pulse"></span>
+                  <span className="w-2 h-2 rounded-full bg-sky-600 shrink-0 mt-2 animate-pulse"></span>
                 )}
               </button>
             );
@@ -871,19 +871,18 @@ export default function CommunicationSection() {
           <div className="flex items-center gap-3">
             <h4 className="font-bold text-sm text-neutral-900 pr-1">{activeThread.senderName}</h4>
             <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full select-none">
-              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               Encrypted Channel
             </span>
           </div>
-          <span className="text-[10px] text-neutral-400 font-mono">ID: {activeThread.id}</span>
         </div>
 
         {/* Symptoms Flag Header if active on thread */}
         {activeThread.symptoms && activeThread.symptoms.length > 0 && (
-          <div className="bg-red-50/50 p-3 px-4 border-b border-red-100/65 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold text-red-700 uppercase tracking-widest mr-1">Alert Symptoms:</span>
+          <div className="bg-rose-50/60 p-3 px-4 border-b border-rose-100 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-widest mr-1">Alert Symptoms:</span>
             {activeThread.symptoms.map((sym, idx) => (
-              <span key={idx} className="bg-white border border-red-200 text-red-700 font-semibold px-2 py-0.5 rounded text-[10px]">
+              <span key={idx} className="bg-white border border-rose-200 text-rose-700 font-semibold px-2 py-0.5 rounded text-[10px]">
                 {sym}
               </span>
             ))}
@@ -906,7 +905,7 @@ export default function CommunicationSection() {
                     {isDoc && (
                       <button
                         onClick={() => handleRecallMessage(m.id)}
-                        className="opacity-0 group-hover:opacity-100 absolute -left-16 top-1/2 -translate-y-1/2 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded border border-red-200 transition-all shadow-xs cursor-pointer whitespace-nowrap z-10"
+                        className="opacity-0 group-hover:opacity-100 absolute -left-16 top-1/2 -translate-y-1/2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-[10px] font-bold px-2 py-1 rounded border border-rose-200 transition-all shadow-xs cursor-pointer whitespace-nowrap z-10"
                         title="Recall message"
                       >
                         Recall
@@ -914,25 +913,13 @@ export default function CommunicationSection() {
                     )}
                     <div className={`rounded-2xl p-3.5 text-xs shadow-xs relative ${
                       isDoc 
-                        ? 'bg-neutral-900 text-white font-medium rounded-tr-none' 
-                        : 'bg-white border border-neutral-200 text-neutral-800 rounded-tl-none'
+                        ? 'bg-sky-600 text-white font-medium rounded-tr-none' 
+                        : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
                     }`}>
                       <p className="leading-relaxed font-sans">{m.text}</p>
-                      {translatedMessages[m.id] && (
-                        <p className="mt-2 pt-2 border-t border-neutral-100 italic text-[11px] text-teal-600 font-semibold">
-                          {translatedMessages[m.id]}
-                        </p>
-                      )}
-                      <div className="flex justify-between items-center mt-1.5 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => handleTranslateMessage(m.id, m.text)}
-                          className="text-[9px] font-bold text-teal-600 hover:underline cursor-pointer"
-                        >
-                          {translatedMessages[m.id] ? "Show Original" : "🌐 Translate"}
-                        </button>
-                        <span className={`text-[9px] font-mono ${
-                          isDoc ? 'text-neutral-400' : 'text-neutral-400'
+                      <div className="flex justify-end items-center mt-1">
+                        <span className={`text-[9.5px] font-mono ${
+                          isDoc ? 'text-sky-200' : 'text-slate-400'
                         }`}>{m.timestamp}</span>
                       </div>
                     </div>
@@ -948,7 +935,7 @@ export default function CommunicationSection() {
 
           {/* Form field */}
           <div className="flex items-center gap-2">
-            <button className="p-2 bg-neutral-50 border border-neutral-250 hover:bg-neutral-100 text-neutral-500 rounded-xl cursor-pointer">
+            <button className="p-2 bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-500 rounded-xl cursor-pointer">
               <Paperclip className="w-4 h-4" />
             </button>
             <input
@@ -962,12 +949,12 @@ export default function CommunicationSection() {
                   handleSendMessage(typedMessage);
                 }
               }}
-              className="flex-1 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400"
+              className="flex-1 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-800 outline-none focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-200 transition"
             />
             <button
               onClick={() => handleSendMessage(typedMessage)}
               id="chat-send-btn"
-              className="p-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer"
+              className="p-2 px-3.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer shadow-xs active:scale-98"
             >
               <Send className="w-4 h-4" />
             </button>

@@ -19,7 +19,11 @@ import {
   History,
   FileSpreadsheet,
   Eye,
-  Camera
+  Camera,
+  ArrowLeft,
+  Pill,
+  Clock,
+  X
 } from 'lucide-react';
 import { mockPatients } from '../../data/mockData';
 import { Patient, Prescription, Attachment, Appointment } from '../../types';
@@ -78,6 +82,8 @@ const getLoggedUserClinic = () => {
 export default function PatientsSection() {
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('p1');
+  const [isDetailView, setIsDetailView] = useState<boolean>(false);
+  const [selectedVisitModal, setSelectedVisitModal] = useState<any | null>(null);
   const [searchVal, setSearchVal] = useState('');
   
   // Tab control inside active patient workspace
@@ -625,7 +631,7 @@ export default function PatientsSection() {
       setSuccessMsg(`Document downloaded: ${file.name}`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } else {
-      const contents = `CarePoint MOH Health Ledger System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt}\nPatient Name: ${activePatient.name}\nPatient DOB: ${activePatient.dob}\nGender: ${activePatient.gender}\nEmail: ${activePatient.email}\n---------------------------------------\n[COMPILER SUCCESS] This is a simulated clinical record file parsed from CarePoint central database.\n`;
+      const contents = `PenangHealth Clinical EHR System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt}\nPatient Name: ${activePatient.name}\nPatient DOB: ${activePatient.dob}\nGender: ${activePatient.gender}\nEmail: ${activePatient.email}\n---------------------------------------\nThis is a clinical record file stored in the PenangHealth database.\n`;
       const blob = new Blob([contents], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -865,78 +871,144 @@ export default function PatientsSection() {
     );
   }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans text-neutral-800">
-      
-      {/* Left Column: Patient Directory */}
-      <div className="lg:col-span-1 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-4">
-        <div>
-          <h3 className="font-bold text-base text-neutral-900">Patient Directory</h3>
-          <p className="text-xs text-neutral-500 mt-0.5">Quick lookup or index select for active outpatient profiles.</p>
+  if (!isDetailView) {
+    return (
+      <div className="space-y-6 font-sans text-neutral-800">
+        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight flex items-center gap-2.5">
+              <span>Patient Directory</span>
+              <span className="text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full font-mono">
+                {filteredPatients.length} Active {filteredPatients.length === 1 ? 'Profile' : 'Profiles'}
+              </span>
+            </h2>
+            <p className="text-xs text-neutral-500 mt-1">
+              Quick lookup or index select for active outpatient profiles across your clinical department.
+            </p>
+          </div>
+
+          {/* Search */}
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search patients by name or ID..."
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              className="w-full bg-slate-50 border border-neutral-200 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200 transition-all h-10"
+            />
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search patients by name or diagnostic..."
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-9 pr-4 py-2 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-200/50 transition-all h-9"
-          />
-        </div>
-
-        {/* Directory Items List */}
-        <div className="space-y-2 overflow-y-auto max-h-[600px] pr-1" id="patient-directory-list">
-          {filteredPatients.length === 0 ? (
-            <p className="text-xs text-neutral-400 text-center py-8">No clinical profiles matching search.</p>
-          ) : (
-            filteredPatients.map((p) => {
-              const isActive = p.id === activePatient.id;
+        {/* Directory Items Grid */}
+        {filteredPatients.length === 0 ? (
+          <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center text-neutral-400 text-xs">
+            No clinical profiles matching search.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="patient-directory-grid">
+            {filteredPatients.map((p) => {
               const initials = p.name.split(' ').map((n: string) => n[0]).join('');
               return (
-                <button
+                <div
                   key={p.id}
                   id={`patient-select-card-${p.id}`}
                   onClick={() => {
                     setSelectedPatientId(p.id);
                     setSuccessMsg('');
                     setActiveTab('overview');
+                    setIsDetailView(true);
                   }}
-                  className={`w-full flex items-center justify-between text-left p-3 rounded-xl border transition-all ${
-                    isActive
-                      ? 'bg-teal-50 text-teal-900 border-teal-355 shadow-sm shadow-teal-500/5'
-                      : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50 hover:border-slate-200'
-                  }`}
+                  className="bg-white border border-slate-200 hover:border-sky-400 hover:shadow-md rounded-2xl p-5 transition-all cursor-pointer group flex flex-col justify-between"
                 >
-                  <div className="flex items-center gap-3">
-                    {p.avatar ? (
-                      <img 
-                        src={p.avatar} 
-                        alt={p.name} 
-                        className="w-9 h-9 rounded-full object-cover border border-neutral-200" 
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-teal-100 text-teal-700 text-xs font-black flex items-center justify-center border border-teal-200">
-                        {initials}
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {p.avatar ? (
+                          <img 
+                            src={p.avatar} 
+                            alt={p.name} 
+                            className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-xs" 
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-700 text-sm font-black flex items-center justify-center border border-sky-200 shadow-xs">
+                            {initials}
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="font-extrabold text-sm text-neutral-900 group-hover:text-sky-600 transition-colors">
+                            {p.name}
+                          </h4>
+                          <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                            ID: {p.id} • {p.gender} • DOB {p.dob}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-bold text-xs text-neutral-900 truncate">{p.name}</p>
-                      <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{p.gender} • DOB {p.dob}</p>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3">
+                      <div className="flex items-center gap-2 text-slate-600 text-[11px]">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="font-mono">{p.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-600 text-[11px]">
+                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{p.email}</span>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-medium text-neutral-455 font-mono">Last v. {p.lastVisited}</span>
-                </button>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-[10px] text-slate-400 font-mono">Last visit: {p.lastVisited}</span>
+                    <span className="text-xs font-bold text-sky-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                      View Profile &amp; EHR &rarr;
+                    </span>
+                  </div>
+                </div>
               );
-            })
-          )}
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 font-sans text-neutral-800">
+      
+      {/* Top Navigation Bar: Back to Patient Directory */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white border border-neutral-200/80 rounded-2xl p-4 shadow-xs">
+        <button
+          onClick={() => setIsDetailView(false)}
+          className="inline-flex items-center gap-2 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-4 py-2.5 rounded-xl border border-sky-200 transition cursor-pointer active:scale-98 shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>&larr; Back to Patient Directory</span>
+        </button>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500 hidden sm:inline">
+            Active Outpatient Record: <strong className="text-slate-800">{activePatient.name}</strong> ({activePatient.id})
+          </span>
+          <select
+            value={selectedPatientId}
+            onChange={(e) => {
+              setSelectedPatientId(e.target.value);
+              setSuccessMsg('');
+            }}
+            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 outline-none focus:border-sky-400 cursor-pointer shadow-xs"
+          >
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.id})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Right Column: Work Workspace */}
-      <div className="lg:col-span-2 space-y-6">
+      {/* Main Full-Width Patient Workspace */}
+      <div className="space-y-6">
         
         {/* Core demographic block */}
         <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs">
@@ -952,54 +1024,59 @@ export default function PatientsSection() {
                   {activePatient.name}
                   <button
                     onClick={() => handleOpenEditModal()}
-                    className="p-1 text-teal-600 hover:bg-teal-50 hover:text-teal-700 rounded-lg transition-colors border border-teal-250 bg-white cursor-pointer inline-flex items-center gap-1 font-bold text-[10px]"
+                    className="p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-700 rounded-lg transition-colors border border-sky-200 bg-white cursor-pointer inline-flex items-center gap-1 font-bold text-[10px]"
                     title="Modify Patient Details"
                   >
                     Edit Profile
                   </button>
                 </h2>
-                <span className="inline-block text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200/50 px-2 py-0.5 rounded-full mt-1">
-                  Primary Issue: {activePatient.condition}
-                </span>
               </div>
             </div>
 
             {/* EHR Tab Controller */}
-            <div className="flex bg-neutral-100 p-1 rounded-xl text-xs font-semibold shrink-0 gap-1 border border-neutral-200/30">
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl text-xs font-bold shrink-0 gap-1.5 border border-slate-200 shadow-xs">
               <button
                 onClick={() => { setActiveTab('overview'); setSuccessMsg(''); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeTab === 'overview' ? 'bg-white text-neutral-950 shadow-xs' : 'text-neutral-500 hover:text-neutral-800'
+                className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer font-bold ${
+                  activeTab === 'overview'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
+                <Layers className="w-4 h-4" />
                 Overview
               </button>
               <button
                 onClick={() => { setActiveTab('consult'); setSuccessMsg(''); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeTab === 'consult' ? 'bg-white text-neutral-950 shadow-xs' : 'text-neutral-500 hover:text-neutral-800'
+                className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer font-bold ${
+                  activeTab === 'consult'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
-                <Activity className="w-3.5 h-3.5" />
+                <Activity className="w-4 h-4" />
                 Consultation
               </button>
               <button
                 onClick={() => { setActiveTab('history'); setSuccessMsg(''); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeTab === 'history' ? 'bg-white text-neutral-950 shadow-xs' : 'text-neutral-500 hover:text-neutral-800'
+                className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer font-bold ${
+                  activeTab === 'history'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
-                <History className="w-3.5 h-3.5" />
+                <History className="w-4 h-4" />
                 History
               </button>
               <button
                 onClick={() => { setActiveTab('upload'); setSuccessMsg(''); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeTab === 'upload' ? 'bg-white text-neutral-950 shadow-xs' : 'text-neutral-500 hover:text-neutral-800'
+                className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer font-bold ${
+                  activeTab === 'upload'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
-                <UploadCloud className="w-3.5 h-3.5" />
+                <UploadCloud className="w-4 h-4" />
                 Upload Center
               </button>
             </div>
@@ -1103,88 +1180,95 @@ export default function PatientsSection() {
           <div className="space-y-6 animate-fadeIn">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Clinical Notes */}
-              <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+              <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="font-bold text-xs text-neutral-900 border-b border-neutral-100 pb-2.5 mb-3 flex items-center gap-2 uppercase tracking-wide">
-                    <FileText className="w-4 h-4 text-neutral-400" />
+                  <h3 className="font-extrabold text-sm text-neutral-900 border-b border-neutral-100 pb-3 mb-4 flex items-center gap-2">
+                    <FileText className="w-4.5 h-4.5 text-sky-600" />
                     Historic Diagnoses & Visits
                   </h3>
-                  <div className="space-y-1 mb-4">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Diagnosed Conditions</span>
-                    <ul className="space-y-1.5 text-xs text-neutral-600 leading-relaxed list-disc pl-4">
+                  <div className="space-y-1.5 mb-5">
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">Diagnosed Conditions</span>
+                    <ul className="space-y-2 text-sm text-neutral-700 leading-relaxed list-disc pl-5">
                       {activePatient.history && activePatient.history.map((hist: string, i: number) => (
-                        <li key={i} className="pl-0.5">{hist}</li>
+                        <li key={i} className="pl-0.5 font-medium">{hist}</li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="space-y-2 pt-2.5 border-t border-neutral-100">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
+                  <div className="space-y-2.5 pt-3 border-t border-neutral-100">
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">
                       Visit History ({historyApts.length} {historyApts.length === 1 ? 'time' : 'times'})
                     </span>
                     {historyApts.length === 0 ? (
                       <p className="text-xs text-neutral-400 italic">No previous clinic visits recorded.</p>
                     ) : (
-                      <ul className="space-y-1.5 text-xs text-neutral-700 max-h-[140px] overflow-y-auto pr-1">
+                      <ul className="space-y-2 text-xs text-neutral-700 max-h-[220px] overflow-y-auto pr-1">
                         {historyApts.map((apt, idx) => (
-                          <li key={apt.id || idx} className="flex flex-col bg-neutral-50 px-2.5 py-1.5 rounded-lg border border-neutral-200/50">
+                          <li
+                            key={apt.id || idx}
+                            onClick={() => setSelectedVisitModal(apt)}
+                            className="flex flex-col bg-neutral-50/80 hover:bg-sky-50/70 hover:border-sky-300 p-3 rounded-xl border border-neutral-200/80 cursor-pointer transition-all group shadow-xs"
+                          >
                             <div className="flex justify-between items-center">
-                              <span className="font-bold text-neutral-800">{apt.date} at {apt.timeSlot}</span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${
+                              <span className="font-bold text-neutral-900 group-hover:text-sky-700 text-xs flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                                {apt.date} at {apt.timeSlot}
+                              </span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
                                 apt.status === 'Completed' || apt.status === 'Done'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : 'bg-neutral-50 text-neutral-600 border-neutral-200'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-neutral-100 text-neutral-700 border-neutral-200'
                               }`}>{apt.status}</span>
                             </div>
-                            <span className="text-[10px] text-neutral-450 mt-0.5 block font-medium">Doctor: {apt.doctorName} • {apt.specialty}</span>
+                            <div className="flex justify-between items-center mt-1">
+                              <span className="text-xs text-neutral-500 font-medium">Doctor: {apt.doctorName} • {apt.specialty}</span>
+                              <span className="text-[10px] font-bold text-sky-600 group-hover:underline">View Rx &amp; Reminder &rarr;</span>
+                            </div>
                           </li>
                         ))}
                       </ul>
                     )}
                   </div>
                 </div>
-                <div className="mt-4 pt-2.5 border-t border-dashed border-neutral-200 text-[10px] text-neutral-400 font-mono">
-                  HL7 Central Synced Ledger
-                </div>
               </div>
 
               {/* Attachments */}
-              <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs">
-                <h3 className="font-bold text-xs text-neutral-900 border-b border-neutral-100 pb-2.5 mb-3 flex items-center gap-2 uppercase tracking-wide">
-                  <FileCheck2 className="w-4 h-4 text-neutral-400" />
+              <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
+                <h3 className="font-extrabold text-sm text-neutral-900 border-b border-neutral-100 pb-3 mb-4 flex items-center gap-2">
+                  <FileCheck2 className="w-4.5 h-4.5 text-sky-600" />
                   EHR Document Scan Index
                 </h3>
                 {(!visibleAttachments || visibleAttachments.length === 0) ? (
                   <p className="text-xs text-neutral-455 italic text-center py-8">No uploaded clinical lab files attached.</p>
                 ) : (
-                  <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                  <div className="space-y-2.5 max-h-[240px] overflow-y-auto pr-1">
                     {visibleAttachments.map((file: Attachment) => (
-                      <div key={file.id} className="p-2.5 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/50 rounded-xl flex items-center justify-between text-xs animate-fadeIn">
+                      <div key={file.id} className="p-3 bg-neutral-50 hover:bg-sky-50/30 border border-neutral-200/80 rounded-xl flex items-center justify-between text-xs animate-fadeIn transition-colors">
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold text-neutral-900 truncate pr-2" title={file.name}>{file.name}</p>
+                          <p className="font-bold text-neutral-900 truncate pr-2 text-xs" title={file.name}>{file.name}</p>
                           <p className="text-[10px] text-neutral-400 mt-0.5 font-mono">{file.size} • Uploaded {file.uploadedAt}</p>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
                           <button
                             onClick={() => handlePreviewAttachment(file)}
-                            className="p-1 hover:bg-teal-50 text-neutral-400 hover:text-teal-650 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-600 rounded-lg transition-colors cursor-pointer"
                             title="Preview document"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDownloadAttachment(file)}
-                            className="p-1 hover:bg-sky-50 text-neutral-400 hover:text-sky-655 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-600 rounded-lg transition-colors cursor-pointer"
                             title="Download document"
                           >
-                            <Download className="w-3.5 h-3.5" />
+                            <Download className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => handleRemoveAttachment(file.id)}
-                            className="p-1 hover:bg-red-50 text-neutral-400 hover:text-red-650 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-red-50 text-neutral-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
                             title="Delete document"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -1316,7 +1400,7 @@ export default function PatientsSection() {
             {/* Vitals Longitudinal Log */}
             <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs space-y-4">
               <h3 className="font-bold text-xs text-neutral-900 border-b border-neutral-100 pb-2.5 flex items-center gap-2 uppercase tracking-wide">
-                <Activity className="w-4 h-4 text-teal-600" />
+                <Activity className="w-4 h-4 text-sky-600" />
                 Vitals Longitudinal Log
               </h3>
               {historyVitals.length === 0 ? (
@@ -1426,7 +1510,7 @@ export default function PatientsSection() {
                                 <td className="py-2.5 font-mono">{log.weight} kg</td>
                               </>
                             )}
-                            <td className="py-2.5 font-sans font-medium text-teal-850">
+                            <td className="py-2.5 font-sans font-medium text-sky-800">
                               {(() => {
                                 const apt = getAppointmentForDate(log.timestamp);
                                 const combinedRx = getMedicalForDate(log.timestamp);
@@ -1437,7 +1521,7 @@ export default function PatientsSection() {
                                         type="text"
                                         value={editAptRxText}
                                         onChange={(e) => setEditAptRxText(e.target.value)}
-                                        className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-48 font-sans font-medium"
+                                        className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-48 font-sans font-medium"
                                       />
                                       <button
                                         onClick={() => handleSaveAptRx(apt.id)}
@@ -1463,7 +1547,7 @@ export default function PatientsSection() {
                                           setEditingAptId(apt.id);
                                           setEditAptRxText(apt.prescription || '');
                                         }}
-                                        className="text-[10px] text-teal-600 hover:text-teal-700 hover:underline font-bold cursor-pointer transition-colors"
+                                        className="text-[10px] text-sky-600 hover:text-sky-700 hover:underline font-bold cursor-pointer transition-colors"
                                       >
                                         Edit
                                       </button>
@@ -1491,7 +1575,7 @@ export default function PatientsSection() {
                               ) : (
                                 <button
                                   onClick={() => handleStartEditVital(log)}
-                                  className="text-[10px] text-teal-600 hover:text-teal-700 hover:underline font-bold cursor-pointer transition-colors"
+                                  className="text-[10px] text-sky-600 hover:text-sky-700 hover:underline font-bold cursor-pointer transition-colors"
                                 >
                                   Edit Vitals
                                 </button>
@@ -1627,7 +1711,7 @@ export default function PatientsSection() {
                       <button
                         type="button"
                         onClick={handleAddMedication}
-                        className="text-[10px] bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer animate-pulse"
+                        className="text-[10px] bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                         Add Medication
@@ -1637,7 +1721,7 @@ export default function PatientsSection() {
                     {medications.map((med, idx) => (
                       <div key={idx} className="p-4 rounded-xl bg-neutral-50 border border-neutral-200/60 text-xs space-y-3 relative animate-fadeIn">
                         <div className="flex justify-between items-center">
-                          <span className="font-bold text-[10px] text-teal-850 bg-teal-50 border border-teal-150 px-2 py-0.5 rounded-full">Medication #{idx + 1}</span>
+                          <span className="font-bold text-[10px] text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">Medication #{idx + 1}</span>
                           {medications.length > 1 && (
                             <button
                               type="button"
@@ -1658,7 +1742,7 @@ export default function PatientsSection() {
                               placeholder="e.g. Paracetamol"
                               value={med.drugName}
                               onChange={(e) => handleMedicationChange(idx, 'drugName', e.target.value)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8"
                             />
                           </div>
                           <div className="space-y-1">
@@ -1666,7 +1750,7 @@ export default function PatientsSection() {
                             <select
                               value={med.dosage}
                               onChange={(e) => handleMedicationChange(idx, 'dosage', e.target.value)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8"
                             >
                               <option>1 Tablet</option>
                               <option>2 Tablets</option>
@@ -1681,7 +1765,7 @@ export default function PatientsSection() {
                             <select
                               value={med.frequency}
                               onChange={(e) => handleMedicationChange(idx, 'frequency', e.target.value)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8"
                             >
                               <option>Once Daily</option>
                               <option>Twice Daily</option>
@@ -1693,7 +1777,7 @@ export default function PatientsSection() {
                             <select
                               value={med.foodTiming}
                               onChange={(e) => handleMedicationChange(idx, 'foodTiming', e.target.value as any)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8"
                             >
                               <option value="Before Food">Before Food</option>
                               <option value="After Food">After Food</option>
@@ -1705,7 +1789,7 @@ export default function PatientsSection() {
                               type="date"
                               value={med.startDate}
                               onChange={(e) => handleMedicationChange(idx, 'startDate', e.target.value)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8"
                             />
                           </div>
                           <div className="space-y-1">
@@ -1714,7 +1798,7 @@ export default function PatientsSection() {
                               type="date"
                               value={med.endDate}
                               onChange={(e) => handleMedicationChange(idx, 'endDate', e.target.value)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8"
                             />
                           </div>
                         </div>
@@ -1727,7 +1811,7 @@ export default function PatientsSection() {
                               placeholder="e.g. Take with warm water, avoid dairy"
                               value={med.instructions}
                               onChange={(e) => handleMedicationChange(idx, 'instructions', e.target.value)}
-                              className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 h-8 font-sans"
+                              className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 h-8 font-sans"
                             />
                           </div>
                           <div className="space-y-1">
@@ -1772,7 +1856,7 @@ export default function PatientsSection() {
             {/* Vitals History List */}
             <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs space-y-4">
               <h3 className="font-bold text-xs text-neutral-900 border-b border-neutral-100 pb-2.5 flex items-center gap-2 uppercase tracking-wide">
-                <Activity className="w-4 h-4 text-teal-600" />
+                <Activity className="w-4 h-4 text-sky-600" />
                 Vitals Longitudinal Log
               </h3>
               {historyVitals.length === 0 ? (
@@ -1804,7 +1888,7 @@ export default function PatientsSection() {
                                     type="text"
                                     value={editVitalTimestamp}
                                     onChange={(e) => setEditVitalTimestamp(e.target.value)}
-                                    className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-28 font-mono"
+                                    className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-28 font-mono"
                                   />
                                 </td>
                                 <td className="py-2.5">
@@ -1813,7 +1897,7 @@ export default function PatientsSection() {
                                       type="text"
                                       value={editVitalSys}
                                       onChange={(e) => setEditVitalSys(e.target.value)}
-                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-10 font-mono text-center"
+                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-10 font-mono text-center"
                                       placeholder="Sys"
                                     />
                                     <span className="text-neutral-405">/</span>
@@ -1821,7 +1905,7 @@ export default function PatientsSection() {
                                       type="text"
                                       value={editVitalDia}
                                       onChange={(e) => setEditVitalDia(e.target.value)}
-                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-10 font-mono text-center"
+                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-10 font-mono text-center"
                                       placeholder="Dia"
                                     />
                                     <span className="text-neutral-450 text-[10px] ml-0.5">mmHg</span>
@@ -1833,7 +1917,7 @@ export default function PatientsSection() {
                                       type="text"
                                       value={editVitalHR}
                                       onChange={(e) => setEditVitalHR(e.target.value)}
-                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-10 font-mono text-center"
+                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-10 font-mono text-center"
                                     />
                                     <span className="text-neutral-450 text-[10px]">BPM</span>
                                   </div>
@@ -1844,7 +1928,7 @@ export default function PatientsSection() {
                                       type="text"
                                       value={editVitalSpO2}
                                       onChange={(e) => setEditVitalSpO2(e.target.value)}
-                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-10 font-mono text-center"
+                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-10 font-mono text-center"
                                     />
                                     <span className="text-neutral-450 text-[10px]">%</span>
                                   </div>
@@ -1855,7 +1939,7 @@ export default function PatientsSection() {
                                       type="text"
                                       value={editVitalTemp}
                                       onChange={(e) => setEditVitalTemp(e.target.value)}
-                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-10 font-mono text-center"
+                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-10 font-mono text-center"
                                     />
                                     <span className="text-neutral-450 text-[10px]">°C</span>
                                   </div>
@@ -1866,7 +1950,7 @@ export default function PatientsSection() {
                                       type="text"
                                       value={editVitalWeight}
                                       onChange={(e) => setEditVitalWeight(e.target.value)}
-                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-10 font-mono text-center"
+                                      className="bg-white border border-neutral-300 rounded px-1 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-10 font-mono text-center"
                                     />
                                     <span className="text-neutral-450 text-[10px]">kg</span>
                                   </div>
@@ -1882,7 +1966,7 @@ export default function PatientsSection() {
                                 <td className="py-2.5 font-mono">{log.weight} kg</td>
                               </>
                             )}
-                            <td className="py-2.5 font-sans font-medium text-teal-850">
+                            <td className="py-2.5 font-sans font-medium text-sky-800">
                               {(() => {
                                 const apt = getAppointmentForDate(log.timestamp);
                                 const combinedRx = getMedicalForDate(log.timestamp);
@@ -1893,7 +1977,7 @@ export default function PatientsSection() {
                                         type="text"
                                         value={editAptRxText}
                                         onChange={(e) => setEditAptRxText(e.target.value)}
-                                        className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-teal-500 w-48 font-sans font-medium"
+                                        className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-800 outline-none focus:ring-1 focus:ring-sky-500 w-48 font-sans font-medium"
                                       />
                                       <button
                                         onClick={() => handleSaveAptRx(apt.id)}
@@ -1919,7 +2003,7 @@ export default function PatientsSection() {
                                           setEditingAptId(apt.id);
                                           setEditAptRxText(apt.prescription || '');
                                         }}
-                                        className="text-[10px] text-teal-600 hover:text-teal-700 hover:underline font-bold cursor-pointer transition-colors"
+                                        className="text-[10px] text-sky-600 hover:text-sky-700 hover:underline font-bold cursor-pointer transition-colors"
                                       >
                                         Edit
                                       </button>
@@ -1947,7 +2031,7 @@ export default function PatientsSection() {
                               ) : (
                                 <button
                                   onClick={() => handleStartEditVital(log)}
-                                  className="text-[10px] text-teal-600 hover:text-teal-700 hover:underline font-bold cursor-pointer transition-colors"
+                                  className="text-[10px] text-sky-600 hover:text-sky-700 hover:underline font-bold cursor-pointer transition-colors"
                                 >
                                   Edit Vitals
                                 </button>
@@ -1990,7 +2074,7 @@ export default function PatientsSection() {
                       {apt.prescription && (
                         <div className="pt-1">
                           <span className="text-[9px] font-extrabold text-neutral-450 uppercase tracking-widest block">Prescription Summary</span>
-                          <p className="mt-1 font-bold text-teal-850 font-sans">{apt.prescription}</p>
+                          <p className="mt-1 font-bold text-sky-800 font-sans">{apt.prescription}</p>
                         </div>
                       )}
                     </div>
@@ -2165,7 +2249,7 @@ export default function PatientsSection() {
                           <button
                             type="button"
                             onClick={() => handlePreviewAttachment(file)}
-                            className="p-1.5 hover:bg-teal-50 text-neutral-400 hover:text-teal-650 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-600 rounded-md transition-colors cursor-pointer"
                             title="Preview document"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -2192,8 +2276,8 @@ export default function PatientsSection() {
                   </div>
                 )}
               </div>
-              <div className="pt-3 border-t border-neutral-100 text-[10px] text-neutral-400 font-mono">
-                CarePoint Clinical File Vault
+              <div className="pt-3 border-t border-neutral-100 text-[10px] text-neutral-400 font-sans">
+                PenangHealth Clinical File Vault
               </div>
             </div>
           </div>
@@ -2245,7 +2329,7 @@ export default function PatientsSection() {
                   <select
                     value={editGender}
                     onChange={(e) => setEditGender(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   >
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -2259,7 +2343,7 @@ export default function PatientsSection() {
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
                     required
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1">
@@ -2269,7 +2353,7 @@ export default function PatientsSection() {
                     placeholder="e.g. O+"
                     value={editBloodType}
                     onChange={(e) => setEditBloodType(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1">
@@ -2279,7 +2363,7 @@ export default function PatientsSection() {
                     placeholder="e.g. Great Eastern"
                     value={editInsuranceProvider}
                     onChange={(e) => setEditInsuranceProvider(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1">
@@ -2289,7 +2373,7 @@ export default function PatientsSection() {
                     placeholder="e.g. GE-98765-AX"
                     value={editInsurancePolicy}
                     onChange={(e) => setEditInsurancePolicy(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1">
@@ -2298,7 +2382,7 @@ export default function PatientsSection() {
                     type="text"
                     value={editEmergencyName}
                     onChange={(e) => setEditEmergencyName(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
@@ -2307,7 +2391,7 @@ export default function PatientsSection() {
                     type="text"
                     value={editEmergencyPhone}
                     onChange={(e) => setEditEmergencyPhone(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
@@ -2316,7 +2400,7 @@ export default function PatientsSection() {
                     type="text"
                     value={editAllergies.join(", ")}
                     onChange={(e) => setEditAllergies(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
@@ -2325,7 +2409,7 @@ export default function PatientsSection() {
                     type="text"
                     value={editChronic.join(", ")}
                     onChange={(e) => setEditChronic(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-9"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-855 outline-none focus:bg-white focus:ring-1 focus:ring-sky-500 h-9"
                   />
                 </div>
               </div>
@@ -2340,7 +2424,7 @@ export default function PatientsSection() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-teal-650 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer"
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer"
                 >
                   Save Changes
                 </button>
@@ -2356,7 +2440,7 @@ export default function PatientsSection() {
           <div className="bg-white border border-neutral-200 rounded-3xl w-full max-w-xl shadow-2xl p-6 flex flex-col gap-4 text-neutral-800">
             <div className="flex justify-between items-start border-b border-neutral-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="bg-teal-50 p-2 rounded-lg text-teal-600">
+                <div className="bg-sky-50 p-2 rounded-lg text-sky-600">
                   <FileCheck2 className="w-5 h-5" />
                 </div>
                 <div>
@@ -2373,12 +2457,12 @@ export default function PatientsSection() {
             </div>
 
             <div className="bg-neutral-950 text-emerald-450 p-4 rounded-xl font-mono text-xs overflow-y-auto max-h-[300px] leading-relaxed border border-neutral-800 shadow-inner">
-              <p className="text-neutral-500">// CAREPOINT HL7 CENTRAL LEDGER OCR PARSER v4.1</p>
+              <p className="text-neutral-500">// PENANGHEALTH SECURE EHR RECORD PARSER</p>
               <p className="text-neutral-500">// PATIENT IDENTIFIER: {activePatient.email}</p>
               <p className="text-neutral-500">// TIMESTAMP: {previewFile.uploadedAt} 08:30:00 UTC</p>
               <p className="mt-2 text-white font-bold">DOCUMENT NAME: {previewFile.name}</p>
-              <p className="text-teal-405">FILE_TYPE: {previewFile.type.toUpperCase()}</p>
-              <p className="text-teal-405">FILE_SIZE: {previewFile.size}</p>
+              <p className="text-sky-400">FILE_TYPE: {previewFile.type.toUpperCase()}</p>
+              <p className="text-sky-400">FILE_SIZE: {previewFile.size}</p>
               <p className="mt-3 text-neutral-500 border-t border-neutral-800 pt-2 font-semibold">// OCR INGESTION RAW TEXT STREAM:</p>
               <p className="mt-1 text-emerald-500">
                 [OCR SUCCESS] Ingestion complete. Target file scanned. Found matching patient demographic data. 
@@ -2391,7 +2475,7 @@ export default function PatientsSection() {
                 <br />Allergies: {(activePatient.allergies || []).join(", ") || "No known drug allergies"}
                 <br />Chronic Conditions: {(activePatient.history || []).join(", ") || "General health tracking"}
                 <br />
-                <br />Physician Notes: Record synced with central ministry repository. All indicators within parameters.
+                <br />Physician Notes: Record synced with PenangHealth clinical ledger. All indicators within parameters.
                 <br />----------------------------------
               </p>
               <p className="mt-3 text-[10px] text-neutral-500">// END OF FILE DECRYPT STREAM</p>
@@ -2408,6 +2492,115 @@ export default function PatientsSection() {
               >
                 <Download className="w-3.5 h-3.5" />
                 Download Original
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clickable Visit Encounter Details Modal */}
+      {selectedVisitModal && (
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn font-sans">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl border border-slate-200 animate-scaleUp max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div className="space-y-0.5">
+                <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-100">
+                  <Calendar className="w-3 h-3" />
+                  <span>Encounter Record: {selectedVisitModal.date}</span>
+                </div>
+                <h3 className="font-extrabold text-base text-slate-900 mt-1">
+                  Clinical Visit &amp; Medication Schedule
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedVisitModal(null)}
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Visit Context */}
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Attending Doctor</span>
+                <p className="font-bold text-slate-800 mt-0.5">{selectedVisitModal.doctorName}</p>
+                <p className="text-[10px] text-slate-500">{selectedVisitModal.specialty}</p>
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Clinic / Facility</span>
+                <p className="font-bold text-slate-800 mt-0.5">{selectedVisitModal.clinic || selectedVisitModal.hospital || 'Outpatient Clinic'}</p>
+                <span className="inline-block mt-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  {selectedVisitModal.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Reason for Visit */}
+            <div className="space-y-1.5 bg-sky-50/50 p-3.5 rounded-2xl border border-sky-100">
+              <span className="text-[11px] font-bold text-sky-800 uppercase tracking-wide flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-sky-600" />
+                Reason for Visit / Chief Complaint
+              </span>
+              <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                {selectedVisitModal.remarks || "Outpatient follow-up consultation and clinical examination. Patient reported persistent mild discomfort requiring specialist triage review."}
+              </p>
+            </div>
+
+            {/* Prescribed Medications */}
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <Pill className="w-3.5 h-3.5 text-sky-600" />
+                Doctor's Prescriptions &amp; Medication Schedule
+              </h4>
+              <div className="space-y-2">
+                {((activePatient.prescriptions || []).length === 0) ? (
+                  <p className="text-xs text-slate-400 italic bg-slate-50 p-3 rounded-xl">No prescription issued for this visit date.</p>
+                ) : (
+                  (activePatient.prescriptions || []).map((rx: any, idx: number) => {
+                    const times = calculateScheduledTimes(rx.frequency || '');
+                    return (
+                      <div key={rx.id || idx} className="bg-white border border-slate-200 p-3.5 rounded-2xl space-y-2 shadow-xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-bold text-xs text-slate-900 block">{rx.drugName}</span>
+                            <span className="text-[10px] text-slate-500 font-mono mt-0.5">Dosage: {rx.dosage} • Duration: {rx.duration || '7 Days'}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
+                            {rx.frequency}
+                          </span>
+                        </div>
+
+                        {/* Schedule & Reminder Times */}
+                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <span className="text-[10px] font-bold text-slate-600">Reminder Schedule:</span>
+                            <div className="flex gap-1">
+                              {times.map((t, ti) => (
+                                <span key={ti} className="text-[9.5px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-slate-500 italic">
+                            Take after meals with water
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedVisitModal(null)}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer shadow-xs"
+              >
+                Close Encounter Details
               </button>
             </div>
           </div>

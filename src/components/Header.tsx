@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, Heart, ArrowLeft, Bell, Settings, Info } from "lucide-react";
+import { ShieldCheck, Home, Bell, Settings, Activity } from "lucide-react";
 import { AppNotification } from "../types";
 
 interface HeaderProps {
@@ -14,59 +14,80 @@ export default function Header({ currentScreen, onNavigateHome, notifications, o
   const unreadNotificationsOfCategory = notifications.filter(n => !n.read);
 
   const screenDisplayNames: Record<string, string> = {
-    "dashboard": "Universal Patient Dashboard",
-    "ai-consultation": "Carey AI Health Assistant",
-    "medical-records": "Biometrics EHR & Diagnoses",
-    "communication": "Provider secure messages",
-    "schedule-appointment": "Schedule Consult",
-    "appointments-history": "Consultation logs",
-    "clinic-search": "Clinic locator & map",
-    "patient-registration": "MyKad Card Registry",
-    "notifications": "Important alerts index",
-    "user-settings": "Platform security configurations"
+    "dashboard": "Outpatient Dashboard",
+    "healthcare-analytics": "Clinical Health Analytics",
+    "wearable-health": "Wearable Vitals Telemetry",
+    "ai-consultation": "Health Assistant",
+    "medical-records": "Electronic Medical Records (EMR)",
+    "communication": "Direct Clinical Messages",
+    "schedule-appointment": "Schedule Specialist Consultation",
+    "appointments-history": "Consultation History & Past Visits",
+    "clinic-search": "Penang Clinic & Hospital Finder",
+    "fetching-transit": "Clinic & Hospital Ride Booking",
+    "patient-registration": "Patient Demographic Verification",
+    "notifications": "Notifications & Reminders",
+    "user-settings": "Account Security & Preferences"
   };
 
   return (
-    <header id="portal-header" className="sticky top-0 z-40 bg-slate-50/95 border-b border-slate-200/80 px-8 py-4 flex items-center justify-between backdrop-blur-sm shadow-sm">
+    <header id="portal-header" className="sticky top-0 z-40 bg-white/95 border-b border-slate-200/90 px-6 sm:px-8 py-3.5 flex items-center justify-between backdrop-blur-md shadow-xs">
       
-      {/* Back home gate */}
-      <div className="flex items-center gap-4">
+      {/* Left: Brand mark & breadcrumb */}
+      <div className="flex items-center gap-4 min-w-0">
         <button 
           onClick={onNavigateHome}
-          className="p-2 border border-slate-200/70 bg-white/90 hover:bg-slate-100 text-slate-700 rounded-2xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-          title="Return to corporate landing gate"
+          className="p-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+          title="Return to Public Home Page"
         >
-          <ArrowLeft className="w-4 h-4" /> HOME GATE
+          <Home className="w-4 h-4 text-slate-600" />
+          <span className="hidden md:inline font-sans">Home</span>
         </button>
 
-        <div className="h-6 w-[1px] bg-slate-200"></div>
+        <div className="h-5 w-[1px] bg-slate-200 shrink-0"></div>
 
-        <div>
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">CarePoint Portal Context</span>
-          <h2 className="text-md font-extrabold text-slate-900 leading-none mt-0.5">
-            {screenDisplayNames[currentScreen] || "Patient Session Space"}
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight truncate">
+            {screenDisplayNames[currentScreen] || "Patient Care Space"}
           </h2>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-
+      {/* Right: Notifications, settings & patient chip */}
+      <div className="flex items-center gap-3 shrink-0">
         <button 
           onClick={() => onSetScreen("notifications")}
-          className="relative p-2.5 hover:bg-slate-50 text-slate-500 hover:text-teal-600 rounded-xl transition"
+          className="relative p-2.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 text-slate-600 hover:text-sky-700 rounded-xl transition cursor-pointer shadow-xs"
+          title="View Notifications"
         >
-          <Bell className="w-5 h-5" />
+          <Bell className="w-4.5 h-4.5" />
           {unreadNotificationsOfCategory.length > 0 && (
-            <span className="absolute top-2 right-2 bg-red-650 bg-red-500 w-2.5 h-2.5 rounded-full ring-2 ring-white"></span>
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white font-mono text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white">
+              {unreadNotificationsOfCategory.length}
+            </span>
           )}
         </button>
 
         <button 
           onClick={() => onSetScreen("user-settings")}
-          className="p-2.5 hover:bg-slate-50 text-slate-500 hover:text-teal-600 rounded-xl transition"
+          className="p-2.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 text-slate-600 hover:text-sky-700 rounded-xl transition cursor-pointer shadow-xs hidden sm:flex"
+          title="Account Settings"
         >
-          <Settings className="w-5 h-5" />
+          <Settings className="w-4.5 h-4.5" />
         </button>
+
+        <div 
+          onClick={() => onSetScreen("user-settings")}
+          className="flex items-center gap-2.5 pl-2 border-l border-slate-200 cursor-pointer"
+        >
+          <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center font-extrabold text-xs shadow-xs">
+            {patientName ? patientName.trim().charAt(0).toUpperCase() : "P"}
+          </div>
+          <div className="hidden md:block text-left">
+            <span className="text-xs font-bold text-slate-800 block leading-tight truncate max-w-[130px]">
+              {patientName || "Patient"}
+            </span>
+          </div>
+        </div>
       </div>
 
     </header>

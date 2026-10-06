@@ -7,9 +7,8 @@ import {
   Check, 
   AlertCircle, 
   Save, 
-  Coffee, 
-  ShieldAlert, 
-  CalendarRange 
+  CalendarRange,
+  Stethoscope
 } from 'lucide-react';
 
 interface Shift {
@@ -22,35 +21,24 @@ interface Shifts {
   [day: string]: Shift;
 }
 
-interface ScheduleData {
+export interface DoctorMCRecord {
+  id: string;
   doctorName: string;
-  shifts: Shifts;
-  blockedDates: string[];
-  breaks: string[];
+  startDate: string;
+  endDate: string;
+  leaveType: 'Medical Certificate (MC)' | 'Emergency Medical Leave' | 'Annual Leave';
+  reason: string;
 }
 
-function getClinicFromEmail(email: string): string {
-  const cached = localStorage.getItem("lifelink_user_clinic");
-  if (cached) return cached;
-
-  const emailLower = (email || '').toLowerCase().trim();
-  if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
-  if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
-  if (emailLower.includes('kkjalanperak')) return 'Klinik Kesihatan Jalan Perak';
-  if (emailLower.includes('kkbayanbaru')) return 'Klinik Kesihatan Bayan Baru';
-  if (emailLower.includes('hospitalbukitmertajam')) return 'Hospital Bukit Mertajam';
-  if (emailLower.includes('pantaihospital')) return 'Pantai Hospital Penang';
-  if (emailLower.includes('lamwahee')) return 'Hospital Lam Wah Ee';
-  if (emailLower.includes('gleneagleshospital')) return 'Gleneagles Hospital Penang';
-  if (emailLower.includes('islandhospital')) return 'Island Hospital';
-  if (emailLower.includes('o2klinik')) return 'O2 Klinik';
-  if (emailLower.includes('kliniksingapore')) return 'Klinik Singapore';
-  if (emailLower.includes('poliklinikperdana')) return 'Poliklinik Perdana';
-  if (emailLower.includes('penangadventisthospital')) return 'Penang Adventist Hospital';
-  if (emailLower.includes('lohguanlye')) return 'Loh Guan Lye Specialists Centre';
-  if (emailLower.includes('kpjpenang')) return 'KPJ Penang Specialist Hospital';
-  return '';
-}
+const defaultDoctorsList = [
+  "Dr. Ainol Shareha Binti Sahar",
+  "Dr. Simon Lo",
+  "Dr. Sarah Mitchell",
+  "Dr. Tan Wei Ming",
+  "Dr. Siti Aminah",
+  "Dr. Lim Mei Ling",
+  "Dr. Ahmad Faiz"
+];
 
 interface ScheduleManagerProps {
   doctorName: string;
@@ -72,14 +60,35 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   const [customBreaks, setCustomBreaks] = useState<{ [date: string]: { start: string; end: string } }>({});
 
   const [newLeaveDate, setNewLeaveDate] = useState("");
-  const [newCustomBreakDate, setNewCustomBreakDate] = useState("");
-  const [newCustomBreakStart, setNewCustomBreakStart] = useState("");
-  const [newCustomBreakEnd, setNewCustomBreakEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Doctor MC List - clear out mock records so it starts empty and persists real entries
+  const [doctorMCList, setDoctorMCList] = useState<DoctorMCRecord[]>(() => {
+    const saved = localStorage.getItem("lifelink_doctor_mc_records");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Exclude any previous mock records (mc-1, mc-2, or Simon Lo / Sarah Mitchell mock records)
+          return parsed.filter((r: any) => 
+            r.id !== "mc-1" && 
+            r.id !== "mc-2" && 
+            !(r.doctorName === "Dr. Simon Lo" && r.reason?.includes("Acute Bronchitis")) &&
+            !(r.doctorName === "Dr. Sarah Mitchell" && r.reason?.includes("Family emergency"))
+          );
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
 
+  const [mcDoctor, setMcDoctor] = useState(doctorName || defaultDoctorsList[0]);
+  const [mcStartDate, setMcStartDate] = useState("");
+  const [mcEndDate, setMcEndDate] = useState("");
+  const [mcType, setMcType] = useState<'Medical Certificate (MC)' | 'Emergency Medical Leave' | 'Annual Leave'>('Medical Certificate (MC)');
+  const [mcReason, setMcReason] = useState("");
 
   // Load schedule from server
   useEffect(() => {
@@ -100,94 +109,90 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
       });
   }, [doctorName]);
 
-  const handleToggleDay = (day: string) => {
-    setShifts(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        enabled: !prev[day].enabled
-      }
-    }));
+  const persistBlockedDates = (dates: string[]) => {
+    fetch("/api/provider/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        doctorName,
+        shifts,
+        blockedDates: dates,
+        globalBreak,
+        customBreaks
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 3000);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to save schedule settings", err);
+        setErrorMsg("Failed to synchronize schedule configuration.");
+        setTimeout(() => setErrorMsg(""), 3000);
+      });
   };
 
-  const handleTimeChange = (day: string, type: 'start' | 'end', val: string) => {
-    setShifts(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [type]: val
-      }
-    }));
+  const handleAddDoctorMC = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mcDoctor || !mcStartDate) return;
+    const newRecord: DoctorMCRecord = {
+      id: "mc-" + Date.now(),
+      doctorName: mcDoctor,
+      startDate: mcStartDate,
+      endDate: mcEndDate || mcStartDate,
+      leaveType: mcType,
+      reason: mcReason.trim() || "Attending physician medical leave"
+    };
+    const updated = [newRecord, ...doctorMCList];
+    setDoctorMCList(updated);
+    localStorage.setItem("lifelink_doctor_mc_records", JSON.stringify(updated));
+
+    // Calculate dates between start and end date to block out
+    const datesToAdd: string[] = [];
+    const start = new Date(mcStartDate);
+    const end = new Date(mcEndDate || mcStartDate);
+    for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      datesToAdd.push(`${yyyy}-${mm}-${dd}`);
+    }
+
+    const updatedBlocked = Array.from(new Set([...blockedDates, ...datesToAdd])).sort();
+    setBlockedDates(updatedBlocked);
+    persistBlockedDates(updatedBlocked);
+
+    setMcStartDate("");
+    setMcEndDate("");
+    setMcReason("");
+  };
+
+  const handleRemoveDoctorMC = (id: string) => {
+    const updated = doctorMCList.filter(m => m.id !== id);
+    setDoctorMCList(updated);
+    localStorage.setItem("lifelink_doctor_mc_records", JSON.stringify(updated));
   };
 
   const handleAddLeave = () => {
     if (!newLeaveDate) return;
     if (blockedDates.includes(newLeaveDate)) {
-      setErrorMsg("This date is already marked as a leave day.");
+      setErrorMsg("This date is already marked as a leave or holiday.");
       setTimeout(() => setErrorMsg(""), 3000);
       return;
     }
-    setBlockedDates(prev => [...prev, newLeaveDate].sort());
+    const updated = [...blockedDates, newLeaveDate].sort();
+    setBlockedDates(updated);
     setNewLeaveDate("");
+    persistBlockedDates(updated);
   };
 
   const handleRemoveLeave = (date: string) => {
-    setBlockedDates(prev => prev.filter(d => d !== date));
-  };
-
-  // Helper to parse "14:00" to "02:00 PM"
-  const formatTimeInput = (timeStr: string): string => {
-    const match = timeStr.match(/^(\d{2}):(\d{2})$/);
-    if (!match) return "";
-    let hrs = parseInt(match[1], 10);
-    const mins = match[2];
-    const ampm = hrs >= 12 ? "PM" : "AM";
-    hrs = hrs % 12 === 0 ? 12 : hrs % 12;
-    const hrsStr = hrs < 10 ? `0${hrs}` : `${hrs}`;
-    return `${hrsStr}:${mins} ${ampm}`;
-  };
-
-  // Helper to parse "02:00 PM" to "14:00" for time inputs
-  const formatTimeForInput = (timeStr: string): string => {
-    const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
-    if (!match) return "";
-    let hrs = parseInt(match[1], 10);
-    const mins = match[2];
-    const pm = match[3].toUpperCase() === "PM";
-    if (pm && hrs < 12) hrs += 12;
-    if (!pm && hrs === 12) hrs = 0;
-    const hrsStr = hrs < 10 ? `0${hrs}` : `${hrs}`;
-    return `${hrsStr}:${mins}`;
-  };
-
-  const handleAddCustomBreak = () => {
-    if (!newCustomBreakDate || !newCustomBreakStart || !newCustomBreakEnd) {
-      setErrorMsg("Please select a date, start time, and end time for the custom break.");
-      setTimeout(() => setErrorMsg(""), 3000);
-      return;
-    }
-
-    const startFormatted = formatTimeInput(newCustomBreakStart);
-    const endFormatted = formatTimeInput(newCustomBreakEnd);
-
-    if (!startFormatted || !endFormatted) return;
-
-    setCustomBreaks(prev => ({
-      ...prev,
-      [newCustomBreakDate]: { start: startFormatted, end: endFormatted }
-    }));
-
-    setNewCustomBreakDate("");
-    setNewCustomBreakStart("");
-    setNewCustomBreakEnd("");
-  };
-
-  const handleRemoveCustomBreak = (date: string) => {
-    setCustomBreaks(prev => {
-      const next = { ...prev };
-      delete next[date];
-      return next;
-    });
+    const updated = blockedDates.filter(d => d !== date);
+    setBlockedDates(updated);
+    persistBlockedDates(updated);
   };
 
   const handleSaveAll = () => {
@@ -225,8 +230,8 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   if (isLoading && blockedDates.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-neutral-500 font-sans">
-        <Clock className="w-8 h-8 animate-spin text-teal-600 mb-2" />
-        <p className="text-xs">Loading calendar availability vectors...</p>
+        <Clock className="w-8 h-8 animate-spin text-sky-600 mb-2" />
+        <p className="text-xs">Loading duty schedule records...</p>
       </div>
     );
   }
@@ -234,40 +239,19 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   return (
     <div className="space-y-6 font-sans text-neutral-800">
       
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-teal-700 to-sky-700 text-white rounded-3xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mr-16 -mt-16 w-48 h-48 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-        <div className="space-y-1 z-10">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-teal-200 bg-teal-850/30 px-3 py-1 rounded-full border border-teal-500/25">
-            Availability Panel
-          </span>
-          <h2 className="text-lg font-black tracking-tight">{doctorName}'s Duty Schedule</h2>
-          <p className="text-xs text-teal-100 leading-relaxed max-w-xl">
-            Configure your active shifts, block out clinic leaves, or set daily breaks. Changes instantly lock booking calendar availability for patients.
-          </p>
+      {/* Top Clean Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Duty &amp; Schedule Management</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Manage doctor medical leaves (MC) and calendar holiday leave blocks.</p>
         </div>
-
-        <button
-          onClick={handleSaveAll}
-          disabled={isLoading}
-          className="px-5 py-2.5 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white text-xs font-bold rounded-xl inline-flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer z-10 shrink-0"
-        >
-          {isLoading ? (
-            <Clock className="w-3.5 h-3.5 animate-spin" />
-          ) : saveSuccess ? (
-            <Check className="w-3.5 h-3.5 text-emerald-400" />
-          ) : (
-            <Save className="w-3.5 h-3.5" />
-          )}
-          {saveSuccess ? "Duty Settings Saved" : "Save Changes"}
-        </button>
       </div>
 
       {/* Floating Status Banners */}
       {saveSuccess && (
         <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-xs animate-fadeIn">
           <Check className="w-4 h-4 shrink-0" />
-          <span>Clinic booking ledger updated. Calendar blocks successfully activated.</span>
+          <span>Calendar blocks and duty records successfully synchronized.</span>
         </div>
       )}
       {errorMsg && (
@@ -277,86 +261,154 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Column: Weekly Shifts Planner */}
-        <div className="lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-          <div>
-            <h3 className="font-bold text-sm text-neutral-900">Weekly Shift Allocations</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Toggle clinic weekdays and specify consultation window intervals.</p>
-          </div>
+        {/* Left Column (7 cols): Doctor MC & Medical Leave Tracker */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
+              <div>
+                <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-sky-600" />
+                  Doctor MC &amp; Leave Tracker
+                </h3>
+                <p className="text-xs text-neutral-500 mt-0.5">Record doctor medical certificates (MC) and block out shift consultation availability.</p>
+              </div>
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full self-start font-mono">
+                {doctorMCList.length} Active Records
+              </span>
+            </div>
 
-          <div className="space-y-3">
-            {Object.keys(shifts).map((day) => {
-              const shift = shifts[day];
-              return (
-                <div 
-                  key={day} 
-                  className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    shift.enabled 
-                      ? 'bg-white border-neutral-200' 
-                      : 'bg-neutral-50 border-neutral-100 opacity-60'
-                  }`}
-                >
-                  {/* Left Label & Toggle */}
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id={`shift-toggle-${day}`}
-                      checked={shift.enabled}
-                      onChange={() => handleToggleDay(day)}
-                      className="rounded border-neutral-300 text-teal-600 focus:outline-none w-4.5 h-4.5 cursor-pointer"
-                    />
-                    <label 
-                      htmlFor={`shift-toggle-${day}`} 
-                      className="font-bold text-xs text-neutral-900 w-24 cursor-pointer select-none"
-                    >
-                      {day}
-                    </label>
-                  </div>
-
-                  {/* Right Hours Inputs */}
-                  {shift.enabled ? (
-                    <div className="flex items-center gap-2 text-xs">
-                      <Clock className="w-3.5 h-3.5 text-neutral-400" />
-                      <input 
-                        type="text"
-                        placeholder="e.g. 09:00 AM"
-                        value={shift.start}
-                        onChange={(e) => handleTimeChange(day, 'start', e.target.value)}
-                        className="bg-neutral-50 border border-neutral-200 rounded-lg px-2.5 py-1.5 w-24 text-center font-mono font-bold text-neutral-800 focus:bg-white outline-none focus:ring-1 focus:ring-neutral-400"
-                      />
-                      <span className="text-neutral-400 font-semibold font-mono">to</span>
-                      <input 
-                        type="text"
-                        placeholder="e.g. 05:00 PM"
-                        value={shift.end}
-                        onChange={(e) => handleTimeChange(day, 'end', e.target.value)}
-                        className="bg-neutral-50 border border-neutral-200 rounded-lg px-2.5 py-1.5 w-24 text-center font-mono font-bold text-neutral-800 focus:bg-white outline-none focus:ring-1 focus:ring-neutral-400"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-neutral-100 px-2.5 py-1 rounded-md border border-neutral-200/50">
-                      Closed Consultation
-                    </span>
-                  )}
+            {/* Form to submit a new Doctor MC */}
+            <form onSubmit={handleAddDoctorMC} className="bg-slate-50 border border-slate-200/70 p-4 rounded-xl space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select Attending Doctor</label>
+                  <select
+                    value={mcDoctor}
+                    onChange={(e) => setMcDoctor(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 h-9 cursor-pointer"
+                  >
+                    {defaultDoctorsList.map((doc) => (
+                      <option key={doc} value={doc}>{doc}</option>
+                    ))}
+                  </select>
                 </div>
-              );
-            })}
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Leave Category</label>
+                  <select
+                    value={mcType}
+                    onChange={(e: any) => setMcType(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 h-9 cursor-pointer"
+                  >
+                    <option value="Medical Certificate (MC)">Medical Certificate (MC)</option>
+                    <option value="Emergency Medical Leave">Emergency Medical Leave</option>
+                    <option value="Annual Leave">Annual Leave</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    required
+                    min="2026-06-13"
+                    value={mcStartDate}
+                    onChange={(e) => setMcStartDate(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">End Date (Optional)</label>
+                  <input
+                    type="date"
+                    min={mcStartDate || "2026-06-13"}
+                    value={mcEndDate}
+                    onChange={(e) => setMcEndDate(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={mcReason}
+                  onChange={(e) => setMcReason(e.target.value)}
+                  placeholder="Reason or diagnosis note (e.g. Acute Gastritis, High Fever)..."
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-sky-500 h-9"
+                />
+                <button
+                  type="submit"
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs cursor-pointer active:scale-98 shrink-0 flex items-center justify-center gap-1.5 h-9"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Record MC &amp; Block Duty</span>
+                </button>
+              </div>
+            </form>
+
+            {/* List of recorded Doctor MCs */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Active Doctor MC Registry</h4>
+              {doctorMCList.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-6 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+                  No doctor MCs currently recorded. Use the form above to log a medical certificate or leave.
+                </p>
+              ) : (
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                  {doctorMCList.map((rec) => (
+                    <div key={rec.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-900 text-xs">{rec.doctorName}</span>
+                          <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full border ${
+                            rec.leaveType === 'Medical Certificate (MC)'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : rec.leaveType === 'Emergency Medical Leave'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {rec.leaveType}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                          <span className="font-mono font-bold text-slate-700">
+                            {rec.startDate} {rec.endDate && rec.endDate !== rec.startDate ? `to ${rec.endDate}` : ''}
+                          </span>
+                          <span>•</span>
+                          <span className="truncate italic">{rec.reason}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRemoveDoctorMC(rec.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                        title="Dismiss MC Record"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Block Leaves & Breaks */}
-        <div className="space-y-6">
-          
-          {/* Calendar Block Leaves Panel */}
-          <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs space-y-4">
-            <div>
+        {/* Right Column (5 cols): Calendar Leave Blocks */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+            <div className="border-b border-neutral-100 pb-3">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                <CalendarRange className="w-4 h-4 text-neutral-400" />
-                Calendar Leave Blocks
+                <CalendarRange className="w-4 h-4 text-sky-600" />
+                Calendar Leave &amp; Holiday Blocks
               </h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Select calendar dates to prevent any patient bookings.</p>
+              <p className="text-xs text-neutral-500 mt-0.5">Select holiday or leave dates to prevent any patient bookings.</p>
             </div>
 
             {/* Input Row */}
@@ -367,143 +419,59 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
                 min="2026-06-13"
                 value={newLeaveDate}
                 onChange={(e) => setNewLeaveDate(e.target.value)}
-                className="flex-1 bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-mono"
+                className="flex-1 bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-mono"
               />
               <button
                 type="button"
                 id="add-leave-btn"
                 onClick={handleAddLeave}
-                className="bg-neutral-900 text-white hover:bg-neutral-800 border border-neutral-800 px-3.5 rounded-xl flex items-center justify-center shadow-sm cursor-pointer"
+                className="bg-sky-600 text-white hover:bg-sky-700 px-4 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
+                <span>Block Date</span>
               </button>
             </div>
 
             {/* List of blocked dates */}
-            {blockedDates.length === 0 ? (
-              <p className="text-xs text-neutral-400 italic text-center py-6">No leave dates currently blocked.</p>
-            ) : (
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {blockedDates.map((date) => (
-                  <div key={date} className="p-2.5 bg-neutral-50 border border-neutral-200/50 rounded-xl flex items-center justify-between text-xs font-mono">
-                    <span className="font-bold text-neutral-800">{date}</span>
-                    <button
-                      onClick={() => handleRemoveLeave(date)}
-                      className="p-1 hover:bg-neutral-200 hover:text-red-600 text-neutral-400 rounded-md transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
+                <span>Blocked Dates ({blockedDates.length})</span>
               </div>
-            )}
-          </div>
-
-          {/* Daily Shift Breaks */}
-          <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs space-y-4">
-            <div>
-              <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                <Coffee className="w-4 h-4 text-neutral-400" />
-                Daily Break Periods
-              </h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Specify regular clinic break hours and schedule overrides.</p>
-            </div>
-
-            {/* Global Break Selection */}
-            <div className="space-y-3 bg-neutral-50/55 border border-neutral-100 rounded-xl p-3">
-              <h4 className="text-[11px] font-bold text-neutral-700 uppercase tracking-wider">Default Global Break (All Days)</h4>
-              <div className="flex items-center gap-3 text-xs">
-                <div className="flex-1">
-                  <label className="text-[9px] text-neutral-400 font-bold block mb-1">FROM</label>
-                  <input
-                    type="time"
-                    value={formatTimeForInput(globalBreak.start)}
-                    onChange={(e) => setGlobalBreak(prev => ({ ...prev, start: formatTimeInput(e.target.value) || prev.start }))}
-                    className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:ring-1 focus:ring-neutral-450"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[9px] text-neutral-400 font-bold block mb-1">TO</label>
-                  <input
-                    type="time"
-                    value={formatTimeForInput(globalBreak.end)}
-                    onChange={(e) => setGlobalBreak(prev => ({ ...prev, end: formatTimeInput(e.target.value) || prev.end }))}
-                    className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:ring-1 focus:ring-neutral-450"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Custom Overrides Picker */}
-            <div className="space-y-3 border-t border-neutral-105 pt-4">
-              <h4 className="text-[11px] font-bold text-neutral-700 uppercase tracking-wider">Date Break Overrides</h4>
-              <p className="text-[10px] text-neutral-400 leading-relaxed">Override break ranges for specific clinic days.</p>
-              
-              <div className="space-y-2.5">
-                <div>
-                  <label className="text-[9px] text-neutral-400 font-bold block mb-1">SELECT DATE</label>
-                  <input
-                    type="date"
-                    min="2026-06-13"
-                    value={newCustomBreakDate}
-                    onChange={(e) => setNewCustomBreakDate(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <label className="text-[9px] text-neutral-400 font-bold block mb-1">FROM</label>
-                    <input
-                      type="time"
-                      value={newCustomBreakStart}
-                      onChange={(e) => setNewCustomBreakStart(e.target.value)}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[9px] text-neutral-400 font-bold block mb-1">TO</label>
-                    <input
-                      type="time"
-                      value={newCustomBreakEnd}
-                      onChange={(e) => setNewCustomBreakEnd(e.target.value)}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddCustomBreak}
-                    className="self-end bg-neutral-900 text-white hover:bg-neutral-800 border border-neutral-800 p-2 rounded-xl flex items-center justify-center shadow-sm cursor-pointer h-9 w-9 shrink-0 hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Overrides list */}
-              {Object.keys(customBreaks).length === 0 ? (
-                <p className="text-[10px] text-neutral-400 italic text-center py-4">No custom date overrides configured.</p>
+              {blockedDates.length === 0 ? (
+                <p className="text-xs text-neutral-400 italic text-center py-6 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+                  No leave dates currently blocked. Select a date above to block bookings.
+                </p>
               ) : (
-                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                  {Object.keys(customBreaks).map((date) => (
-                    <div key={date} className="p-2.5 bg-neutral-50 border border-neutral-200/50 rounded-xl flex items-center justify-between text-xs font-mono">
-                      <div className="min-w-0">
-                        <span className="font-bold text-neutral-800 block">{date}</span>
-                        <span className="text-[10px] text-neutral-500 block mt-0.5">{customBreaks[date].start} - {customBreaks[date].end}</span>
-                      </div>
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {blockedDates.map((date) => (
+                    <div key={date} className="p-3 bg-neutral-50 border border-neutral-200/60 rounded-xl flex items-center justify-between text-xs font-mono shadow-xs">
+                      <span className="font-bold text-neutral-800">{date}</span>
                       <button
-                        onClick={() => handleRemoveCustomBreak(date)}
-                        className="p-1 hover:bg-neutral-200 hover:text-red-600 text-neutral-400 rounded-md transition-colors cursor-pointer"
+                        onClick={() => handleRemoveLeave(date)}
+                        className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-neutral-400 rounded-lg transition-colors cursor-pointer"
+                        title="Remove Block"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          </div>
 
+            <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+              <span className="text-[11px] text-neutral-400 font-medium">Automatic real-time sync with patient booking ledger.</span>
+              <button
+                onClick={handleSaveAll}
+                disabled={isLoading}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save</span>
+              </button>
+            </div>
           </div>
+        </div>
 
       </div>
 
