@@ -4,9 +4,7 @@ import {
   Mail,
   ShieldCheck,
   Lock,
-  Globe,
   Volume2,
-  Monitor,
   LayoutDashboard,
   Save,
   CheckCircle2,
@@ -17,8 +15,7 @@ import {
   ChevronDown,
   HelpCircle,
   Phone,
-  FileText,
-  Bell
+  FileText
 } from 'lucide-react';
 
 /* ──────────────────────────────────────────────
@@ -57,38 +54,9 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/* ──────────────────────────────────────────────
-   Toggle switch component
-   ────────────────────────────────────────────── */
-function ToggleSwitch({
-  enabled,
-  onToggle,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-        enabled ? 'bg-teal-500' : 'bg-neutral-300'
-      }`}
-      role="switch"
-      aria-checked={enabled}
-    >
-      <span
-        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ease-in-out ${
-          enabled ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  );
-}
-
 interface StaffSettingsProps {
-  language: string;
-  setLanguage: (lang: string) => void;
+  language?: string;
+  setLanguage?: (lang: string) => void;
 }
 
 export default function StaffSettings({ language, setLanguage }: StaffSettingsProps) {
@@ -220,51 +188,7 @@ export default function StaffSettings({ language, setLanguage }: StaffSettingsPr
     }
   };
 
-  // ── 3. ALERT / NOTIFICATION STATES ──
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [alertSuccess, setAlertSuccess] = useState('');
-
-  useEffect(() => {
-    const savedPush = localStorage.getItem('lifelink_staff_push_enabled');
-    const savedEmail = localStorage.getItem('lifelink_staff_email_alerts');
-
-    if (savedPush !== null) setPushEnabled(savedPush === 'true');
-    if (savedEmail !== null) setEmailAlerts(savedEmail === 'true');
-  }, []);
-
-  const handleSaveAlertPreferences = () => {
-    localStorage.setItem('lifelink_staff_push_enabled', String(pushEnabled));
-    localStorage.setItem('lifelink_staff_email_alerts', String(emailAlerts));
-    setAlertSuccess('Alert preferences updated!');
-    setTimeout(() => setAlertSuccess(''), 3000);
-  };
-
-  // ── 4. LANGUAGE & REGION STATES ──
-  const [selectedLanguage, setSelectedLanguage] = useState(language);
-  const [selectedRegion, setSelectedRegion] = useState('Malaysia');
-
-  useEffect(() => {
-    const savedLang = localStorage.getItem('lifelink_staff_language');
-    const savedRegion = localStorage.getItem('lifelink_staff_region');
-    if (savedLang) setSelectedLanguage(savedLang);
-    if (savedRegion) setSelectedRegion(savedRegion);
-  }, [language]);
-
-  const handleLanguageChange = (lang: string) => {
-    setSelectedLanguage(lang);
-    localStorage.setItem('lifelink_staff_language', lang);
-    if (setLanguage) {
-      setLanguage(lang);
-    }
-  };
-
-  const handleRegionChange = (reg: string) => {
-    setSelectedRegion(reg);
-    localStorage.setItem('lifelink_staff_region', reg);
-  };
-
-  // ── 5. HELP CENTER / SUPPORT TICKET STATES ──
+  // ── 3. HELP CENTER / SUPPORT TICKET STATES ──
   const [ticketCategory, setTicketCategory] = useState('System Bug');
   const [ticketSeverity, setTicketSeverity] = useState('Medium');
   const [ticketSubject, setTicketSubject] = useState('');
@@ -331,9 +255,6 @@ export default function StaffSettings({ language, setLanguage }: StaffSettingsPr
             {getInitials(staffName)}
           </div>
           <h4 className="font-bold text-base text-neutral-900">{staffName}</h4>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mt-1 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-full">
-            {staffRole}
-          </span>
 
           <div className="w-full mt-6 pt-5 border-t border-neutral-100 space-y-3.5 text-left">
             <div className="flex items-center gap-2.5 text-xs text-neutral-600">
@@ -548,106 +469,6 @@ export default function StaffSettings({ language, setLanguage }: StaffSettingsPr
               </div>
             )}
           </form>
-        </div>
-
-        {/* Notification & Alerts Preferences */}
-        <div className={cardBase}>
-          <div className="flex items-center gap-2 mb-4">
-            <Bell className="w-4 h-4 text-teal-600" />
-            <h3 className="font-bold text-sm text-neutral-900">Alert Preferences</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              
-              {/* Push Notifications Toggle */}
-              <div className="flex items-center justify-between bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2.5">
-                <div className="flex items-center gap-2">
-                  <Monitor className="w-4 h-4 text-neutral-500 shrink-0" />
-                  <div>
-                    <p className="text-[11px] font-bold text-neutral-800">Push Notifications</p>
-                    <p className="text-[9px] text-neutral-400">On-screen alerts</p>
-                  </div>
-                </div>
-                <ToggleSwitch enabled={pushEnabled} onToggle={() => setPushEnabled(!pushEnabled)} />
-              </div>
-
-              {/* Email Alerts Toggle */}
-              <div className="flex items-center justify-between bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2.5">
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-neutral-500 shrink-0" />
-                  <div>
-                    <p className="text-[11px] font-bold text-neutral-800">Email Alerts</p>
-                    <p className="text-[9px] text-neutral-400">Inbox alerts</p>
-                  </div>
-                </div>
-                <ToggleSwitch enabled={emailAlerts} onToggle={() => setEmailAlerts(!emailAlerts)} />
-              </div>
-            </div>
-
-            {alertSuccess && (
-              <div className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100 p-2 rounded-lg flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {alertSuccess}
-              </div>
-            )}
-
-            <button
-              onClick={handleSaveAlertPreferences}
-              className="bg-teal-600 border border-teal-700 hover:bg-teal-700 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer h-9"
-            >
-              <Save className="w-3.5 h-3.5" />
-              Save Alert Preferences
-            </button>
-          </div>
-        </div>
-
-        {/* Language & Region Selector Card */}
-        <div className={cardBase}>
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-4 h-4 text-teal-600" />
-            <h3 className="font-bold text-sm text-neutral-900">Language & Region</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Language Dropdown */}
-            <div className="space-y-1">
-              <label className={labelClass}>Language Selector</label>
-              <div className="relative">
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => handleLanguageChange(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="English">English</option>
-                  <option value="Bahasa Malaysia">Bahasa Malaysia</option>
-                  <option value="中文 (Chinese)">中文 (Chinese)</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Region Dropdown */}
-            <div className="space-y-1">
-              <label className={labelClass}>Region Selector</label>
-              <div className="relative">
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => handleRegionChange(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="Malaysia">Malaysia</option>
-                  <option value="Singapore">Singapore</option>
-                  <option value="United Kingdom">United Kingdom</option>
-                  <option value="United States">United States</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-          <p className="text-[10px] text-neutral-400 mt-2">
-            * Selected language changes are applied instantly to local translations and layout variables.
-          </p>
         </div>
 
         {/* Help Center & Customer Support Ticket Form */}

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
-  CheckCheck, 
+  CheckCheck,
   AlertTriangle, 
   ShieldAlert, 
-  Megaphone,
-  Clock,
-  Inbox
+  Megaphone, 
+  Clock, 
+  Inbox 
 } from 'lucide-react';
 
 interface BroadcastMessage {
@@ -128,29 +128,8 @@ export default function StaffNotificationsInbox({
     <div className="space-y-6 font-sans text-neutral-800">
       
       {/* HEADER SECTION */}
-      <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <h3 className="font-bold text-base text-neutral-900">System Notifications Inbox</h3>
-          <p className="text-xs text-neutral-500 mt-0.5 font-medium">Review administrative announcements, system bypass directives, and critical emergency logs.</p>
-        </div>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
-          <button 
-            onClick={handleMarkAllAsRead} 
-            disabled={listWithReadStatus.every(b => b.read)}
-            className="h-9 px-4 border border-neutral-200 text-neutral-600 rounded-xl text-xs font-bold hover:bg-neutral-50 hover:text-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <CheckCheck className="w-4 h-4" />
-            Mark All as Read
-          </button>
-
-          <button 
-            onClick={fetchBroadcasts} 
-            className="h-9 px-4 bg-neutral-900 text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            Refresh Messages
-          </button>
-        </div>
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs">
+        <h3 className="font-bold text-base text-neutral-900">System Notifications Inbox</h3>
       </div>
 
       {/* NOTIFICATIONS CONTAINER */}
