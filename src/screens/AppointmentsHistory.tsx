@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { Search, Filter, Calendar, Clock, ChevronRight, RefreshCw, Star, Mail, MapPin, Building2, FileText, Pill, Eye, X } from "lucide-react";
+import { Search, Filter, Calendar, Clock, RefreshCw, Building2, FileText, Pill, Eye, X } from "lucide-react";
 import { Appointment, Doctor } from "../types";
-import { mockDoctors } from "../mockData";
 
 interface AppointmentsHistoryProps {
   appointments: Appointment[];
@@ -10,7 +9,7 @@ interface AppointmentsHistoryProps {
   doctors?: Doctor[];
 }
 
-export default function AppointmentsHistory({ appointments, onResubmitBooking, onSetScreen, doctors = [] }: AppointmentsHistoryProps) {
+export default function AppointmentsHistory({ appointments, onResubmitBooking, onSetScreen }: AppointmentsHistoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<'All' | 'Upcoming' | 'Completed'>('All');
   const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
@@ -29,14 +28,12 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
       <div>
         <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">Consultation Log & Archive</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Review, reschedule, or quickly book previous healthcare experts and specialized physician rosters.
+          Review, reschedule, or quickly book previous healthcare appointments and specialist consultations.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Part: List of consultations + search filters */}
-        <div className="lg:col-span-8 space-y-6">
+      {/* Main consultation list container */}
+      <div className="max-w-4xl mx-auto space-y-6">
           {/* Filters shelf */}
           <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="relative w-full sm:max-w-xs">
@@ -151,135 +148,148 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
           </div>
         </div>
 
-        {/* Right Part: Active Consultation Details Panel & Doctors Lists */}
-        <div className="lg:col-span-4 space-y-6">
-          {selectedApt ? (
-            <div className="bg-white border border-sky-200 rounded-3xl p-5 shadow-lg space-y-4 animate-fade-in relative">
-
-              <div className="flex items-center gap-3">
-                <img 
-                  src={selectedApt.doctorImage} 
-                  alt={selectedApt.doctorName} 
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-100 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="font-extrabold text-slate-900 text-sm leading-snug truncate">{selectedApt.doctorName}</h4>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border shrink-0 ${
-                      selectedApt.status === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
-                      selectedApt.status === 'Upcoming' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                      'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {selectedApt.status}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-sky-700 block font-semibold">{selectedApt.specialty}</span>
-                </div>
+        {/* Consultation Details Card Modal (Centred in viewport, immune to scroll) */}
+      {selectedApt && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setSelectedApt(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden transform transition-all duration-300 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full font-mono">
+                  Consultation Record
+                </span>
+                <h3 className="text-base font-extrabold text-slate-950 mt-1 flex items-center gap-2">
+                  <FileText className="w-4.5 h-4.5 text-sky-600" />
+                  Visit Details & Results
+                </h3>
               </div>
+              <button 
+                onClick={() => setSelectedApt(null)}
+                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-              {/* Consultation metadata */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-[11px] space-y-1 text-slate-600">
-                <div className="flex items-center gap-1.5 font-mono">
-                  <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                  <span>{selectedApt.date} &middot; {selectedApt.timeSlot}</span>
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              
+              {/* Doctor & Facility Card */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={selectedApt.doctorImage} 
+                      alt={selectedApt.doctorName} 
+                      className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 shadow-xs"
+                    />
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm leading-snug">{selectedApt.doctorName}</h4>
+                      <p className="text-[11px] text-sky-700 font-semibold">{selectedApt.specialty}</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase border shrink-0 ${
+                    selectedApt.status === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
+                    selectedApt.status === 'Upcoming' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>
+                    {selectedApt.status}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1.5">
+
+                <div className="pt-2 border-t border-slate-200/60 grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-slate-600 font-mono">
+                    <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                    <span>{selectedApt.date}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-600 font-mono">
+                    <Clock className="w-3.5 h-3.5 text-sky-600" />
+                    <span>{selectedApt.timeSlot || "Scheduled slot"}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
                   <Building2 className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                   <span className="truncate">{selectedApt.clinic || "Penang Healthcare Facility"}</span>
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-3 space-y-3 text-xs text-slate-700">
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-bold">Reported Symptoms</span>
-                  <p className="p-2.5 bg-slate-50 rounded-xl leading-relaxed mt-1 text-slate-600 text-[11px] font-mono">
+              {/* Reported Symptoms */}
+              {selectedApt.symptoms && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block font-mono">
+                    Reported Symptoms
+                  </span>
+                  <p className="text-slate-700 text-xs leading-relaxed italic">
                     "{selectedApt.symptoms}"
                   </p>
                 </div>
+              )}
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 block font-bold flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-sky-600" />
-                    Doctor Clinical Notes
-                  </span>
-                  <p className="mt-1 leading-relaxed text-slate-800 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    {selectedApt.clinicalNotes || "General outpatient consultation recorded."}
-                  </p>
-                </div>
-
-                <div className="bg-sky-50/70 border border-sky-100 rounded-2xl p-3 space-y-1">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-sky-800 block font-extrabold flex items-center gap-1.5">
-                    <Pill className="w-3.5 h-3.5 text-sky-600" />
-                    Prescribed Medication
-                  </span>
-                  <p className="mt-1 leading-normal font-semibold text-sky-950 select-all text-[11px] font-mono bg-white p-2.5 rounded-xl border border-sky-100">
-                    {selectedApt.prescription || "No medications prescribed."}
-                  </p>
-                </div>
+              {/* Doctor Clinical Notes */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block font-mono flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-sky-600" />
+                  Doctor Clinical Notes
+                </span>
+                <p className="text-slate-800 text-xs leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  {selectedApt.clinicalNotes || "General outpatient consultation recorded."}
+                </p>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+              {/* Prescribed Medication */}
+              <div className="bg-sky-50/60 border border-sky-100 rounded-2xl p-3.5 space-y-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-sky-800 block font-mono flex items-center gap-1.5">
+                  <Pill className="w-3.5 h-3.5 text-sky-600" />
+                  Prescribed Medication
+                </span>
+                <p className="text-sky-950 font-semibold text-xs leading-relaxed bg-white p-2.5 rounded-xl border border-sky-100 select-all font-mono">
+                  {selectedApt.prescription || "No medications prescribed."}
+                </p>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+              <button 
+                onClick={() => setSelectedApt(null)}
+                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Close View
+              </button>
+              <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => onResubmitBooking(selectedApt)}
-                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  title="Resubmit previous parameters to a new booking"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Book Again
-                </button>
-                <button 
-                  onClick={() => onSetScreen("communication")}
-                  className="border border-slate-200 hover:border-sky-500 hover:text-sky-700 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition cursor-pointer"
+                  onClick={() => {
+                    setSelectedApt(null);
+                    onSetScreen("communication");
+                  }}
+                  className="px-3.5 py-2 border border-slate-200 hover:border-sky-500 hover:text-sky-700 bg-white text-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer"
                 >
                   Contact Clinic
                 </button>
+                <button 
+                  onClick={() => {
+                    const aptToResubmit = selectedApt;
+                    setSelectedApt(null);
+                    onResubmitBooking(aptToResubmit);
+                  }}
+                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Book Again
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-6 text-center text-slate-500 text-xs">
-              Click any consultation on the list to view attending diagnostic writeups and active prescriptions.
-            </div>
-          )}
 
-          {/* Attending Doctors Panel */}
-          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm space-y-4">
-            <h4 className="font-bold text-slate-950 text-sm">Top Doctors Directory</h4>
-            
-            <div className="space-y-3">
-              {(doctors.length > 0 ? doctors : mockDoctors).slice(0, 5).map((doc) => (
-                <div key={doc.id} className="flex gap-3 items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition border border-transparent hover:border-slate-100">
-                  <div className="flex gap-2.5 items-center">
-                    <img 
-                      src={doc.image} 
-                      alt={doc.name} 
-                      className="w-10 h-10 rounded-lg object-cover shrink-0"
-                    />
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs block leading-tight">{doc.name}</span>
-                      <span className="text-[10px] text-sky-600 font-semibold block mt-0.5">{doc.specialty}</span>
-                      <span className="text-[9px] text-slate-400 font-mono block mt-0.5">{doc.hospital}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="flex items-center gap-0.5 text-xs text-amber-500 font-bold select-none justify-end">
-                      <Star className="w-3 h-3 fill-amber-500 stroke-none" /> {doc.rating}
-                    </div>
-                    <span className="text-[9px] text-slate-400 font-mono block">({doc.reviewsCount} reviews)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button 
-              onClick={() => onSetScreen("schedule-appointment")}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
-            >
-              Book New Specialist
-            </button>
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }

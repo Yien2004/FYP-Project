@@ -4,7 +4,6 @@ import {
   Send, 
   Heart, 
   Activity, 
-  Thermometer, 
   AlertTriangle, 
   ArrowRight, 
   Sliders, 
@@ -374,51 +373,6 @@ I noticed your health remarks. I have logged these symptoms and flagged your pat
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Vitals side widget */}
-          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm space-y-3">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold block">Live Physical Biometric checklist</span>
-            
-            {vitals.length === 0 ? (
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center text-xs text-slate-500 font-mono">
-                No biometric readings recorded.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-rose-500" />
-                  <div>
-                    <span className="text-[9px] text-slate-400 block font-mono">PULSE RATE</span>
-                    <span className="font-bold text-slate-800 text-xs font-mono">{vitals[0].heartRate} bpm</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-2">
-                  <Thermometer className="w-4 h-4 text-amber-500" />
-                  <div>
-                    <span className="text-[9px] text-slate-400 block font-mono">TEMPERATURE</span>
-                    <span className="font-bold text-slate-800 text-xs font-mono">{vitals[0].temperature}°C</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-500" />
-                  <div>
-                    <span className="text-[9px] text-slate-400 block font-mono">BLOOD PRESS</span>
-                    <span className="font-bold text-slate-800 text-xs font-mono">{vitals[0].bloodPressureSys}/{vitals[0].bloodPressureDia}</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-sky-600" />
-                  <div>
-                    <span className="text-[9px] text-slate-400 block font-mono">OXYGEN SpO2</span>
-                    <span className="font-bold text-slate-800 text-xs font-mono">{vitals[0].oxygenSaturation}%</span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
         </div>
