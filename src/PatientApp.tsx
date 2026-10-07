@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Dashboard from "./screens/Dashboard";
 import AIConsultation from "./screens/AIConsultation";
-import MedicalRecords from "./screens/MedicalRecords";
 import Communication from "./screens/Communication";
 import ScheduleAppointment from "./screens/ScheduleAppointment";
 import AppointmentsHistory from "./screens/AppointmentsHistory";
@@ -9,13 +8,9 @@ import ClinicSearch from "./screens/ClinicSearch";
 import PatientRegistration from "./screens/PatientRegistration";
 import Notifications from "./screens/Notifications";
 import UserSettings from "./screens/UserSettings";
-import HealthcareAnalytics from "./screens/HealthcareAnalytics";
-import WearableHealth from "./screens/WearableHealth";
-import FetchingTransit from "./screens/FetchingTransit";
 
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
-import EmergencySOS from "./components/EmergencySOS";
 
 import {
   PatientProfile,
@@ -649,37 +644,12 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
               />
             )}
 
-            {currentScreen === "healthcare-analytics" && (
-              <HealthcareAnalytics
-                patientProfile={patientProfile}
-                vitals={vitalsList}
-                appointments={appointments}
-                onSetScreen={setCurrentScreen}
-              />
-            )}
-
-            {currentScreen === "wearable-health" && (
-              <WearableHealth
-                patientProfile={patientProfile}
-                appointments={appointments}
-                onSetScreen={setCurrentScreen}
-              />
-            )}
-
             {currentScreen === "ai-consultation" && (
               <AIConsultation
                 patientProfile={patientProfile}
                 vitals={vitalsList}
                 onSetScreen={setCurrentScreen}
                 onInjectDoctorMessage={handleInjectDoctorMessage}
-              />
-            )}
-
-            {currentScreen === "medical-records" && (
-              <MedicalRecords
-                vitalsList={vitalsList}
-                onAddVitals={handleAddVitals}
-                appointments={appointments}
               />
             )}
 
@@ -717,14 +687,6 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
               <ClinicSearch onSetScreen={setCurrentScreen} />
             )}
 
-            {currentScreen === "fetching-transit" && (
-              <FetchingTransit
-                appointments={appointments}
-                onSetScreen={setCurrentScreen}
-                onUpdateAppointment={handleUpdateAppointment}
-              />
-            )}
-
             {currentScreen === "patient-registration" && (
               <PatientRegistration
                 currentProfile={patientProfile}
@@ -756,9 +718,6 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           </div>
         </main>
       </div>
-
-      {/* Emergency SOS Floating Widget */}
-      <EmergencySOS patientProfile={patientProfile} />
     </div>
   );
 }

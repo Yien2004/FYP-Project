@@ -20,9 +20,6 @@ import {
   HelpCircle,
   AlertTriangle,
   ShieldCheck,
-  Car,
-  Sparkles,
-  Share2,
   FileText
 } from "lucide-react";
 import { Appointment } from "../types";
@@ -655,7 +652,7 @@ export default function ScheduleAppointment({
     );
   };
 
-  const currentStepLabel = ["Facility", "Symptoms", "Doctor", "Schedule", "Preferences"] as const;
+  const currentStepLabel = ["Facility", "Symptoms", "Doctor", "Schedule", "Review"] as const;
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -809,24 +806,20 @@ export default function ScheduleAppointment({
               </div>
             </div>
 
-            {/* Cross-Facility Synchronization Badge */}
-            {(lastCreatedVoucher?.syncCrossFacilityRecords || upcomingAppointment?.syncCrossFacilityRecords) && (
-              <div className="mt-4 p-3 bg-blue-900/40 border border-blue-700/40 rounded-xl flex items-center gap-2.5 text-xs text-blue-200">
-                <span className="text-base">🔗</span>
-                <span>Cross-Facility Medical Record Sync is <strong>Active</strong> for this consultation.</span>
-              </div>
-            )}
           </div>
 
           {/* Action buttons */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <button
               type="button"
-              onClick={() => onSetScreen("fetching-transit")}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-2xl transition shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 text-sm cursor-pointer"
+              onClick={() => {
+                setBookingConfirmed(false);
+                onSetScreen("appointments-history");
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-5 rounded-2xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 text-sm cursor-pointer"
             >
-              <span>🚗</span>
-              <span>Book Ride to Clinic (Grab Simulation)</span>
+              <Calendar className="w-4 h-4" />
+              <span>View My Appointments</span>
             </button>
             <button
               type="button"
@@ -1462,7 +1455,7 @@ export default function ScheduleAppointment({
                       onClick={() => setStep(5)}
                       className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-md shadow-blue-600/20"
                     >
-                      Continue to Authorizations & Transit
+                      Continue to Review & Confirm
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   )}
@@ -1470,7 +1463,7 @@ export default function ScheduleAppointment({
               </section>
             )}
 
-            {/* STEP 5: Authorizations & Transit Preferences */}
+            {/* STEP 5: Review & Confirm Appointment */}
             {step === 5 && (
               <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 animate-fade-in">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -1478,7 +1471,7 @@ export default function ScheduleAppointment({
                     <ShieldCheck className="w-5.5 h-5.5 text-blue-600" />
                     <div>
                       <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-blue-600 block">Step 5</span>
-                      <h2 className="text-lg font-bold text-slate-900">Authorizations & Transit Preferences</h2>
+                      <h2 className="text-lg font-bold text-slate-900">Review & Confirm Appointment</h2>
                     </div>
                   </div>
                   <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100">
@@ -1486,186 +1479,59 @@ export default function ScheduleAppointment({
                   </span>
                 </div>
 
-                {/* Section 1: Conspicuous Cross-Facility Synchronisation */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <span>🔗</span>
-                      <span>Authorize Cross-Facility Medical Record Synchronisation (跨医疗机构资料同步)</span>
-                    </label>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                      Step Required
-                    </span>
-                  </div>
+                {/* Appointment Overview Summary Card */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 block">
+                    Consultation Details Overview
+                  </span>
 
-                  {/* Option 1: Yes, Authorize (Recommended) */}
-                  <div
-                    onClick={() => {
-                      setSyncCrossFacilityRecords(true);
-                      setShareHistory(true);
-                    }}
-                    className={`p-5 rounded-2xl border-2 transition cursor-pointer relative ${
-                      syncCrossFacilityRecords
-                        ? 'bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border-blue-500 shadow-md shadow-blue-600/10 ring-2 ring-blue-500/20'
-                        : 'bg-white border-slate-250 hover:border-slate-400'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3.5">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
-                        syncCrossFacilityRecords ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-400 bg-white'
-                      }`}>
-                        {syncCrossFacilityRecords && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
-                      </div>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-extrabold text-slate-900 text-sm">
-                            Yes, Authorize Cross-Facility Synchronisation (同意授权跨机构同步)
-                          </span>
-                          <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-                            Recommended
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          I agree to securely synchronize my past medical history generated across other clinics/hospitals to <strong className="text-slate-900 font-bold">{selectedClinic?.name || "the selected facility"}</strong> to prevent duplicate checkups and reduce redundant examinations.
-                        </p>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    {/* Facility */}
+                    <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Facility & Location</span>
+                      <span className="font-extrabold text-slate-900 text-sm block">{selectedClinic?.name || "Selected Facility"}</span>
+                      <span className="text-slate-500 text-[11px] block">{selectedClinic?.address || "Penang, Malaysia"}</span>
                     </div>
 
-                    {/* 8 Categories Breakdown */}
-                    <div className="mt-4 pt-3.5 border-t border-blue-200/70">
-                      <div className="flex items-center justify-between mb-2.5">
-                        <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                          View Synchronized Record Categories (8 Types Included):
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowSyncCategories(!showSyncCategories);
-                          }}
-                          className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline cursor-pointer"
-                        >
-                          {showSyncCategories ? "Hide Synchronized Categories ▲" : "View Synchronized Record Categories (8 Types) ▼"}
-                        </button>
-                      </div>
+                    {/* Doctor & Specialty */}
+                    <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Physician & Specialty</span>
+                      <span className="font-extrabold text-slate-900 text-sm block">{selectedDoctor?.name || "Attending Doctor"}</span>
+                      <span className="text-blue-600 font-bold text-[11px] block">{selectedDoctor?.title || selectedDoctor?.specialty || "Specialist"}</span>
+                    </div>
 
-                      {showSyncCategories && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-700 bg-white/95 border border-blue-200 rounded-xl p-3.5 animate-fade-in">
-                          <div>1. Past Visit Records</div>
-                          <div>2. Symptoms & Diagnoses</div>
-                          <div>3. Past Illnesses</div>
-                          <div>4. X-ray / MRI Imaging</div>
-                          <div>5. Blood & Lab Tests</div>
-                          <div>6. Past Treatments</div>
-                          <div>7. Prescriptions & Drugs</div>
-                          <div>8. Doctor Clinical Notes</div>
-                        </div>
+                    {/* Date & Time */}
+                    <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Appointment Schedule</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-extrabold text-slate-900 text-sm font-mono">{selectedDate}</span>
+                        <span className="bg-blue-100 text-blue-800 font-extrabold text-xs px-2 py-0.5 rounded-md font-mono">{selectedTimeSlot}</span>
+                      </div>
+                      <span className="text-slate-400 text-[10px] block">Consultation Type: In-Clinic Outpatient</span>
+                    </div>
+
+                    {/* Symptoms */}
+                    <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Reported Symptoms / Concern</span>
+                      <span className="font-extrabold text-slate-900 text-xs block">{selectedSymptom?.label || "General Checkup"}</span>
+                      {remarks && (
+                        <p className="text-slate-600 text-[11px] italic mt-1 bg-slate-50 p-2 rounded border border-slate-150">
+                          "{remarks}"
+                        </p>
                       )}
                     </div>
                   </div>
-
-                  {/* Option 2: No, Keep Records Local Only */}
-                  <div
-                    onClick={() => {
-                      setSyncCrossFacilityRecords(false);
-                      setShareHistory(false);
-                    }}
-                    className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
-                      !syncCrossFacilityRecords
-                        ? 'bg-slate-50 border-slate-500 shadow-sm ring-2 ring-slate-400/20'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3.5">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
-                        !syncCrossFacilityRecords ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white'
-                      }`}>
-                        {!syncCrossFacilityRecords && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="font-bold text-slate-800 text-sm">
-                          No, Keep Records Local Only (不进行跨机构同步，仅限本院独立记录)
-                        </span>
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                          Your medical history from other healthcare providers will not be synchronized to <span className="font-medium text-slate-700">{selectedClinic?.name}</span>.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Section 2: Grab Ride Transit Selection */}
-                <div className="space-y-3 pt-3 border-t border-slate-100">
-                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <span>🚗</span>
-                    <span>Transportation & Clinic Fetching (出行接送偏好)</span>
-                  </label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Option 1: Request Grab ride */}
-                    <div
-                      onClick={() => setRequestRide(true)}
-                      className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
-                        requestRide
-                          ? 'bg-blue-50/80 border-blue-500 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                          requestRide ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                        }`}>
-                          {requestRide && <Check className="w-3 h-3 stroke-[3px]" />}
-                        </div>
-                        <div>
-                          <span className="font-extrabold text-slate-900 text-xs block">
-                            🚗 Request Grab-Style Fetching Ride
-                          </span>
-                          <span className="text-[11px] text-slate-500 block mt-1 leading-snug">
-                            Auto-dispatches simulated on-demand vehicle to escort you safely to {selectedClinic?.name}.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Option 2: Self-Arranged */}
-                    <div
-                      onClick={() => setRequestRide(false)}
-                      className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
-                        !requestRide
-                          ? 'bg-slate-50 border-slate-500 shadow-sm ring-2 ring-slate-400/20'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                          !requestRide ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300'
-                        }`}>
-                          {!requestRide && <Check className="w-3 h-3 stroke-[3px]" />}
-                        </div>
-                        <div>
-                          <span className="font-extrabold text-slate-900 text-xs block">
-                            🚶 Self-Arranged Transport (自行前往)
-                          </span>
-                          <span className="text-[11px] text-slate-500 block mt-1 leading-snug">
-                            I will drive, take public bus, or arrange personal transit to reach the clinic counter on time.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 3: MANDATORY 5-10 MINUTE ON-SITE ARRIVAL NOTICE (Requested by user) */}
+                {/* Mandatory 5-10 Minute On-Site Arrival Notice */}
                 <div className="p-4 bg-amber-500/10 border-2 border-amber-400/60 rounded-2xl flex items-start gap-3.5 text-amber-900">
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div className="space-y-1 text-xs leading-relaxed">
                     <span className="font-black text-amber-900 uppercase tracking-wider block text-xs">
-                      ⚠️ Mandatory Counter Arrival Check-in Notice (请务必在就诊前5分钟到达柜台报到)
+                      Mandatory Counter Arrival Notice
                     </span>
                     <p className="text-amber-850 font-medium">
-                      Please arrive at <strong>{selectedClinic?.name}</strong> counter at least <strong>5–10 minutes before your scheduled appointment time ({selectedTimeSlot})</strong> and present your assigned <strong>Queue Number</strong> to the counter staff. Make sure you have arrived in person to confirm your consultation slot!
+                      Please arrive at the <strong>{selectedClinic?.name}</strong> reception counter at least <strong>5–10 minutes before your scheduled appointment time ({selectedTimeSlot})</strong> and present your assigned <strong>Queue Number</strong> to the clinic staff.
                     </p>
                   </div>
                 </div>

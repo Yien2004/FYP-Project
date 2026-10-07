@@ -14,19 +14,17 @@ import {
   FileCheck2,
   Activity,
   Heart,
-  UploadCloud,
   Layers,
   History,
   FileSpreadsheet,
   Eye,
-  Camera,
   ArrowLeft,
   Pill,
   Clock,
   X
 } from 'lucide-react';
 import { mockPatients } from '../../data/mockData';
-import { Patient, Prescription, Attachment, Appointment } from '../../types';
+import { Patient, Prescription, Appointment } from '../../types';
 
 function getClinicFromEmail(email: string): string {
   const emailLower = (email || '').toLowerCase().trim();
@@ -87,7 +85,7 @@ export default function PatientsSection() {
   const [searchVal, setSearchVal] = useState('');
   
   // Tab control inside active patient workspace
-  const [activeTab, setActiveTab] = useState<'overview' | 'consult' | 'history' | 'upload'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'consult' | 'history'>('overview');
 
   // Load patients from backend and filter by clinic appointments
   const loadPatients = () => {
@@ -144,15 +142,6 @@ export default function PatientsSection() {
     return !!globalConsent || appointmentConsent;
   }, [patientAppointments, activePatient]);
 
-  const visibleAttachments = useMemo(() => {
-    if (!activePatient || !activePatient.attachments) return [];
-    const currentClinic = getLoggedUserClinic();
-    if (!currentClinic || hasConsent) return activePatient.attachments;
-    return activePatient.attachments.filter((file: any) => {
-      return !file.clinic || file.clinic.toLowerCase() === currentClinic.toLowerCase();
-    });
-  }, [activePatient, hasConsent]);
-  
   // Vitals inputs
   const [vitalBPsys, setVitalBPsys] = useState<number>(120);
   const [vitalBPdia, setVitalBPdia] = useState<number>(80);
@@ -606,151 +595,6 @@ export default function PatientsSection() {
     }
   }, [activePatient]);
 
-  // ==========================================
-  // TAB 4: EHR DOCUMENT UPLOAD CENTER
-  // ==========================================
-  const [selectedFileObj, setSelectedFileObj] = useState<File | null>(null);
-
-  const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleDownloadAttachment = (file: Attachment) => {
-    if (file.data && file.data.startsWith('data:')) {
-      const link = document.createElement('a');
-      link.href = file.data;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setSuccessMsg(`Document downloaded: ${file.name}`);
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } else {
-      const contents = `PenangHealth Clinical EHR System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt}\nPatient Name: ${activePatient.name}\nPatient DOB: ${activePatient.dob}\nGender: ${activePatient.gender}\nEmail: ${activePatient.email}\n---------------------------------------\nThis is a clinical record file stored in the PenangHealth database.\n`;
-      const blob = new Blob([contents], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.name.endsWith('.pdf') || file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.doc') 
-        ? file.name 
-        : `${file.name}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      setSuccessMsg(`Simulated report downloaded: ${file.name}`);
-      setTimeout(() => setSuccessMsg(''), 3000);
-    }
-  };
-
-  const handlePreviewAttachment = (file: Attachment) => {
-    setPreviewFile(file);
-  };
-
-  const [uploadName, setUploadName] = useState('');
-  const [uploadType, setUploadType] = useState('pdf');
-  const [uploadSize, setUploadSize] = useState('1.5 MB');
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-
-  // States & handlers for document preview and download
-  const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
-
-  const handleDocumentUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!uploadName.trim()) {
-      setFormError("Please enter a descriptive document name.");
-      setTimeout(() => setFormError(''), 3000);
-      return;
-    }
-
-    setUploadProgress(10);
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev === null) return 0;
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 200);
-
-    let base64Data: string | null = null;
-    if (selectedFileObj) {
-      try {
-        base64Data = await readFileAsDataURL(selectedFileObj);
-      } catch (err) {
-        console.error("Failed to read file contents", err);
-      }
-    }
-
-    setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/patients/${activePatient.id}/attachments`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: uploadName.includes('.') ? uploadName : `${uploadName}.${uploadType}`,
-            size: uploadSize,
-            type: uploadType,
-            clinic: getLoggedUserClinic(),
-            data: base64Data
-          })
-        });
-
-        if (res.ok) {
-          const newDoc = await res.json();
-          setPatients(prev => prev.map(p => {
-            if (p.id === activePatient.id) {
-              return {
-                ...p,
-                attachments: [newDoc, ...p.attachments]
-              };
-            }
-            return p;
-          }));
-          setSuccessMsg("Document scanned and attached successfully!");
-          setUploadName('');
-          setSelectedFileObj(null);
-          setUploadProgress(null);
-          setTimeout(() => setSuccessMsg(''), 3000);
-        }
-      } catch (err) {
-        console.error("EHR upload failed", err);
-        setFormError("Document persistence failed.");
-        setUploadProgress(null);
-        setTimeout(() => setFormError(''), 3000);
-      }
-    }, 1000);
-  };
-
-  const handleRemoveAttachment = async (attId: string) => {
-    if (!window.confirm("Are you sure you want to delete this document from patient records?")) return;
-    try {
-      const res = await fetch(`/api/patients/${activePatient.id}/attachments/${attId}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        setPatients(prev => prev.map(p => {
-          if (p.id === activePatient.id) {
-            return {
-              ...p,
-              attachments: p.attachments.filter((a: any) => a.id !== attId)
-            };
-          }
-          return p;
-        }));
-      }
-    } catch (err) {
-      console.error("Failed to delete attachment", err);
-    }
-  };
-
   const handleDeletePrescription = async (rxId: string) => {
     if (!window.confirm("Are you sure you want to delete this prescription from active outpatient records?")) return;
     try {
@@ -1068,17 +912,6 @@ export default function PatientsSection() {
                 <History className="w-4 h-4" />
                 History
               </button>
-              <button
-                onClick={() => { setActiveTab('upload'); setSuccessMsg(''); }}
-                className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer font-bold ${
-                  activeTab === 'upload'
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-                }`}
-              >
-                <UploadCloud className="w-4 h-4" />
-                Upload Center
-              </button>
             </div>
           </div>
 
@@ -1178,7 +1011,7 @@ export default function PatientsSection() {
             ======================================================== */}
         {activeTab === 'overview' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* Clinical Notes */}
               <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                 <div>
@@ -1230,51 +1063,6 @@ export default function PatientsSection() {
                     )}
                   </div>
                 </div>
-              </div>
-
-              {/* Attachments */}
-              <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
-                <h3 className="font-extrabold text-sm text-neutral-900 border-b border-neutral-100 pb-3 mb-4 flex items-center gap-2">
-                  <FileCheck2 className="w-4.5 h-4.5 text-sky-600" />
-                  EHR Document Scan Index
-                </h3>
-                {(!visibleAttachments || visibleAttachments.length === 0) ? (
-                  <p className="text-xs text-neutral-455 italic text-center py-8">No uploaded clinical lab files attached.</p>
-                ) : (
-                  <div className="space-y-2.5 max-h-[240px] overflow-y-auto pr-1">
-                    {visibleAttachments.map((file: Attachment) => (
-                      <div key={file.id} className="p-3 bg-neutral-50 hover:bg-sky-50/30 border border-neutral-200/80 rounded-xl flex items-center justify-between text-xs animate-fadeIn transition-colors">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-neutral-900 truncate pr-2 text-xs" title={file.name}>{file.name}</p>
-                          <p className="text-[10px] text-neutral-400 mt-0.5 font-mono">{file.size} • Uploaded {file.uploadedAt}</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          <button
-                            onClick={() => handlePreviewAttachment(file)}
-                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-600 rounded-lg transition-colors cursor-pointer"
-                            title="Preview document"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDownloadAttachment(file)}
-                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-600 rounded-lg transition-colors cursor-pointer"
-                            title="Download document"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleRemoveAttachment(file.id)}
-                            className="p-1.5 hover:bg-red-50 text-neutral-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                            title="Delete document"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -2086,203 +1874,6 @@ export default function PatientsSection() {
           </div>
         )}
 
-        {/* ========================================================
-            RENDER TAB 4: EHR DOCUMENT UPLOAD CENTER
-            ======================================================== */}
-        {activeTab === 'upload' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fadeIn">
-            {/* Left Col: Upload Form */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-              <div>
-                <h3 className="font-bold text-sm text-neutral-900">EHR Document Upload Center</h3>
-                <p className="text-xs text-neutral-550 mt-0.5">Attach medical certificates, radiology reports, or lab results directly into the patient's record ledger.</p>
-              </div>
-
-              <form onSubmit={handleDocumentUpload} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest pl-0.5">Document Title</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Hemogram Blood Report May 2026"
-                    value={uploadName}
-                    onChange={(e) => setUploadName(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-sans"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest pl-0.5">Document Type</label>
-                    <select
-                      value={uploadType}
-                      onChange={(e) => setUploadType(e.target.value)}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 cursor-pointer"
-                    >
-                      <option value="pdf">PDF Document</option>
-                      <option value="image">Diagnostic Image (PNG/JPG)</option>
-                      <option value="doc">Word/Text file</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-455 uppercase tracking-widest pl-0.5">Scan File Size</label>
-                    <select
-                      value={uploadSize}
-                      onChange={(e) => setUploadSize(e.target.value)}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 cursor-pointer"
-                    >
-                      <option value="1.2 MB">1.2 MB (Standard)</option>
-                      <option value="2.5 MB">2.5 MB (High Res)</option>
-                      <option value="5.8 MB">5.8 MB (MRI Scan)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Upload Inputs (standard file + mobile camera capture) */}
-                <input
-                  type="file"
-                  id="ehr-file-input"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setUploadName(file.name);
-                      setSelectedFileObj(file);
-                      const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
-                      setUploadSize(`${sizeInMB} MB`);
-                      if (file.type.includes('image')) {
-                        setUploadType('image');
-                      } else if (file.type.includes('pdf')) {
-                        setUploadType('pdf');
-                      } else {
-                        setUploadType('doc');
-                      }
-                    }
-                  }}
-                />
-                <input
-                  type="file"
-                  id="ehr-camera-input"
-                  className="hidden"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setUploadName(file.name || `camera_capture_${Date.now()}.jpg`);
-                      setSelectedFileObj(file);
-                      const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
-                      setUploadSize(`${sizeInMB} MB`);
-                      setUploadType('image');
-                    }
-                  }}
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Select Document File Card */}
-                  <div 
-                    onClick={() => document.getElementById('ehr-file-input')?.click()}
-                    className="border-2 border-dashed border-neutral-200 rounded-2xl p-6 text-center flex flex-col items-center justify-center gap-2 bg-neutral-50 hover:bg-neutral-100/50 transition-colors cursor-pointer"
-                  >
-                    <UploadCloud className="w-8 h-8 text-neutral-450 animate-bounce" />
-                    <div>
-                      <span className="font-bold text-xs text-neutral-800 block">Select Document File</span>
-                      <span className="text-[10px] text-neutral-400 block mt-0.5">Upload PDFs, docs, or images</span>
-                    </div>
-                  </div>
-
-                  {/* Use Phone Camera Card */}
-                  <div 
-                    onClick={() => document.getElementById('ehr-camera-input')?.click()}
-                    className="border-2 border-dashed border-neutral-200 rounded-2xl p-6 text-center flex flex-col items-center justify-center gap-2 bg-neutral-50 hover:bg-neutral-100/50 transition-colors cursor-pointer"
-                  >
-                    <Camera className="w-8 h-8 text-neutral-455 animate-pulse" />
-                    <div>
-                      <span className="font-bold text-xs text-neutral-800 block">Use Phone Camera</span>
-                      <span className="text-[10px] text-neutral-400 block mt-0.5">Capture and upload clinical photo</span>
-                    </div>
-                  </div>
-                </div>
-
-                {uploadProgress !== null && (
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex justify-between text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                      <span>Uploading Scans</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-neutral-900 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    id="btn-upload-document"
-                    className="bg-neutral-900 border border-neutral-800 text-white hover:bg-neutral-800 transition-colors text-xs font-bold px-4 py-2.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
-                  >
-                    <FileCheck2 className="w-4 h-4 text-emerald-400" />
-                    Scan & Upload to Patient EHR
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Right Col: Upload History */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
-              <div>
-                <div>
-                  <h3 className="font-bold text-sm text-neutral-900">Document Upload History</h3>
-                  <p className="text-xs text-neutral-550 mt-0.5">Archive of scanned records, attachments, and files uploaded for this patient.</p>
-                </div>
-                {(!visibleAttachments || visibleAttachments.length === 0) ? (
-                  <p className="text-xs text-neutral-455 italic text-center py-12">No uploaded clinical files in history.</p>
-                ) : (
-                  <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 mt-4">
-                    {visibleAttachments.map((file: Attachment) => (
-                      <div key={file.id} className="p-3 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/50 rounded-xl flex items-center justify-between text-xs animate-fadeIn">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-neutral-900 truncate pr-2" title={file.name}>{file.name}</p>
-                          <p className="text-[10px] text-neutral-400 mt-0.5 font-mono">{file.size} • Uploaded {file.uploadedAt}</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          <button
-                            type="button"
-                            onClick={() => handlePreviewAttachment(file)}
-                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-600 rounded-md transition-colors cursor-pointer"
-                            title="Preview document"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadAttachment(file)}
-                            className="p-1.5 hover:bg-sky-50 text-neutral-400 hover:text-sky-655 rounded-md transition-colors cursor-pointer"
-                            title="Download document"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => handleRemoveAttachment(file.id)}
-                            className="p-1.5 hover:bg-red-50 text-neutral-400 hover:text-red-650 rounded-md transition-colors cursor-pointer"
-                            title="Delete document"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="pt-3 border-t border-neutral-100 text-[10px] text-neutral-400 font-sans">
-                PenangHealth Clinical File Vault
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
 
       {/* Modify Patient Details Modal */}
@@ -2430,70 +2021,6 @@ export default function PatientsSection() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* EHR Document Preview Modal */}
-      {previewFile && (
-        <div className="fixed inset-0 bg-neutral-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fadeIn font-sans">
-          <div className="bg-white border border-neutral-200 rounded-3xl w-full max-w-xl shadow-2xl p-6 flex flex-col gap-4 text-neutral-800">
-            <div className="flex justify-between items-start border-b border-neutral-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="bg-sky-50 p-2 rounded-lg text-sky-600">
-                  <FileCheck2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-neutral-900">EHR Document Preview</h3>
-                  <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{previewFile.id} • {previewFile.size} • Uploaded {previewFile.uploadedAt}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setPreviewFile(null)}
-                className="p-1 px-2.5 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors cursor-pointer text-xs font-bold text-neutral-600"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="bg-neutral-950 text-emerald-450 p-4 rounded-xl font-mono text-xs overflow-y-auto max-h-[300px] leading-relaxed border border-neutral-800 shadow-inner">
-              <p className="text-neutral-500">// PENANGHEALTH SECURE EHR RECORD PARSER</p>
-              <p className="text-neutral-500">// PATIENT IDENTIFIER: {activePatient.email}</p>
-              <p className="text-neutral-500">// TIMESTAMP: {previewFile.uploadedAt} 08:30:00 UTC</p>
-              <p className="mt-2 text-white font-bold">DOCUMENT NAME: {previewFile.name}</p>
-              <p className="text-sky-400">FILE_TYPE: {previewFile.type.toUpperCase()}</p>
-              <p className="text-sky-400">FILE_SIZE: {previewFile.size}</p>
-              <p className="mt-3 text-neutral-500 border-t border-neutral-800 pt-2 font-semibold">// OCR INGESTION RAW TEXT STREAM:</p>
-              <p className="mt-1 text-emerald-500">
-                [OCR SUCCESS] Ingestion complete. Target file scanned. Found matching patient demographic data. 
-                Name check: "{activePatient.name}" MATCHED.
-              </p>
-              <p className="mt-2 text-neutral-300">
-                --- CLINICAL SUMMARY SCAN DATA ---
-                <br />Patient: {activePatient.name} (DOB: {activePatient.dob})
-                <br />Blood Type: {activePatient.bloodType || "O positive"}
-                <br />Allergies: {(activePatient.allergies || []).join(", ") || "No known drug allergies"}
-                <br />Chronic Conditions: {(activePatient.history || []).join(", ") || "General health tracking"}
-                <br />
-                <br />Physician Notes: Record synced with PenangHealth clinical ledger. All indicators within parameters.
-                <br />----------------------------------
-              </p>
-              <p className="mt-3 text-[10px] text-neutral-500">// END OF FILE DECRYPT STREAM</p>
-            </div>
-
-            <div className="flex justify-between items-center pt-2 border-t border-neutral-150">
-              <span className="text-[10px] text-neutral-405 font-mono">MD5 Hash: 4e9a3b8c7d6e5f0a2b9c</span>
-              <button
-                onClick={() => {
-                  handleDownloadAttachment(previewFile);
-                  setPreviewFile(null);
-                }}
-                className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition-all inline-flex items-center gap-1 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download Original
-              </button>
-            </div>
           </div>
         </div>
       )}

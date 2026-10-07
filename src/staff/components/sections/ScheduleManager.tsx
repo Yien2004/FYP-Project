@@ -7,8 +7,7 @@ import {
   Check, 
   AlertCircle, 
   Save, 
-  CalendarRange,
-  Stethoscope
+  CalendarRange
 } from 'lucide-react';
 
 interface Shift {
@@ -21,28 +20,16 @@ interface Shifts {
   [day: string]: Shift;
 }
 
-export interface DoctorMCRecord {
-  id: string;
-  doctorName: string;
-  startDate: string;
-  endDate: string;
-  leaveType: 'Medical Certificate (MC)' | 'Emergency Medical Leave' | 'Annual Leave';
-  reason: string;
-}
-
-const defaultDoctorsList = [
-  "Dr. Ainol Shareha Binti Sahar",
-  "Dr. Simon Lo",
-  "Dr. Sarah Mitchell",
-  "Dr. Tan Wei Ming",
-  "Dr. Siti Aminah",
-  "Dr. Lim Mei Ling",
-  "Dr. Ahmad Faiz"
-];
-
 interface ScheduleManagerProps {
   doctorName: string;
 }
+
+const timeSlotOptions = [
+  "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
+  "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM",
+  "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM",
+  "05:00 PM", "05:30 PM", "06:00 PM", "07:00 PM", "08:00 PM"
+];
 
 export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   const [shifts, setShifts] = useState<Shifts>({
@@ -63,32 +50,6 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
-  // Doctor MC List - clear out mock records so it starts empty and persists real entries
-  const [doctorMCList, setDoctorMCList] = useState<DoctorMCRecord[]>(() => {
-    const saved = localStorage.getItem("lifelink_doctor_mc_records");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Exclude any previous mock records (mc-1, mc-2, or Simon Lo / Sarah Mitchell mock records)
-          return parsed.filter((r: any) => 
-            r.id !== "mc-1" && 
-            r.id !== "mc-2" && 
-            !(r.doctorName === "Dr. Simon Lo" && r.reason?.includes("Acute Bronchitis")) &&
-            !(r.doctorName === "Dr. Sarah Mitchell" && r.reason?.includes("Family emergency"))
-          );
-        }
-      } catch (e) {}
-    }
-    return [];
-  });
-
-  const [mcDoctor, setMcDoctor] = useState(doctorName || defaultDoctorsList[0]);
-  const [mcStartDate, setMcStartDate] = useState("");
-  const [mcEndDate, setMcEndDate] = useState("");
-  const [mcType, setMcType] = useState<'Medical Certificate (MC)' | 'Emergency Medical Leave' | 'Annual Leave'>('Medical Certificate (MC)');
-  const [mcReason, setMcReason] = useState("");
 
   // Load schedule from server
   useEffect(() => {
@@ -135,47 +96,6 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
       });
   };
 
-  const handleAddDoctorMC = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mcDoctor || !mcStartDate) return;
-    const newRecord: DoctorMCRecord = {
-      id: "mc-" + Date.now(),
-      doctorName: mcDoctor,
-      startDate: mcStartDate,
-      endDate: mcEndDate || mcStartDate,
-      leaveType: mcType,
-      reason: mcReason.trim() || "Attending physician medical leave"
-    };
-    const updated = [newRecord, ...doctorMCList];
-    setDoctorMCList(updated);
-    localStorage.setItem("lifelink_doctor_mc_records", JSON.stringify(updated));
-
-    // Calculate dates between start and end date to block out
-    const datesToAdd: string[] = [];
-    const start = new Date(mcStartDate);
-    const end = new Date(mcEndDate || mcStartDate);
-    for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
-      const yyyy = dt.getFullYear();
-      const mm = String(dt.getMonth() + 1).padStart(2, '0');
-      const dd = String(dt.getDate()).padStart(2, '0');
-      datesToAdd.push(`${yyyy}-${mm}-${dd}`);
-    }
-
-    const updatedBlocked = Array.from(new Set([...blockedDates, ...datesToAdd])).sort();
-    setBlockedDates(updatedBlocked);
-    persistBlockedDates(updatedBlocked);
-
-    setMcStartDate("");
-    setMcEndDate("");
-    setMcReason("");
-  };
-
-  const handleRemoveDoctorMC = (id: string) => {
-    const updated = doctorMCList.filter(m => m.id !== id);
-    setDoctorMCList(updated);
-    localStorage.setItem("lifelink_doctor_mc_records", JSON.stringify(updated));
-  };
-
   const handleAddLeave = () => {
     if (!newLeaveDate) return;
     if (blockedDates.includes(newLeaveDate)) {
@@ -193,6 +113,26 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
     const updated = blockedDates.filter(d => d !== date);
     setBlockedDates(updated);
     persistBlockedDates(updated);
+  };
+
+  const handleToggleDay = (day: string) => {
+    setShifts(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled
+      }
+    }));
+  };
+
+  const handleTimeChange = (day: string, field: 'start' | 'end', value: string) => {
+    setShifts(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value
+      }
+    }));
   };
 
   const handleSaveAll = () => {
@@ -236,6 +176,8 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
     );
   }
 
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
   return (
     <div className="space-y-6 font-sans text-neutral-800">
       
@@ -243,7 +185,7 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Duty &amp; Schedule Management</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Manage doctor medical leaves (MC) and calendar holiday leave blocks.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Configure weekly consultation shifts and calendar holiday leave blocks.</p>
         </div>
       </div>
 
@@ -263,139 +205,81 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Column (7 cols): Doctor MC & Medical Leave Tracker */}
+        {/* Left Column (7 cols): Weekly Duty Shifts & Operating Hours */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
               <div>
                 <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                  <Stethoscope className="w-4 h-4 text-sky-600" />
-                  Doctor MC &amp; Leave Tracker
+                  <Clock className="w-4 h-4 text-sky-600" />
+                  Weekly Consultation Shifts
                 </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">Record doctor medical certificates (MC) and block out shift consultation availability.</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Set attending physician consultation hours for each day of the week.</p>
               </div>
-              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full self-start font-mono">
-                {doctorMCList.length} Active Records
-              </span>
             </div>
 
-            {/* Form to submit a new Doctor MC */}
-            <form onSubmit={handleAddDoctorMC} className="bg-slate-50 border border-slate-200/70 p-4 rounded-xl space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select Attending Doctor</label>
-                  <select
-                    value={mcDoctor}
-                    onChange={(e) => setMcDoctor(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 h-9 cursor-pointer"
+            {/* List of Days & Shifts */}
+            <div className="space-y-3">
+              {daysOfWeek.map((day) => {
+                const shift = shifts[day] || { start: "09:00 AM", end: "05:00 PM", enabled: false };
+                return (
+                  <div 
+                    key={day} 
+                    className={`p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      shift.enabled 
+                        ? 'bg-slate-50/70 border-slate-200' 
+                        : 'bg-slate-100/40 border-slate-200/60 opacity-60'
+                    }`}
                   >
-                    {defaultDoctorsList.map((doc) => (
-                      <option key={doc} value={doc}>{doc}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Leave Category</label>
-                  <select
-                    value={mcType}
-                    onChange={(e: any) => setMcType(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 h-9 cursor-pointer"
-                  >
-                    <option value="Medical Certificate (MC)">Medical Certificate (MC)</option>
-                    <option value="Emergency Medical Leave">Emergency Medical Leave</option>
-                    <option value="Annual Leave">Annual Leave</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    min="2026-06-13"
-                    value={mcStartDate}
-                    onChange={(e) => setMcStartDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:border-sky-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">End Date (Optional)</label>
-                  <input
-                    type="date"
-                    min={mcStartDate || "2026-06-13"}
-                    value={mcEndDate}
-                    onChange={(e) => setMcEndDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono h-9 outline-none focus:border-sky-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-                <input
-                  type="text"
-                  value={mcReason}
-                  onChange={(e) => setMcReason(e.target.value)}
-                  placeholder="Reason or diagnosis note (e.g. Acute Gastritis, High Fever)..."
-                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-sky-500 h-9"
-                />
-                <button
-                  type="submit"
-                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs cursor-pointer active:scale-98 shrink-0 flex items-center justify-center gap-1.5 h-9"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Record MC &amp; Block Duty</span>
-                </button>
-              </div>
-            </form>
-
-            {/* List of recorded Doctor MCs */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Active Doctor MC Registry</h4>
-              {doctorMCList.length === 0 ? (
-                <p className="text-xs text-slate-400 italic text-center py-6 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
-                  No doctor MCs currently recorded. Use the form above to log a medical certificate or leave.
-                </p>
-              ) : (
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                  {doctorMCList.map((rec) => (
-                    <div key={rec.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-slate-900 text-xs">{rec.doctorName}</span>
-                          <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full border ${
-                            rec.leaveType === 'Medical Certificate (MC)'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : rec.leaveType === 'Emergency Medical Leave'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}>
-                            {rec.leaveType}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
-                          <span className="font-mono font-bold text-slate-700">
-                            {rec.startDate} {rec.endDate && rec.endDate !== rec.startDate ? `to ${rec.endDate}` : ''}
-                          </span>
-                          <span>•</span>
-                          <span className="truncate italic">{rec.reason}</span>
-                        </div>
-                      </div>
-
+                    <div className="flex items-center gap-3 min-w-[120px]">
                       <button
-                        onClick={() => handleRemoveDoctorMC(rec.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
-                        title="Dismiss MC Record"
+                        type="button"
+                        onClick={() => handleToggleDay(day)}
+                        className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                          shift.enabled ? 'bg-sky-600' : 'bg-slate-300'
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <span 
+                          className={`w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 transition-transform ${
+                            shift.enabled ? 'left-5' : 'left-0.5'
+                          }`}
+                        />
                       </button>
+                      <span className={`text-xs font-bold ${shift.enabled ? 'text-slate-900' : 'text-slate-400'}`}>
+                        {day}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    {shift.enabled ? (
+                      <div className="flex items-center gap-2 text-xs">
+                        <select
+                          value={shift.start}
+                          onChange={(e) => handleTimeChange(day, 'start', e.target.value)}
+                          className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500"
+                        >
+                          {timeSlotOptions.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <span className="text-slate-400 text-xs font-bold">to</span>
+                        <select
+                          value={shift.end}
+                          onChange={(e) => handleTimeChange(day, 'end', e.target.value)}
+                          className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500"
+                        >
+                          {timeSlotOptions.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Off Duty / Closed
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -467,7 +351,7 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Save</span>
+                <span>Save Shifts &amp; Blocks</span>
               </button>
             </div>
           </div>

@@ -15,9 +15,7 @@ import {
   User,
   HeartHandshake,
   Pill,
-  X,
-  Database,
-  Download
+  X
 } from "lucide-react";
 import { PatientProfile, Appointment, VitalSign } from "../types";
 
@@ -442,77 +440,12 @@ export default function Dashboard({
     ].join(":");
   };
 
-  // Last completed appointment for Medical Certificate (MC) Module
-  const lastCompleted = useMemo(() => {
-    return appointments.find(a => a.status === "Completed") || null;
-  }, [appointments]);
-
-  // Compute MC End Date
-  const mcEndDateStr = useMemo(() => {
-    if (!lastCompleted) return "";
-    const parts = lastCompleted.date.split("-");
-    if (parts.length !== 3) return "";
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    const dateObj = new Date(year, month, day);
-    dateObj.setDate(dateObj.getDate() + 1); // 2 Days rest total (Day A and Day A+1)
-    return dateObj.toISOString().split("T")[0];
-  }, [lastCompleted]);
-
   const handleCancelClick = (id: string) => {
     if (window.confirm("Are you sure you want to cancel this appointment?")) {
       if (onCancelAppointment) {
         onCancelAppointment(id);
       }
     }
-  };
-
-  // ── EHR Export & Attachments States ──
-  const [selectedVisitId, setSelectedVisitId] = useState("");
-  const [previewFile, setPreviewFile] = useState<any | null>(null);
-
-  const completedAppointments = useMemo(() => {
-    return appointments.filter(apt => apt.status === "Completed");
-  }, [appointments]);
-
-  useEffect(() => {
-    if (completedAppointments.length > 0 && !selectedVisitId) {
-      setSelectedVisitId(completedAppointments[0].id);
-    }
-  }, [completedAppointments, selectedVisitId]);
-
-  const handleExportSingleVisit = () => {
-    const apt = appointments.find(a => a.id === selectedVisitId);
-    if (!apt) return;
-    const matchingVitals = vitals.filter(v => v.timestamp.substring(0, 10) === apt.date);
-    
-    const reportData = {
-      patientEmail: patientProfile.email,
-      patientName: patientProfile.fullName,
-      visitDetails: {
-        id: apt.id,
-        doctorName: apt.doctorName,
-        specialty: apt.specialty,
-        date: apt.date,
-        timeSlot: apt.timeSlot,
-        clinic: apt.clinic || apt.doctorName,
-        symptoms: apt.symptoms,
-        clinicalNotes: apt.clinicalNotes || "No clinical notes entered.",
-        prescription: apt.prescription || "No prescriptions on this visit."
-      },
-      matchingVitals: matchingVitals,
-      exportTimestamp: new Date().toISOString()
-    };
-
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `PenangHealth_Report_${apt.date}_${apt.id}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    alert("SUCCESS: Clinic visit report exported!");
   };
 
   const handleDownloadPrescription = (apt: Appointment) => {
@@ -526,58 +459,6 @@ export default function Dashboard({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadMC = (apt: Appointment) => {
-    const contents = `PenangHealth Digital Medical Certificate (MC)\n=======================================================\nDate of Issue: ${apt.date}\nAttending Physician: ${apt.doctorName}\nClinic/Facility: ${apt.clinic || apt.doctorName}\nPatient: ${patientProfile.fullName}\nMyKad/Passport: ${patientProfile.myKadOrPassport}\n\nThis certifies that the patient was evaluated and is unfit for duty for a period of 1 day(s) starting on ${apt.date}.\n\nVerification Code: REG-PH-${(apt.doctorId || "DOC").toUpperCase().slice(0, 5)}\n=======================================================\nPenangHealth Verified Digital MC`;
-    const blob = new Blob([contents], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `MC_${apt.clinic?.replace(/[^a-zA-Z0-9]/g, "_") || "Clinic"}_${apt.date}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
-      profile: patientProfile,
-      vitalsIndex: vitals,
-      appointmentsHistory: appointments,
-      backupTimestamp: new Date().toISOString()
-    }, null, 2));
-    
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `PenangHealth_Health_Record_${patientProfile.myKadOrPassport || "EHR"}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    alert("SUCCESS: Secure database profile exported! Check your Downloads folder.");
-  };
-
-  const handleDownloadAttachment = (file: any) => {
-    if (file.data && file.data.startsWith('data:')) {
-      const link = document.createElement('a');
-      link.href = file.data;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      const contents = `PenangHealth Records System\n=======================================\nDocument: ${file.name}\nSize: ${file.size}\nUploaded: ${file.uploadedAt || "June 15, 2026"}\nPatient Name: ${patientProfile.fullName}\nPatient DOB: ${patientProfile.dateOfBirth}\nGender: ${patientProfile.gender}\nEmail: ${patientProfile.email}\n---------------------------------------\nOfficial Clinical Document Export • Penang Private Healthcare Network\n`;
-      const blob = new Blob([contents], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.name.includes('.') ? file.name : `${file.name}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
   };
 
   return (
@@ -606,20 +487,19 @@ export default function Dashboard({
             <div className="flex flex-wrap items-center gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => onSetScreen("fetching-transit")}
+                onClick={() => onSetScreen("clinic-search")}
                 className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer active:scale-95"
               >
-                <span>🚗</span>
-                <span>Book Grab Ride (Simulation)</span>
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Nearby Clinics & Hospitals</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleTriggerAiReminder(nextUpcoming.id)}
-                disabled={isSendingReminder}
-                className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs px-3.5 py-1.5 rounded-xl transition border border-slate-200 cursor-pointer disabled:opacity-50 active:scale-95 shadow-xs"
+                onClick={() => onSetScreen("ai-consultation")}
+                className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs px-3.5 py-1.5 rounded-xl transition border border-slate-200 cursor-pointer active:scale-95 shadow-xs"
               >
                 <span>🤖</span>
-                <span>{isSendingReminder ? "Sending AI Reminder..." : "Test AI 24h Reminder"}</span>
+                <span>Consult Health Assistant</span>
               </button>
             </div>
           )}
@@ -628,38 +508,6 @@ export default function Dashboard({
           <HeartHandshake className="w-48 h-48 text-sky-500" />
         </div>
       </div>
-
-      {/* Grab Fetching Ride Panel */}
-      {nextUpcoming && nextUpcoming.requestRide && (
-        <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-md shadow-blue-600/5 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-l-4 border-l-blue-600">
-          <div className="flex items-center gap-4.5">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 text-xl animate-pulse">
-              🚗
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-extrabold uppercase tracking-widest text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full inline-block">
-                Grab Outpatient Transit Service
-              </span>
-              <h3 className="text-sm font-extrabold text-slate-800">
-                Driver is on the way to pick you up
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Driver <span className="font-bold text-slate-700">Danish</span> (Proton Saga Grey - <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] font-bold">WEE 2026</span>) is arriving. Destination strictly locked to <span className="font-bold text-blue-700">{nextUpcoming.clinic}</span>.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col items-end shrink-0 w-full md:w-auto">
-            <div className="text-right space-y-0.5">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Estimated Arrival</span>
-              <span className="text-2xl font-black text-blue-700 tracking-tight block">{getClinicTravelTime(nextUpcoming.clinic)} Mins</span>
-            </div>
-            {/* Simple Transit Progress Bar */}
-            <div className="w-full md:w-48 bg-slate-100 h-2 rounded-full mt-2.5 overflow-hidden relative">
-              <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '65%' }}></div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
@@ -1022,127 +870,6 @@ export default function Dashboard({
               </div>
             )}
           </div>
-
-          {/* Verified Digital MC Module */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <ShieldCheck className="w-5 h-5 text-blue-600" />
-              <span className="font-extrabold text-sm tracking-tight">Verified Digital MC</span>
-            </div>
-
-            {lastCompleted ? (
-              <div className="space-y-4">
-                {/* MC Clinic Header */}
-                <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl">
-                  <span className="font-black text-slate-900 text-xs block leading-tight">{lastCompleted.clinic}</span>
-                  <span className="text-[9px] text-blue-700 font-mono block mt-1 font-bold">
-                    MOH CODE: REG-MOH-{(lastCompleted.doctorId || "DOC").toUpperCase().slice(0, 5)}
-                  </span>
-                </div>
-
-                {/* MC Leave Duration */}
-                <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl space-y-1.5">
-                  <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Leave Authorization</span>
-                  <span className="text-sm font-black text-rose-600 block">2 Days Medical Rest</span>
-                  <div className="flex justify-between text-[10px] text-slate-500 font-mono pt-1">
-                    <div>
-                      <span className="block text-[8px] uppercase text-slate-400">Start Date</span>
-                      <strong>{lastCompleted.date}</strong>
-                    </div>
-                    <div>
-                      <span className="block text-[8px] uppercase text-slate-400">End Date</span>
-                      <strong>{mcEndDateStr}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Download MC PDF File block */}
-                <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-center justify-between gap-3.5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center border border-rose-100 shrink-0">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Medical Certificate (PDF)</span>
-                      <p className="text-xs font-bold text-slate-800 truncate font-mono mt-0.5">
-                        MC_{lastCompleted.clinic.replace(/[^a-zA-Z0-9]/g, "_")}_{lastCompleted.id.replace("apt-", "")}.pdf
-                      </p>
-                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[8px] px-1.5 py-0.5 rounded font-extrabold block w-fit mt-1 uppercase tracking-wider font-mono">
-                        Verified & Signed
-                      </span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => handleDownloadMC(lastCompleted)}
-                    className="bg-slate-950 hover:bg-slate-800 text-white font-bold text-[10px] uppercase tracking-wider p-2 px-3.5 rounded-xl transition shrink-0 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <FileDown className="w-3.5 h-3.5" /> Download
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-center space-y-2 text-xs">
-                <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">No MC Available</span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  Digital MC logs are automatically registered once a doctor files a completed outpatient consultation.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* My Scans & Clinical Documents (EHR Document Scan Index) */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span className="font-extrabold text-sm tracking-tight">EHR Scans & Clinical Documents</span>
-            </div>
-
-            {(!patientProfile.attachments || patientProfile.attachments.length === 0) ? (
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-center space-y-2 text-xs">
-                <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">No Uploaded Files</span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  No clinical documents or scan files have been uploaded by facility staff.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {patientProfile.attachments.map((file: any) => (
-                  <div key={file.id} className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-center justify-between gap-3.5 hover:border-blue-500 hover:bg-blue-50/10 transition-all duration-150">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-blue-50 text-blue-700 rounded-xl flex items-center justify-center border border-blue-100 shrink-0">
-                        <FileText className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">{file.type?.toUpperCase() || "DOCUMENT"}</span>
-                        <p className="text-xs font-bold text-slate-800 truncate font-mono mt-0.5">
-                          {file.name}
-                        </p>
-                        <p className="text-[9px] text-slate-400 mt-0.5 font-mono">
-                          Size: {file.size} • Uploaded: {file.uploadedAt}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <button
-                        onClick={() => setPreviewFile(file)}
-                        className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
-                      >
-                        Preview
-                      </button>
-                      <button
-                        onClick={() => handleDownloadAttachment(file)}
-                        className="text-[10px] font-bold text-white bg-slate-950 hover:bg-slate-850 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
-                      >
-                        Download
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
         </div>
 
         {/* Right Column: Health Passport Box & Digital Medical Certificate (MC) Module */}
@@ -1249,63 +976,6 @@ export default function Dashboard({
               >
                 View All & Traffic Details ({waitTimeFacilities.length})
               </button>
-            </div>
-          </div>
-
-
-          {/* 6. SECURE EHR DATA MANAGEMENT */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <Database className="w-5 h-5 text-sky-600" />
-              <span className="font-extrabold text-sm tracking-tight">Personal EHR & Visit Records</span>
-            </div>
-
-            <p className="text-slate-500 leading-relaxed text-[11px]">
-              You can download your clinical visit summaries, consultation notes, and full personal health records for your own records or when consulting external specialists.
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
-                  Select Clinical Visit Report
-                </label>
-                {completedAppointments.length > 0 ? (
-                  <select
-                    value={selectedVisitId}
-                    onChange={(e) => setSelectedVisitId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    {completedAppointments.map((apt) => (
-                      <option key={apt.id} value={apt.id}>
-                        {apt.date} - {apt.clinic || apt.doctorName} ({apt.specialty})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center text-xs text-slate-400">
-                    No completed clinic visits on record.
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2 pt-1">
-                {completedAppointments.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleExportSingleVisit}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white text-[10px] uppercase tracking-wider font-extrabold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Export Selected Report
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleExportJSON}
-                  className="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] uppercase tracking-wider font-extrabold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Database className="w-3.5 h-3.5 text-blue-600" /> Export Full Medical Ledger
-                </button>
-              </div>
             </div>
           </div>
 
@@ -1435,90 +1105,6 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* EHR Document Preview Modal */}
-      {previewFile && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fadeIn font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl shadow-2xl p-6 flex flex-col gap-4 text-slate-800">
-            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="bg-teal-50 p-2 rounded-lg text-teal-600">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">EHR Document Preview</h3>
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">{previewFile.id} • {previewFile.size} • Uploaded {previewFile.uploadedAt}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setPreviewFile(null)}
-                className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer text-xs font-bold text-slate-600"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 text-xs text-slate-700 space-y-4 max-h-[350px] overflow-y-auto leading-relaxed shadow-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-teal-700 block">
-                    Penang Healthcare Network • Electronic Medical Record
-                  </span>
-                  <h4 className="font-extrabold text-sm text-slate-900 mt-0.5">{previewFile.name}</h4>
-                </div>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono">
-                  Verified Report
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-[11px] bg-white border border-slate-200 p-3.5 rounded-xl">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Patient Name</span>
-                  <span className="font-bold text-slate-800">{patientProfile.fullName}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Date of Birth</span>
-                  <span className="font-bold text-slate-800 font-mono">{patientProfile.dateOfBirth || "1994-08-22"}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Blood Group</span>
-                  <span className="font-bold text-slate-800">{patientProfile.bloodType || "O+"}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Uploaded Date</span>
-                  <span className="font-bold text-slate-800 font-mono">{previewFile.uploadedAt || "2026-06-15"}</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 pt-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
-                  Clinical Examination & Findings
-                </span>
-                <p className="text-slate-600 bg-white border border-slate-200 p-3.5 rounded-xl text-xs leading-relaxed">
-                  Patient presented for outpatient health checkup and clinical evaluation. Vital signs baseline parameters fall within standard operational limits. No acute cardiopulmonary decompensation observed. Blood pressure and oxygen saturation recorded in active range. Diagnostic imaging and laboratory analyses completed with full compliance.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>Attending Specialist: <strong>Dr. Sarah Jenkins (Consultant)</strong></span>
-                <span className="text-sky-700 font-bold">PenangHealth Network</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-2 border-t border-slate-150">
-              <span className="text-[10px] text-slate-400 font-mono">Ref: PH-DOC-{previewFile.id || "001"}</span>
-              <button
-                onClick={() => {
-                  handleDownloadAttachment(previewFile);
-                  setPreviewFile(null);
-                }}
-                className="bg-slate-950 hover:bg-slate-800 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 px-3.5 rounded-xl transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" /> Download Document
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

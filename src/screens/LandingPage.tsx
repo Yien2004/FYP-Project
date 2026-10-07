@@ -10,8 +10,7 @@ import {
   Award, 
   Users, 
   Activity, 
-  Calendar, 
-  Car, 
+  Calendar,
   FileText, 
   CheckCircle2, 
   Sparkles, 
@@ -47,25 +46,25 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
       highlight: "Reduces lobby waiting by 42%"
     },
     {
-      icon: <Car className="w-6 h-6 text-emerald-600" />,
-      tag: "Transit Dispatch",
-      title: "Doorstep Grab Transit Integration",
-      desc: "One-click Grab ride dispatch synchronized with your appointment time slot. Destinations are automatically locked to your specific outpatient clinic lobby.",
-      highlight: "Synchronized to appointment arrival"
+      icon: <MapPin className="w-6 h-6 text-emerald-600" />,
+      tag: "Facility Finder",
+      title: "Nearby Hospital & Clinic Discovery",
+      desc: "Instantly locate nearby hospitals and clinics based on your current location or selected region, view available healthcare services, and check real-time queue delays.",
+      highlight: "Proximity-based GPS matching"
     },
     {
       icon: <Bot className="w-6 h-6 text-indigo-600" />,
       tag: "Intelligent Triage",
       title: "Health Assistant Pre-Consultation",
-      desc: "Audit symptoms prior to your visit. The Health Assistant prepares structured notes and vital summaries for your attending specialist.",
-      highlight: "Clinical summary transmitted to doctor"
+      desc: "Audit symptoms prior to your visit. The Health Assistant analyzes reported concerns, recommends suitable healthcare services, and identifies nearby hospital facilities.",
+      highlight: "AI-assisted clinical guidance"
     },
     {
-      icon: <FileText className="w-6 h-6 text-sky-600" />,
-      tag: "MOH Verified",
-      title: "Unified EMR & Digital MC Ledger",
-      desc: "Access digital medical certificates (MC) with MOH registry codes, digital prescriptions, and cross-facility historical consultation archives.",
-      highlight: "Cross-facility record sharing"
+      icon: <Calendar className="w-6 h-6 text-sky-600" />,
+      tag: "Online Booking",
+      title: "Seamless Appointment Scheduling",
+      desc: "Select preferred specialist physicians, schedule available time slots, and monitor real-time queue numbers and estimated wait times.",
+      highlight: "Real-time slot reservation"
     }
   ];
 
@@ -177,7 +176,7 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
               </div>
               <div className="flex items-center gap-2.5 text-xs text-slate-700 font-semibold">
                 <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>MOH-verified digital MC & prescription ledger</span>
+                <span>Real-time appointment scheduling &amp; live queue tracker</span>
               </div>
             </div>
 
@@ -439,7 +438,7 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
             <ul className="space-y-2.5 text-xs text-slate-600">
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>Ministry of Health (MOH) Digital MC Standards</span>
+                <span>Ministry of Health (MOH) Healthcare Quality Standards</span>
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>

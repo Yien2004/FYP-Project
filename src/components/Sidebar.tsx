@@ -8,9 +8,6 @@ import {
   LogOut, 
   Home, 
   MessageSquare, 
-  TrendingUp, 
-  Car, 
-  Watch, 
   Activity 
 } from "lucide-react";
 import { AppNotification, PatientProfile } from "../types";
@@ -27,30 +24,24 @@ interface SidebarProps {
 const translations: Record<string, Record<string, string>> = {
   "English": {
     "Home": "Home",
-    "Health Analytics": "Health Analytics",
     "Book Appointment": "Book Appointment",
-    "AI Consultation": "AI Consultation",
+    "AI Consultation": "Health Assistant",
     "My Appointments": "My Appointments",
-    "Clinic Locator": "Clinic Locator",
-    "Fetching Transit": "Fetching Transit",
+    "Clinic Locator": "Clinic & Hospital Finder",
     "Messages": "Messages",
     "Profile": "Profile",
     "Sign Out": "Sign Out",
-    "Emergency": "Emergency",
     "Patient": "Patient"
   },
   "Bahasa Malaysia": {
     "Home": "Utama",
-    "Health Analytics": "Analisis Kesihatan",
     "Book Appointment": "Tempah Temujanji",
-    "AI Consultation": "Konsultasi AI",
+    "AI Consultation": "Pembantu Kesihatan",
     "My Appointments": "Temujanji Saya",
-    "Clinic Locator": "Pencari Klinik",
-    "Fetching Transit": "Transit Pengambilan",
+    "Clinic Locator": "Pencari Klinik & Hospital",
     "Messages": "Mesej",
     "Profile": "Profil",
     "Sign Out": "Log Keluar",
-    "Emergency": "Kecemasan",
     "Patient": "Pesakit"
   }
 };
@@ -65,26 +56,23 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
 
   const navSections = [
     {
-      title: "Outpatient Care",
+      title: "Appointments & Facilities",
       items: [
         { id: "dashboard", label: "Home", icon: <Home className="w-4.5 h-4.5" /> },
+        { id: "clinic-search", label: "Clinic & Hospital Finder", icon: <MapPin className="w-4.5 h-4.5" /> },
         { id: "schedule-appointment", label: "Book Appointment", icon: <Calendar className="w-4.5 h-4.5" /> },
-        { id: "clinic-search", label: "Clinic Locator", icon: <MapPin className="w-4.5 h-4.5" /> },
-        { id: "fetching-transit", label: "Ride Booking", icon: <Car className="w-4.5 h-4.5" /> },
-      ]
-    },
-    {
-      title: "Clinical Telemetry & AI",
-      items: [
-        { id: "healthcare-analytics", label: "Health Analytics", icon: <TrendingUp className="w-4.5 h-4.5" /> },
-        { id: "wearable-health", label: "Wearable Monitor", icon: <Watch className="w-4.5 h-4.5" /> },
-        { id: "ai-consultation", label: "AI Consultation", icon: <Bot className="w-4.5 h-4.5" /> },
-      ]
-    },
-    {
-      title: "Records & Account",
-      items: [
         { id: "appointments-history", label: "My Appointments", icon: <FolderHeart className="w-4.5 h-4.5" /> },
+      ]
+    },
+    {
+      title: "AI Symptom Triage",
+      items: [
+        { id: "ai-consultation", label: "Health Assistant", icon: <Bot className="w-4.5 h-4.5" /> },
+      ]
+    },
+    {
+      title: "Account",
+      items: [
         { id: "communication", label: "Messages", icon: <MessageSquare className="w-4.5 h-4.5" />, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined },
         { id: "user-settings", label: "Profile", icon: <Sliders className="w-4.5 h-4.5" /> },
       ]

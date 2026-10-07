@@ -15,15 +15,11 @@ export default function Header({ currentScreen, onNavigateHome, notifications, o
 
   const screenDisplayNames: Record<string, string> = {
     "dashboard": "Outpatient Dashboard",
-    "healthcare-analytics": "Clinical Health Analytics",
-    "wearable-health": "Wearable Vitals Telemetry",
-    "ai-consultation": "Health Assistant",
-    "medical-records": "Electronic Medical Records (EMR)",
-    "communication": "Direct Clinical Messages",
-    "schedule-appointment": "Schedule Specialist Consultation",
-    "appointments-history": "Consultation History & Past Visits",
     "clinic-search": "Penang Clinic & Hospital Finder",
-    "fetching-transit": "Clinic & Hospital Ride Booking",
+    "schedule-appointment": "Schedule Specialist Consultation",
+    "appointments-history": "My Appointments & Visit History",
+    "ai-consultation": "Health Assistant",
+    "communication": "Direct Clinical Messages",
     "patient-registration": "Patient Demographic Verification",
     "notifications": "Notifications & Reminders",
     "user-settings": "Account Security & Preferences"

@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Compass,
   FileText,
+  Calendar,
   AlertTriangle,
   Lock,
   Mail,
@@ -337,20 +338,20 @@ export default function RootLandingPage({
               </div>
             </div>
 
-            {/* Feature 3: Centralized Health Records */}
+            {/* Feature 3: Seamless Appointment Scheduling */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 space-y-3 hover:border-sky-300 transition group">
               <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <FileText className="w-5 h-5 text-sky-600" />
+                <Calendar className="w-5 h-5 text-sky-600" />
               </div>
               <h3 className="text-base font-bold text-slate-900">
-                Centralized Health Records
+                Seamless Appointment Scheduling
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Unified access to historical consultation logs, digital medical certificates (MC), and e-prescriptions with patient-controlled cross-facility synchronisation.
+                Conveniently select healthcare facilities, choose specialist doctors, reserve preferred consultation time slots, and track real-time queue numbers.
               </p>
               <div className="pt-2">
                 <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
-                  Multi-tenant sovereign records
+                  Real-time slot reservation
                 </span>
               </div>
             </div>
