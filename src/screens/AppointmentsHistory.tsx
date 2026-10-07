@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Filter, Calendar, Clock, ChevronRight, RefreshCw, Star, Mail, MapPin } from "lucide-react";
+import { Search, Filter, Calendar, Clock, ChevronRight, RefreshCw, Star, Mail, MapPin, Building2, FileText, Pill, Eye, X } from "lucide-react";
 import { Appointment, Doctor } from "../types";
 import { mockDoctors } from "../mockData";
 
@@ -83,7 +83,7 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                 <div 
                   key={apt.id} 
                   className={`bg-white border rounded-2xl p-5 hover:shadow-md transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-6 ${
-                    selectedApt?.id === apt.id ? 'border-sky-500 ring-1 ring-sky-500/20' : 'border-slate-150'
+                    selectedApt?.id === apt.id ? 'border-sky-500 ring-2 ring-sky-500/20' : 'border-slate-200'
                   }`}
                   onClick={() => setSelectedApt(apt)}
                 >
@@ -96,7 +96,7 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-900 text-sm block">{apt.doctorName}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                           apt.status === 'Upcoming' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                           apt.status === 'Cancelled' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-250'
                         }`}>
@@ -104,8 +104,17 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                         </span>
                       </div>
                       
-                      <div className="text-xs text-slate-500 font-medium">
-                        {apt.specialty} &middot; <span className="font-mono text-slate-400">{apt.type}</span>
+                      <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 flex-wrap">
+                        <span>{apt.specialty}</span>
+                        {apt.clinic && (
+                          <>
+                            <span className="text-slate-300">&middot;</span>
+                            <span className="flex items-center gap-1 text-slate-600 font-medium">
+                              <Building2 className="w-3 h-3 text-slate-400" />
+                              {apt.clinic}
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       <p className="text-xs text-slate-600 line-clamp-1 italic mt-1 font-mono">
@@ -124,7 +133,17 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                       </div>
                     </div>
 
-                    <ChevronRight className="w-5 h-5 text-slate-400 hidden md:block shrink-0" />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedApt(apt);
+                      }}
+                      className="text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Details</span>
+                    </button>
                   </div>
                 </div>
               ))
@@ -141,39 +160,62 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
                 <img 
                   src={selectedApt.doctorImage} 
                   alt={selectedApt.doctorName} 
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-100"
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-100 shrink-0"
                 />
-                <div>
-                  <h4 className="font-extrabold text-slate-900 text-sm leading-snug">{selectedApt.doctorName}</h4>
-                  <span className="text-[10px] text-slate-500 block font-mono">{selectedApt.specialty}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="font-extrabold text-slate-900 text-sm leading-snug truncate">{selectedApt.doctorName}</h4>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border shrink-0 ${
+                      selectedApt.status === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
+                      selectedApt.status === 'Upcoming' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {selectedApt.status}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-sky-700 block font-semibold">{selectedApt.specialty}</span>
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-3 space-y-2.5 text-xs text-slate-700">
+              {/* Consultation metadata */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-[11px] space-y-1 text-slate-600">
+                <div className="flex items-center gap-1.5 font-mono">
+                  <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span>{selectedApt.date} &middot; {selectedApt.timeSlot}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span className="truncate">{selectedApt.clinic || "Penang Healthcare Facility"}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3 space-y-3 text-xs text-slate-700">
                 <div>
                   <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-bold">Reported Symptoms</span>
                   <p className="p-2.5 bg-slate-50 rounded-xl leading-relaxed mt-1 text-slate-600 text-[11px] font-mono">
-                    {selectedApt.symptoms}
+                    "{selectedApt.symptoms}"
                   </p>
                 </div>
 
-                {selectedApt.clinicalNotes && (
-                  <div>
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-bold">Primary Diagnosis</span>
-                    <p className="mt-1 leading-relaxed text-slate-800 text-[11px]">
-                      {selectedApt.clinicalNotes}
-                    </p>
-                  </div>
-                )}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 block font-bold flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-sky-600" />
+                    Doctor Clinical Notes
+                  </span>
+                  <p className="mt-1 leading-relaxed text-slate-800 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    {selectedApt.clinicalNotes || "General outpatient consultation recorded."}
+                  </p>
+                </div>
 
-                {selectedApt.prescription && (
-                  <div className="bg-sky-50/70 border border-sky-100 p-2.5 rounded-xl">
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-sky-700 block font-extrabold">Active Prescription</span>
-                    <p className="mt-1 leading-normal font-semibold text-sky-900 select-all text-[11px] font-mono">
-                      {selectedApt.prescription}
-                    </p>
-                  </div>
-                )}
+                <div className="bg-sky-50/70 border border-sky-100 rounded-2xl p-3 space-y-1">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-sky-800 block font-extrabold flex items-center gap-1.5">
+                    <Pill className="w-3.5 h-3.5 text-sky-600" />
+                    Prescribed Medication
+                  </span>
+                  <p className="mt-1 leading-normal font-semibold text-sky-950 select-all text-[11px] font-mono bg-white p-2.5 rounded-xl border border-sky-100">
+                    {selectedApt.prescription || "No medications prescribed."}
+                  </p>
+                </div>
               </div>
 
               <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
@@ -194,7 +236,7 @@ export default function AppointmentsHistory({ appointments, onResubmitBooking, o
             </div>
           ) : (
             <div className="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-6 text-center text-slate-500 text-xs">
-              Click any consultation on the list to view attending diagnostic writeups and active chemical prescriptions.
+              Click any consultation on the list to view attending diagnostic writeups and active prescriptions.
             </div>
           )}
 

@@ -39,7 +39,7 @@ export default function ReportsSection() {
   const [archiveProfile, setArchiveProfile] = useState<any>(null);
   const [archiveAppointments, setArchiveAppointments] = useState<any[]>([]);
   const [loadingArchive, setLoadingArchive] = useState(false);
-  const [archiveSubView, setArchiveSubView] = useState<'docs' | 'consults' | 'prescriptions'>('docs');
+  const [archiveSubView, setArchiveSubView] = useState<'consults' | 'prescriptions'>('consults');
 
   const fetchArchivePatients = () => {
     fetch("/api/patients")
@@ -193,64 +193,7 @@ export default function ReportsSection() {
     }
   };
 
-  const handleDownloadMC = (apt: any) => {
-    const mcContent = 
-      `PenangHealth System — OFFICIAL MEDICAL CERTIFICATE\n` +
-      `==================================================\n` +
-      `MC Reference ID:   MC-${apt.id}\n` +
-      `Date Issued:       ${apt.date}\n` +
-      `Patient Name:      ${archiveProfile?.fullName || apt.patientName}\n` +
-      `Diagnosis/Reason:  ${apt.clinicalNotes || "Medical Consultation"}\n` +
-      `Attending Doctor:  ${apt.doctorName} (${apt.specialty})\n` +
-      `Facility:          ${apt.clinic || apt.hospital || "Penang General Clinic"}\n` +
-      `Status:            FIT FOR DISCHARGE / WORK LEAVE APPROVED\n` +
-      `==================================================\n` +
-      `This is a computer-generated document verified against HL7 registry.\n`;
 
-    const element = document.createElement("a");
-    const file = new Blob([mcContent], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `mc_${apt.id}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
-
-  const handleDownloadAttachment = (att: any) => {
-    if (att.data && att.data.startsWith('data:')) {
-      const link = document.createElement('a');
-      link.href = att.data;
-      link.download = att.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      const ocrStream = 
-        `PenangHealth SECURE OCR RETRIEVAL REPORT\n` +
-        `==================================================\n` +
-        `File Name:     ${att.name}\n` +
-        `File Size:     ${att.size}\n` +
-        `Uploaded:      ${att.uploadedAt}\n` +
-        `Patient ID:    ${archiveProfile?.email}\n` +
-        `==================================================\n\n` +
-        `Simulated OCR Text Stream Extract:\n` +
-        `----------------------------------\n` +
-        `[OCR Stream Start]\n` +
-        `Patient Name: ${archiveProfile?.fullName}\n` +
-        `MyKad/ID: ${archiveProfile?.myKadOrPassport}\n` +
-        `Lab / Document Type: ${att.type.toUpperCase()}\n` +
-        `Notes: Diagnostic scan verified. Blood markers and radiological plates archived in primary clinical vault.\n` +
-        `[OCR Stream End]\n`;
-
-      const element = document.createElement("a");
-      const file = new Blob([ocrStream], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = `ocr_report_${att.name.replace(/\s+/g, '_')}.txt`;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-    }
-  };
 
   // Toggle clinician availability status
   const handleToggleClinicianStatus = (id: string) => {
@@ -760,12 +703,12 @@ export default function ReportsSection() {
                       {/* Detail tabs navigation */}
                       <div className="bg-neutral-50 border border-neutral-200 p-0.5 rounded-lg flex items-center gap-0.5 text-[10px] font-bold text-neutral-500 shrink-0">
                         <button
-                          onClick={() => setArchiveSubView('docs')}
+                          onClick={() => setArchiveSubView('consults')}
                           className={`flex-1 py-1.5 rounded-md transition-all cursor-pointer ${
-                            archiveSubView === 'docs' ? 'bg-white text-neutral-850 shadow-xs' : 'hover:text-neutral-850'
+                            archiveSubView === 'consults' ? 'bg-white text-neutral-850 shadow-xs' : 'hover:text-neutral-850'
                           }`}
                         >
-                          EHR Document Scans ({archiveProfile.attachments?.length || 0})
+                          Consultation Records ({archiveAppointments.filter(a => a.status === 'Completed').length})
                         </button>
                         <button
                           onClick={() => setArchiveSubView('prescriptions')}
@@ -775,44 +718,11 @@ export default function ReportsSection() {
                         >
                           Prescription Vault ({archiveProfile.prescriptions?.length || 0})
                         </button>
-                        <button
-                          onClick={() => setArchiveSubView('consults')}
-                          className={`flex-1 py-1.5 rounded-md transition-all cursor-pointer ${
-                            archiveSubView === 'consults' ? 'bg-white text-neutral-850 shadow-xs' : 'hover:text-neutral-850'
-                          }`}
-                        >
-                          Consultations & MCs ({archiveAppointments.filter(a => a.status === 'Completed').length})
-                        </button>
                       </div>
 
                       {/* Subview contents */}
                       <div className="pt-2">
-                        {/* 1. EHR Document Scans */}
-                        {archiveSubView === 'docs' && (
-                          <div className="space-y-3">
-                            {!archiveProfile.attachments || archiveProfile.attachments.length === 0 ? (
-                              <p className="text-xs text-neutral-450 font-mono py-4 text-center">No uploaded documents or scans.</p>
-                            ) : (
-                              archiveProfile.attachments.map((att: any) => (
-                                <div key={att.id} className="bg-neutral-50 border border-neutral-150 rounded-xl p-3 flex items-center justify-between gap-4">
-                                  <div className="min-w-0">
-                                    <span className="font-bold text-xs text-neutral-800 block truncate">{att.name}</span>
-                                    <span className="text-[10px] text-neutral-450 block mt-0.5 font-mono font-medium">Size: {att.size} | Uploaded: {att.uploadedAt}</span>
-                                  </div>
-                                  <button
-                                    onClick={() => handleDownloadAttachment(att)}
-                                    className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer shrink-0"
-                                    title="Download File Scan"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-
-                        {/* 2. Prescription Vault */}
+                        {/* 1. Prescription Vault */}
                         {archiveSubView === 'prescriptions' && (
                           <div className="space-y-3">
                             {!archiveProfile.prescriptions || archiveProfile.prescriptions.length === 0 ? (
@@ -836,7 +746,7 @@ export default function ReportsSection() {
                           </div>
                         )}
 
-                        {/* 3. Consultations & MCs */}
+                        {/* 2. Consultations */}
                         {archiveSubView === 'consults' && (
                           <div className="space-y-3">
                             {archiveAppointments.filter(a => a.status === 'Completed').length === 0 ? (
@@ -854,14 +764,12 @@ export default function ReportsSection() {
                                       <span className="text-[9px] uppercase font-bold text-neutral-450 block">Consultation notes</span>
                                       <p className="text-neutral-800 mt-0.5">{apt.clinicalNotes || "Routine checking / outpatient general audit."}</p>
                                     </div>
-                                    <div className="flex justify-end pt-1">
-                                      <button
-                                        onClick={() => handleDownloadMC(apt)}
-                                        className="px-3 py-1 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg font-bold text-[10px] transition cursor-pointer flex items-center gap-1 shadow-sm shadow-black/10"
-                                      >
-                                        <Download className="w-3 h-3" /> Download verified MC
-                                      </button>
-                                    </div>
+                                    {apt.prescription && (
+                                      <div className="bg-sky-50 border border-sky-100 p-2.5 rounded-xl text-[11px] text-sky-900 font-mono">
+                                        <span className="font-bold text-sky-800 uppercase text-[9px] block">Prescription</span>
+                                        {apt.prescription}
+                                      </div>
+                                    )}
                                   </div>
                                 ))
                             )}
@@ -882,7 +790,7 @@ export default function ReportsSection() {
                 <FolderOpen className="w-10 h-10 text-neutral-350 mb-3" />
                 <h4 className="font-bold text-neutral-900 text-sm">Select an Outpatient Account</h4>
                 <p className="text-xs text-neutral-500 mt-1 max-w-xs leading-relaxed">
-                  Choose a patient profile from the left index directory explorer to inspect, view, and safely archive their diagnostic uploads, prescriptions, and digital MC files.
+                  Choose a patient profile from the left index directory explorer to inspect, view, and safely review their consultation records and prescriptions.
                 </p>
               </div>
             )}

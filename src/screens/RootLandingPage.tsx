@@ -33,17 +33,6 @@ export default function RootLandingPage({
 }: RootLandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Private Accredited Facilities Only
-  const partnerFacilities = [
-    { id: "pantai", name: "Pantai Hospital Penang", area: "Bayan Baru", waitTime: "~14 Mins", type: "Private Tertiary Hospital", status: "Normal" },
-    { id: "gleneagles", name: "Gleneagles Hospital Penang", area: "George Town", waitTime: "~16 Mins", type: "Private Specialist Centre", status: "Normal" },
-    { id: "island", name: "Island Hospital", area: "Peel Avenue", waitTime: "~11 Mins", type: "Private Tertiary Centre", status: "Optimal" },
-    { id: "loh", name: "Loh Guan Lye Specialists Centre", area: "Logan Road", waitTime: "~12 Mins", type: "Private Specialist Centre", status: "Optimal" },
-    { id: "lwe", name: "Hospital Lam Wah Ee", area: "Jalan Perak", waitTime: "~15 Mins", type: "Not-for-Profit Private Hospital", status: "Normal" },
-    { id: "kpj", name: "KPJ Penang Specialist Hospital", area: "Bukit Mertajam", waitTime: "~18 Mins", type: "Private Specialist Hospital", status: "Normal" },
-    { id: "bagan", name: "Bagan Specialist Centre", area: "Butterworth", waitTime: "~17 Mins", type: "Private Specialist Centre", status: "Normal" },
-    { id: "mount", name: "Mount Miriam Cancer Hospital", area: "Tanjung Tokong", waitTime: "~13 Mins", type: "Private Oncology Centre", status: "Optimal" },
-  ];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-sky-500 selection:text-white">
@@ -81,9 +70,6 @@ export default function RootLandingPage({
             <a href="#services" className="hover:text-sky-600 transition-colors">
               Services
             </a>
-            <a href="#facilities" className="hover:text-sky-600 transition-colors">
-              Live Wait Times
-            </a>
           </nav>
 
           {/* Action Callouts */}
@@ -120,13 +106,6 @@ export default function RootLandingPage({
               className="px-3 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 rounded-lg"
             >
               Services
-            </a>
-            <a
-              href="#facilities"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 rounded-lg"
-            >
-              Live Wait Times
             </a>
             <button
               onClick={() => { onNavigateLogin("login"); setMobileMenuOpen(false); }}
@@ -356,61 +335,6 @@ export default function RootLandingPage({
               </div>
             </div>
 
-          </div>
-        </div>
-      </section>
-
-      {/* ── 5. LIVE OUTPATIENT WAITING TIMES ── */}
-      <section id="facilities" className="py-14 px-6 lg:px-10 max-w-7xl mx-auto">
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-sky-700 font-mono">
-                Live Outpatient Telemetry
-              </span>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5">
-                Current Outpatient Waiting Times Across Penang
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Real-time queue estimates across participating private specialist hospitals.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onNavigateHospitals()}
-                className="text-xs font-bold text-sky-600 hover:text-sky-700 px-3 py-1.5 bg-sky-50 rounded-lg border border-sky-100 transition cursor-pointer"
-              >
-                Browse Facility Directory &rarr;
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {partnerFacilities.map((facility) => (
-              <div
-                key={facility.id}
-                className="bg-white border border-slate-200 rounded-2xl p-4.5 shadow-xs hover:shadow-sm hover:border-sky-300 transition"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                    <Building2 className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                    {facility.status}
-                  </span>
-                </div>
-
-                <div className="mt-3">
-                  <h4 className="text-xs font-extrabold text-slate-900 line-clamp-1">{facility.name}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{facility.area} • {facility.type}</p>
-                </div>
-
-                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500">Live Outpatient Wait</span>
-                  <span className="text-xs font-bold text-sky-700 font-mono">{facility.waitTime}</span>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>

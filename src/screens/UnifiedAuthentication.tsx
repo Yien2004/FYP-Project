@@ -289,7 +289,6 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
           <div className="space-y-3 pt-2">
             {[
               "Book appointments in under 2 minutes",
-              "Access health records & prescriptions",
               "Communicate directly with your doctor",
               "Automatic dashboard for each role",
             ].map((item) => (
