@@ -139,7 +139,6 @@ export default function Sidebar({
     { id: 'patients', label: 'Patient Directory', icon: Users },
     { id: 'schedule', label: 'Schedule Manager', icon: Clock },
     { id: 'communication', label: 'Communication', icon: MessageSquare, count: unreadCount },
-    { id: 'notifications', label: 'Notifications', icon: Bell, count: alertCount },
     { id: 'send_notifications', label: 'Send Notification', icon: Send },
     { id: 'analytics', label: 'Data Analytics', icon: TrendingUp },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -229,25 +228,6 @@ export default function Sidebar({
               </div>
             </div>
           )}
-  
-          {/* Doctor Summary Card */}
-          <div className="px-5 pt-4 pb-2">
-            <div className="bg-white border border-slate-205 p-3.5 rounded-2xl flex items-center gap-3 shadow-sm">
-              <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-extrabold text-xs shrink-0 select-none">
-                {userName ? userName.replace("Dr. ", "")[0] : "D"}
-              </div>
-              <div className="overflow-hidden">
-                <span className="font-extrabold text-slate-900 text-xs block leading-tight truncate">
-                  {userName || (portal === 'admin' ? "System Admin" : "Staff Member")}
-                </span>
-                {portal !== 'admin' && (
-                  <span className="text-[9px] text-sky-600 block font-mono mt-0.5 font-bold uppercase tracking-wider">
-                    Clinic Operations Staff
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
   
           {/* Navigation Menu */}
           <div className="px-3 py-4 flex flex-col gap-1.5" id="sidebar-nav-menu">

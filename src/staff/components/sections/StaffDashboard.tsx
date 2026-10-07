@@ -10,7 +10,6 @@ import {
   Send, 
   CheckCircle2,
   BellRing,
-  HelpCircle,
   Play,
   Check,
   DoorOpen
@@ -210,23 +209,6 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
     setRoomAssignments(prev => ({ ...prev, [id]: room }));
   };
 
-  // Filter appointments for timeline (strictly today's appointments)
-  const timelineAppointments = useMemo(() => {
-    const sorted = appointments
-      .filter(apt => apt.date === todayDateStr)
-      .sort((a, b) => {
-        if (a.status === 'Completed' && b.status !== 'Completed') return -1;
-        if (a.status !== 'Completed' && b.status === 'Completed') return 1;
-        
-        // Sort by date ascending
-        const dateA = a.date || "";
-        const dateB = b.date || "";
-        if (dateA !== dateB) return dateA.localeCompare(dateB);
-        return 0;
-      });
-    return sorted.slice(0, 5);
-  }, [appointments, todayDateStr]);
-
   // Stats calculation
   const stats = useMemo(() => {
     const totalToday = queueList.length;
@@ -389,77 +371,7 @@ export default function StaffDashboard({ onCallPatient }: StaffDashboardProps) {
               </table>
             </div>
           </div>
-
-          {/* Daily Sequence Timeline */}
-          <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-4 mb-5">
-              <div>
-                <h3 className="font-extrabold text-base text-neutral-900 tracking-tight">Operational Sequence Timeline</h3>
-                <p className="text-xs text-neutral-500 mt-0.5">Chronological trace of completed, active, and upcoming clinical actions.</p>
-              </div>
-              <span className="text-[10px] bg-neutral-100 text-neutral-600 font-extrabold px-2.5 py-1 rounded-lg">Today</span>
-            </div>
-
-            <div className="relative border-l-2 border-neutral-100 ml-4 pl-6 space-y-6">
-              {timelineAppointments.length === 0 ? (
-                <div className="text-center py-6 text-neutral-400 italic">
-                  No operational sequence activities recorded for today.
-                </div>
-              ) : (
-                timelineAppointments.map((apt, idx) => {
-                  const isCompleted = apt.status === 'Completed';
-                  const isChecked = isPatientCheckedIn(apt.patientName, apt.id);
-                  const isProgress = isChecked && !isCompleted;
-                  
-                  let badgeColor = "bg-neutral-105 text-neutral-600 border-neutral-200";
-                  let badgeText = "Upcoming";
-                  let boxClass = "bg-neutral-50/50 border border-dashed border-neutral-200/80";
-                  let dotBg = "bg-neutral-200 text-neutral-600 border-neutral-300";
-
-                  if (isCompleted) {
-                    badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-100";
-                    badgeText = "Complete";
-                    boxClass = "bg-neutral-50 border border-neutral-200/60";
-                    dotBg = "bg-emerald-100 text-emerald-700 border-emerald-500/20";
-                  } else if (isProgress) {
-                    badgeColor = "bg-amber-50 text-amber-700 border-amber-100";
-                    badgeText = "In Progress";
-                    boxClass = "bg-white border border-neutral-200 shadow-xs";
-                    dotBg = "bg-amber-100 text-amber-700 border-amber-500/20";
-                  }
-
-                  return (
-                    <div key={apt.id || idx} className="relative animate-fadeIn">
-                      <span className={`absolute -left-[31px] top-0 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ring-4 ring-white border ${dotBg}`}>
-                        {idx + 1}
-                      </span>
-                      <div className={`rounded-xl p-4 flex items-start justify-between ${boxClass}`}>
-                        <div className="min-w-0 flex-1 pr-3">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeColor}`}>
-                            {apt.timeSlot} - {badgeText}
-                          </span>
-                          <h4 className="font-bold text-sm text-neutral-900 mt-1.5 truncate">
-                            {apt.patientName} • {apt.specialty}
-                          </h4>
-                          <p className="text-xs text-neutral-500 mt-1 leading-normal">
-                            Consultation with {apt.doctorName}. {apt.symptoms ? `Reason: ${apt.symptoms}` : "Routine consultation."}
-                          </p>
-                        </div>
-                        {isCompleted ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                        ) : isProgress ? (
-                          <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200/60 px-2 py-1 rounded-lg shrink-0">Active</span>
-                        ) : (
-                          <HelpCircle className="w-4 h-4 text-neutral-300 shrink-0" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-          </div>
         </div>
-      </div>
     </div>
   );
 }

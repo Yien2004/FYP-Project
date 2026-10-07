@@ -1,16 +1,10 @@
 import React, { useState } from 'react';
 import { 
-  Radio, 
   Users, 
-  FileText, 
   CheckCircle, 
   AlertTriangle, 
   Calendar, 
-  Send, 
-  Plus,
-  Play,
-  Activity,
-  Megaphone
+  Send 
 } from 'lucide-react';
 
 function getClinicFromEmail(email: string): string {
@@ -342,158 +336,209 @@ export default function NotificationsSection() {
     }
   };
 
+  const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+  const currentClinic = localStorage.getItem("lifelink_user_clinic") || getClinicFromEmail(loggedEmail);
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 font-sans text-neutral-800 animate-fadeIn">
       
       {/* Broadcast Center Composer */}
-      <div className="space-y-6">
-        
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col gap-5">
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-4">
           <div>
-            <h3 className="font-extrabold text-base text-neutral-900 flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-red-500 animate-pulse" />
+            <h3 className="font-extrabold text-base text-neutral-900 tracking-tight">
               Staff Broadcast Composer
             </h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Push real-time system-wide messages, alert sirens, or scheduled notifications across target channels.</p>
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Dispatch clinic notices, schedule updates, or appointment advisories across target patient channels.
+            </p>
           </div>
-
-          {showSuccessAlert && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 px-4 text-xs font-bold flex items-center gap-2 animate-fade-in">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 animate-bounce" />
-              <span>Broadcast dispatched successfully! Patient records updated in database.</span>
-            </div>
+          {currentClinic && (
+            <span className="self-start sm:self-auto text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 px-3 py-1 rounded-full">
+              {currentClinic}
+            </span>
           )}
+        </div>
 
-          <form onSubmit={handleSendBroadcast} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Recipient Selector */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Target Channel Group</label>
-                <select
-                  value={targetGroup}
-                  onChange={(e) => setTargetGroup(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9"
-                >
-                  <option>All Registered Patients</option>
-                  <option>Specific Patient...</option>
-                  <option>All Licensed Practitioners</option>
-                  <option>All Cardiovascular Ward A Staff</option>
-                  <option>Inpatients (Ward A & ICCU)</option>
-                </select>
-              </div>
+        {showSuccessAlert && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 px-4 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Broadcast dispatched successfully! Notification delivered to target recipients.</span>
+          </div>
+        )}
 
-              {/* Template shortcuts */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Action template presets</label>
-                <select
-                  value={template}
-                  onChange={(e) => handleApplyTemplate(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9"
-                >
-                  <option value="Central clinic checkups schedule">Routine checkups notification directive</option>
-                  <option value="Emergency cardiac surge warning">Emergency cardiac surge priority alarm</option>
-                  <option value="Server audit logs routine schedule">System database maintenance log notice</option>
-                </select>
-              </div>
+        {/* Quick Notice Template Chips */}
+        <div>
+          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-2">
+            Quick Notice Presets
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              {
+                label: "Appointment Reminder",
+                text: "Reminder: Please arrive at the clinic reception counter at least 10 minutes prior to your scheduled consultation time."
+              },
+              {
+                label: "Clinic Holiday / Closure",
+                text: "Notice: Outpatient consultation services will be closed on upcoming public holidays. Regular consultations will resume on the next operating day."
+              },
+              {
+                label: "Doctor Schedule Adjustment",
+                text: "Advisory: Attending physician consultation slots have been updated. Patients are encouraged to review their booking status in My Appointments."
+              },
+              {
+                label: "General Healthcare Advisory",
+                text: "Notice: Regular outpatient consultation services are running normally today. Please present your booking queue number upon arrival."
+              }
+            ].map(preset => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setCustomMessage(preset.text)}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 transition cursor-pointer text-slate-600"
+              >
+                + {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form onSubmit={handleSendBroadcast} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Recipient Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Target Channel Group</label>
+              <select
+                value={targetGroup}
+                onChange={(e) => setTargetGroup(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:border-sky-500 h-10 transition font-medium"
+              >
+                <option>All Registered Patients</option>
+                <option>Specific Patient...</option>
+                <option>All Clinic Staff</option>
+              </select>
             </div>
 
-            {/* Specific Patient Selector if target is specific */}
-            {targetGroup === 'Specific Patient...' && (
-              <div className="space-y-1.5 animate-fade-in font-sans">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Select Target Patient</label>
+            {/* Target Patient selector if specific */}
+            {targetGroup === 'Specific Patient...' ? (
+              <div className="space-y-1.5 animate-fadeIn">
+                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Select Patient</label>
                 <select
                   value={selectedPatientEmail}
                   onChange={(e) => setSelectedPatientEmail(e.target.value)}
                   required
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-bold"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:border-sky-500 h-10 transition font-medium"
                 >
-                  <option value="">-- Choose patient --</option>
+                  <option value="">-- Choose registered patient --</option>
                   {patients.map(p => (
                     <option key={p.id} value={p.email}>{p.name} ({p.email})</option>
                   ))}
                 </select>
               </div>
-            )}
-
-            {/* Content Field */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5">Message Content</label>
-              <textarea
-                placeholder="Fulfill announcement memo details..."
-                value={customMessage}
-                onChange={handleMessageChange}
-                rows={4}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3.5 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-455 placeholder:text-neutral-400"
-              />
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex justify-end pt-1">
-              <button
-                type="submit"
-                disabled={isSending}
-                className="bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <Radio className="w-4 h-4" />
-                Dispatch Channel Broadcast
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Broadcast Logs History */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col gap-4">
-          <div>
-            <h3 className="font-bold text-base text-neutral-900">Broadcast Transmissions Logs</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Consolidated archive of public clinical announcements dispatched today.</p>
-          </div>
-
-          <div className="overflow-x-auto">
-            {broadcastLogs.length === 0 ? (
-              <div className="py-8 text-center text-xs text-neutral-400 font-mono">
-                No active broadcast records in system log database.
-              </div>
             ) : (
-              <>
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-neutral-100 text-neutral-400 font-bold uppercase tracking-wider pb-2">
-                      <th className="pb-3 pl-1">Timestamp</th>
-                      <th className="pb-3">Target Group</th>
-                      <th className="pb-3">Broadcast memo summary</th>
-                      <th className="pb-3 text-right">Progress</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {(viewAllLogs ? broadcastLogs : broadcastLogs.slice(0, 3)).map((log) => (
-                      <tr key={log.id} className="hover:bg-neutral-50/50 transition-colors">
-                        <td className="py-3 pl-1 font-mono font-bold text-neutral-500 whitespace-nowrap">{log.timestamp}</td>
-                        <td className="py-3 font-semibold text-neutral-810 whitespace-nowrap">{log.group}</td>
-                        <td className="py-3 text-neutral-500 max-w-sm truncate" title={log.message}>{log.message}</td>
-                        <td className="py-3 text-right">
-                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full uppercase">
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {broadcastLogs.length > 3 && (
-                  <div className="mt-3 flex justify-center border-t border-neutral-100 pt-3">
-                    <button
-                      onClick={() => setViewAllLogs(!viewAllLogs)}
-                      className="text-xs text-neutral-600 hover:text-neutral-900 font-bold flex items-center gap-1.5 cursor-pointer bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 px-3.5 py-1.5 rounded-xl transition-colors"
-                    >
-                      {viewAllLogs ? 'Show Less' : `View All History (${broadcastLogs.length})`}
-                    </button>
-                  </div>
-                )}
-              </>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Delivery Channel</label>
+                <div className="h-10 flex items-center px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Standard Patient System Broadcast
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Message Content */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Broadcast Message</label>
+              <span className="text-[10px] text-neutral-400 font-mono">{customMessage.length}/500 chars</span>
+            </div>
+            <textarea
+              placeholder="Type your clinical announcement or notification memo here..."
+              value={customMessage}
+              onChange={handleMessageChange}
+              maxLength={500}
+              rows={4}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-neutral-800 outline-none focus:bg-white focus:border-sky-500 placeholder:text-neutral-400 transition"
+            />
+          </div>
+
+          {/* Action Row */}
+          <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
+            <button
+              type="button"
+              onClick={() => setCustomMessage('')}
+              className="text-xs text-neutral-400 hover:text-neutral-700 transition cursor-pointer font-medium"
+            >
+              Clear message
+            </button>
+            <button
+              type="submit"
+              disabled={isSending || !customMessage.trim()}
+              className="bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-xs font-bold px-5 py-2.5 rounded-xl inline-flex items-center gap-2 shadow-xs transition cursor-pointer"
+            >
+              {isSending ? (
+                <span>Dispatching...</span>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send Broadcast</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Broadcast Logs History */}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col gap-4">
+        <div>
+          <h3 className="font-bold text-base text-neutral-900">Broadcast Transmissions Logs</h3>
+          <p className="text-xs text-neutral-500 mt-0.5">Consolidated archive of public clinical announcements dispatched today.</p>
         </div>
 
+        <div className="overflow-x-auto">
+          {broadcastLogs.length === 0 ? (
+            <div className="py-8 text-center text-xs text-neutral-400 font-mono">
+              No active broadcast records in system log database.
+            </div>
+          ) : (
+            <>
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-neutral-100 text-neutral-400 font-bold uppercase tracking-wider pb-2">
+                    <th className="pb-3 pl-1">Timestamp</th>
+                    <th className="pb-3">Target Group</th>
+                    <th className="pb-3">Broadcast memo summary</th>
+                    <th className="pb-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {(viewAllLogs ? broadcastLogs : broadcastLogs.slice(0, 4)).map((log) => (
+                    <tr key={log.id} className="hover:bg-neutral-50/50 transition-colors">
+                      <td className="py-3 pl-1 font-mono font-bold text-neutral-500 whitespace-nowrap">{log.timestamp}</td>
+                      <td className="py-3 font-semibold text-neutral-800 whitespace-nowrap">{log.group}</td>
+                      <td className="py-3 text-neutral-600 max-w-sm truncate" title={log.message}>{log.message}</td>
+                      <td className="py-3 text-right">
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full uppercase">
+                          {log.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {broadcastLogs.length > 4 && (
+                <div className="mt-3 flex justify-center border-t border-neutral-100 pt-3">
+                  <button
+                    onClick={() => setViewAllLogs(!viewAllLogs)}
+                    className="text-xs text-neutral-600 hover:text-neutral-900 font-bold flex items-center gap-1.5 cursor-pointer bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 px-3.5 py-1.5 rounded-xl transition-colors"
+                  >
+                    {viewAllLogs ? 'Show Less' : `View All History (${broadcastLogs.length})`}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
     </div>

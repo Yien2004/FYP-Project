@@ -81,12 +81,14 @@ export default function Header({
         <div className="flex items-center gap-2 relative">
           <button 
             onClick={() => onSetTab?.('notifications')}
-            className="relative p-2.5 hover:bg-neutral-100 text-neutral-500 hover:text-sky-600 rounded-xl transition cursor-pointer"
+            className="relative p-2.5 hover:bg-neutral-100 text-neutral-600 hover:text-sky-600 rounded-xl transition cursor-pointer"
             title="Notifications"
           >
             <Bell className="w-5 h-5" />
             {alertCount > 0 && (
-              <span className="absolute top-2 right-2 bg-red-500 w-2 h-2 rounded-full ring-2 ring-white animate-pulse"></span>
+              <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-4 text-center ring-2 ring-white">
+                {alertCount}
+              </span>
             )}
           </button>
 
@@ -108,14 +110,9 @@ export default function Header({
               {userName ? userName.replace("Dr. ", "").trim().charAt(0).toUpperCase() : (portal === 'admin' ? 'A' : 'S')}
             </div>
             <div className="hidden md:block text-left">
-              <span className="text-xs font-bold text-neutral-800 block leading-tight truncate max-w-[130px]">
+              <span className="text-xs font-bold text-neutral-800 block leading-tight truncate max-w-[150px]">
                 {userName || (portal === 'admin' ? 'System Admin' : 'Staff Member')}
               </span>
-              {portal !== 'admin' && (
-                <span className="text-[9px] text-neutral-400 block font-mono leading-none mt-0.5">
-                  {userRole || 'Clinician'}
-                </span>
-              )}
             </div>
           </div>
         </div>

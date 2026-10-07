@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
-  Download, 
   Calendar, 
   CheckCircle, 
   XCircle, 
@@ -137,46 +136,7 @@ export default function DataAnalyticsSection() {
 
   const chartData = viewMode === 'daily' ? getDailyStats() : getMonthlyStats();
 
-  // 4. Download Report Handlers
-  const triggerDownload = (fileName: string, csvContent: string) => {
-    const element = document.createElement("a");
-    const file = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    element.href = URL.createObjectURL(file);
-    element.download = fileName;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
-
-  const handleExportDailyReport = () => {
-    const stats = getDailyStats();
-    let csv = "Daily Appointment Bookings Report\n" +
-              `Generated: ${new Date().toLocaleString()}\n` +
-              "-----------------------------------------\n" +
-              "Date,Total Bookings,Completed Consultations,Cancelled/Rejected Bookings\n";
-
-    stats.forEach(s => {
-      csv += `${s.label},${s.total},${s.completed},${s.cancelled}\n`;
-    });
-
-    triggerDownload(`daily_analytics_report_${Date.now()}.csv`, csv);
-  };
-
-  const handleExportMonthlyReport = () => {
-    const stats = getMonthlyStats();
-    let csv = "Monthly Appointment Bookings Report\n" +
-              `Generated: ${new Date().toLocaleString()}\n` +
-              "-----------------------------------------\n" +
-              "Month,Total Bookings,Completed Consultations,Cancelled/Rejected Bookings\n";
-
-    stats.forEach(s => {
-      csv += `${s.label},${s.total},${s.completed},${s.cancelled}\n`;
-    });
-
-    triggerDownload(`monthly_analytics_report_${Date.now()}.csv`, csv);
-  };
-
-  // 5. SVG Render math for trend line
+  // 4. SVG Render math for trend line
   const maxCount = Math.max(...chartData.map(d => d.total), 5); // default floor of 5 to avoid divide by zero
   const height = 180;
   const width = 640;
@@ -242,156 +202,114 @@ export default function DataAnalyticsSection() {
 
       </div>
 
-      {/* Main Trend Chart and Export Options */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Trend Visualizer */}
-        <div className="lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
-          <div className="border-b border-neutral-100 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="font-bold text-base text-neutral-900">Patient Booking Velocities</h3>
-              <p className="text-xs text-neutral-500 mt-0.5 font-medium">Aggregated outpatient schedule registrations from the live database.</p>
-            </div>
-
-            <div className="bg-neutral-50 border border-neutral-200 p-0.5 rounded-lg flex items-center gap-0.5">
-              <button
-                onClick={() => setViewMode('daily')}
-                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                  viewMode === 'daily' ? 'bg-white text-neutral-800 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
-                }`}
-              >
-                Daily Trend
-              </button>
-              <button
-                onClick={() => setViewMode('monthly')}
-                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                  viewMode === 'monthly' ? 'bg-white text-neutral-800 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
-                }`}
-              >
-                Monthly Trend
-              </button>
-            </div>
+      {/* Main Trend Chart */}
+      <div className="w-full bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
+        <div className="border-b border-neutral-100 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-base text-neutral-900">Patient Booking Velocities</h3>
+            <p className="text-xs text-neutral-500 mt-0.5 font-medium">Aggregated outpatient schedule registrations from the live database.</p>
           </div>
 
-          {/* SVG Trend Line Canvas */}
-          <div className="relative flex justify-center py-2 h-52 overflow-hidden bg-neutral-50/50 rounded-2xl border border-neutral-150">
-            {loading ? (
-              <div className="flex items-center justify-center text-xs text-neutral-450 font-mono">
-                Compiling clinic coordinates...
-              </div>
-            ) : chartData.length === 0 ? (
-              <div className="flex items-center justify-center text-xs text-neutral-400 font-mono">
-                No bookings cataloged.
-              </div>
-            ) : (
-              <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full text-neutral-350">
-                <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="#f0f0f0" strokeWidth="1" />
-                <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#f0f0f0" strokeWidth="1" />
-                <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e2e8f0" strokeWidth="1.5" />
+          <div className="bg-neutral-50 border border-neutral-200 p-0.5 rounded-lg flex items-center gap-0.5">
+            <button
+              onClick={() => setViewMode('daily')}
+              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                viewMode === 'daily' ? 'bg-white text-neutral-800 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
+              }`}
+            >
+              Daily Trend
+            </button>
+            <button
+              onClick={() => setViewMode('monthly')}
+              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                viewMode === 'monthly' ? 'bg-white text-neutral-800 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
+              }`}
+            >
+              Monthly Trend
+            </button>
+          </div>
+        </div>
 
-                {pathD && (
-                  <>
-                    <path
-                      d={`${pathD} L ${padding + (chartData.length - 1) * (width - padding * 2) / Math.max(chartData.length - 1, 1)},${height - padding} L ${padding},${height - padding} Z`}
-                      fill="url(#analyticsGrad)"
-                      opacity="0.15"
-                    />
-                    <path
-                      d={pathD}
-                      fill="none"
+        {/* SVG Trend Line Canvas */}
+        <div className="relative flex justify-center py-2 h-56 overflow-hidden bg-neutral-50/50 rounded-2xl border border-neutral-150">
+          {loading ? (
+            <div className="flex items-center justify-center text-xs text-neutral-450 font-mono">
+              Compiling clinic coordinates...
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="flex items-center justify-center text-xs text-neutral-400 font-mono">
+              No bookings cataloged.
+            </div>
+          ) : (
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full text-neutral-350">
+              <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="#f0f0f0" strokeWidth="1" />
+              <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#f0f0f0" strokeWidth="1" />
+              <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e2e8f0" strokeWidth="1.5" />
+
+              {pathD && (
+                <>
+                  <path
+                    d={`${pathD} L ${padding + (chartData.length - 1) * (width - padding * 2) / Math.max(chartData.length - 1, 1)},${height - padding} L ${padding},${height - padding} Z`}
+                    fill="url(#analyticsGrad)"
+                    opacity="0.15"
+                  />
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#0d9488"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                </>
+              )}
+
+              <defs>
+                <linearGradient id="analyticsGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0d9488" />
+                  <stop offset="100%" stopColor="#ffffff" />
+                </linearGradient>
+              </defs>
+
+              {chartData.map((d, index) => {
+                const x = padding + (index * (width - padding * 2)) / Math.max(chartData.length - 1, 1);
+                const y = height - padding - (d.total / maxCount) * (height - padding * 2);
+                return (
+                  <g key={index}>
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r="3.5"
+                      fill="#ffffff"
                       stroke="#0d9488"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
+                      strokeWidth="2"
                     />
-                  </>
-                )}
-
-                <defs>
-                  <linearGradient id="analyticsGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0d9488" />
-                    <stop offset="100%" stopColor="#ffffff" />
-                  </linearGradient>
-                </defs>
-
-                {chartData.map((d, index) => {
-                  const x = padding + (index * (width - padding * 2)) / Math.max(chartData.length - 1, 1);
-                  const y = height - padding - (d.total / maxCount) * (height - padding * 2);
-                  return (
-                    <g key={index}>
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r="3.5"
-                        fill="#ffffff"
-                        stroke="#0d9488"
-                        strokeWidth="2"
-                      />
-                      <text
-                        x={x}
-                        y={y - 10}
-                        textAnchor="middle"
-                        fontSize="8"
-                        fontWeight="bold"
-                        fill="#1e293b"
-                        className="font-mono"
-                      >
-                        {d.total}
-                      </text>
-                      <text
-                        x={x}
-                        y={height - 12}
-                        textAnchor="middle"
-                        fontSize="8"
-                        fontWeight="bold"
-                        fill="#94a3b8"
-                      >
-                        {d.label.length > 6 ? d.label.substring(5) : d.label}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            )}
-          </div>
+                    <text
+                      x={x}
+                      y={y - 10}
+                      textAnchor="middle"
+                      fontSize="8"
+                      fontWeight="bold"
+                      fill="#1e293b"
+                      className="font-mono"
+                    >
+                      {d.total}
+                    </text>
+                    <text
+                      x={x}
+                      y={height - 12}
+                      textAnchor="middle"
+                      fontSize="8"
+                      fontWeight="bold"
+                      fill="#94a3b8"
+                    >
+                      {d.label.length > 6 ? d.label.substring(5) : d.label}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          )}
         </div>
-
-        {/* Report Exporter Sidepanel */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="border-b border-neutral-100 pb-3">
-              <h3 className="font-bold text-sm text-neutral-900">Operations Report Dispatcher</h3>
-              <p className="text-xs text-neutral-500 mt-1 font-medium">Export raw consultation registry datasets into standard CSV report files.</p>
-            </div>
-
-            <div className="bg-sky-50/50 border border-sky-100 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="flex justify-between items-center text-slate-600 font-medium">
-                <span>Active Data Source</span>
-                <span className="font-semibold text-sky-900">PenangHealth Clinical EHR</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-600 font-medium">
-                <span>Dataset Records</span>
-                <span className="font-bold text-slate-900 font-mono">{appointments.length} Consultations</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 mt-6">
-            <button
-              onClick={handleExportDailyReport}
-              className="w-full h-10 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Download className="w-4 h-4" /> Download Daily CSV Report
-            </button>
-            
-            <button
-              onClick={handleExportMonthlyReport}
-              className="w-full h-10 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Download className="w-4 h-4" /> Download Monthly CSV Report
-            </button>
-          </div>
-        </div>
-
       </div>
 
       {/* Structured data table below chart */}
