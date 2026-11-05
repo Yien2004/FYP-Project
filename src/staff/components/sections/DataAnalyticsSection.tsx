@@ -9,6 +9,11 @@ import {
   Activity,
   FileText
 } from 'lucide-react';
+import { 
+  getStaffAccountByEmail, 
+  getFacilityIdByHospital, 
+  matchesSpecialty 
+} from '../../../data/staffAccounts';
 
 interface Appointment {
   id: string;
@@ -60,11 +65,40 @@ export default function DataAnalyticsSection() {
         if (Array.isArray(data)) {
           const isAdmin = localStorage.getItem("lifelink_user_role") === "Admin";
           const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
-          const currentClinic = getClinicFromEmail(loggedEmail);
+          const staffAccount = getStaffAccountByEmail(loggedEmail);
+          const currentClinic = staffAccount?.hospital || getClinicFromEmail(loggedEmail);
+          const currentDepartment = staffAccount?.department || localStorage.getItem("lifelink_user_department") || "All";
+          const currentFacilityId = staffAccount?.facility_id || getFacilityIdByHospital(currentClinic);
+          const isDoctor = staffAccount?.role?.toLowerCase() === "doctor" || loggedEmail.toLowerCase().startsWith("dr_");
+          const doctorName = isDoctor ? staffAccount?.name : "";
           
           let filtered = data;
           if (!isAdmin && currentClinic) {
-            filtered = data.filter((ap: any) => (ap.clinic || ap.hospital || '').toLowerCase() === currentClinic.toLowerCase());
+            filtered = data.filter((ap: any) => {
+              // 1. Hospital match
+              const aptFacilityId = ap.facility_id ? Number(ap.facility_id) : getFacilityIdByHospital(ap.clinic || ap.hospital);
+              if (aptFacilityId !== currentFacilityId) return false;
+
+              // 2. Department match
+              if (currentDepartment !== 'All' && !matchesSpecialty(currentDepartment, ap.specialty)) {
+                return false;
+              }
+
+              // 3. Doctor match (if logged in as a specific doctor)
+              if (isDoctor && doctorName) {
+                const docClean = doctorName.toLowerCase().replace(/^(dr\.|dato' dr\.)\s*/, "").trim();
+                const aptDoc = (ap.doctorName || "").toLowerCase().replace(/^(dr\.|dato' dr\.)\s*/, "").trim();
+                const aptDocEmail = (ap.doctorEmail || "").toLowerCase();
+                const isMatch = (
+                  aptDoc.includes(docClean) || 
+                  docClean.includes(aptDoc) || 
+                  (aptDocEmail && aptDocEmail === loggedEmail.toLowerCase())
+                );
+                if (!isMatch) return false;
+              }
+
+              return true;
+            });
           }
           setAppointments(filtered);
         }

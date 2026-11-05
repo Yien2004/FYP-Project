@@ -60,7 +60,7 @@ export default function Notifications({ notifications, onMarkRead, onMarkAllRead
                   filterCategory === 'reminder' ? 'bg-teal-50 text-teal-700' : 'hover:bg-slate-50 text-slate-600'
                 }`}
               >
-                <span>AI Reminders</span>
+                <span>Appointment Reminders</span>
                 <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{notifications.filter(n=>n.category==='reminder').length}</span>
               </button>
 
@@ -118,7 +118,7 @@ export default function Notifications({ notifications, onMarkRead, onMarkAllRead
                     not.category === 'lab' ? 'bg-indigo-50 text-indigo-700' :
                     not.category === 'medication' ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-slate-50 text-teal-700'
                   }`}>
-                    {not.category === 'reminder' ? <Bot className="w-5 h-5 text-emerald-600" /> :
+                    {not.category === 'reminder' ? <Calendar className="w-5 h-5 text-emerald-600" /> :
                      not.category === 'lab' ? <HeartPulse className="w-5 h-5 animate-pulse" /> : 
                      not.category === 'medication' ? <AlertTriangle className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
                   </div>

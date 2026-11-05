@@ -11,12 +11,13 @@ import {
   FlaskConical,
   Stethoscope,
   Building2,
-  Star,
   Calendar,
   ChevronRight,
   Scissors,
-  AlertTriangle,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
+import { allPantaiDoctors, PantaiDoctor } from '../data/pantaiHospitalsData';
 
 // ─────────────────────────────────────────────
 // Inline CheckCircle helper (same pattern as HospitalsPage)
@@ -33,14 +34,15 @@ function CheckCircle({ className }: { className?: string }) {
 // Types
 // ─────────────────────────────────────────────
 export interface Doctor {
+  id?: string;
   name: string;
   avatar: string;
   title: string;
   specialty: string;
   hospital: string;
-  experience: string;
-  rating: number;
-  reviews: number;
+  experience?: string;
+  rating?: number;
+  reviews?: number;
   availability: string;
   bio: string;
 }
@@ -59,782 +61,439 @@ export interface Specialty {
   doctors: Doctor[];
 }
 
+function mapPantaiDoctor(d: PantaiDoctor): Doctor {
+  const initials = d.avatar || d.name.replace(/^(Dato'|Dr\.?|Datin)\s+/i, '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  return {
+    id: d.id,
+    name: d.name,
+    avatar: initials || 'MD',
+    title: d.title || `Consultant - ${d.specialty || d.department}`,
+    specialty: d.specialty || d.department,
+    hospital: d.hospital,
+    availability: d.availability || 'Mon–Fri: 9:00 AM – 5:00 PM',
+    bio: d.bio || `${d.title || 'Consultant Specialist'} practicing at ${d.hospital}, dedicated to personalized patient treatment and clinical excellence in ${d.specialty || d.department}. Consultations available by appointment.`,
+  };
+}
+
 // ─────────────────────────────────────────────
-// Data
+// Specialty Definitions (18 PantaiCare Specialties)
 // ─────────────────────────────────────────────
-export const specialties: Specialty[] = [
+interface SpecialtyMeta {
+  id: string;
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bg: string;
+  border: string;
+  iconColor: string;
+  desc: string;
+  overview: string;
+  conditions: string[];
+  match: (d: PantaiDoctor) => boolean;
+}
+
+const SPECIALTY_DEFINITIONS: SpecialtyMeta[] = [
   {
     id: 'cardiology',
-    name: 'Cardiology',
+    name: 'Cardiology & Cardiothoracic',
     icon: Heart,
     color: 'from-rose-500 to-pink-600',
     bg: 'bg-rose-50',
     border: 'border-rose-100',
     iconColor: 'text-rose-600',
-    desc: 'Heart & cardiovascular care',
-    overview:
-      'Comprehensive diagnosis and treatment of heart and cardiovascular conditions including ECG, echocardiography, coronary angiography, angioplasty, and pacemaker procedures.',
+    desc: 'Heart, vascular & cardiothoracic surgical care',
+    overview: 'Comprehensive diagnosis and treatment of cardiovascular diseases including coronary angiography, angioplasty, pacemaker implantation, electrophysiology, and open-heart surgeries.',
     conditions: [
       'Coronary Artery Disease',
-      'Heart Failure',
-      'Arrhythmia & AF',
-      'Hypertension',
+      'Heart Failure & Cardiomyopathy',
+      'Arrhythmia & Atrial Fibrillation',
+      'Hypertension & Vascular Disease',
       'Valvular Heart Disease',
-      'Ischemic Heart Disease',
-      'Post-MI Rehabilitation',
+      'Cardiothoracic Surgery',
     ],
-    doctors: [
-      {
-        name: 'Dr. Ainol Shareha Binti Sahar',
-        avatar: 'AS',
-        title: 'Consultant Cardiologist',
-        specialty: 'Ischemic Cardiovascular Conditions',
-        hospital: 'Pantai Hospital Penang',
-        experience: '12 years',
-        rating: 4.9,
-        reviews: 203,
-        availability: 'Mon, Wed, Fri — 9:00 AM to 4:00 PM',
-        bio: 'Expert in managing critical ischemic cardiovascular conditions, coronary interventions, and hypertension. Dr. Ainol Shareha is renowned for her calm diagnostic precision in high-pressure cardiac emergencies at Pantai Hospital.',
-      },
-      {
-        name: 'Dr. Simon Lo',
-        avatar: 'SL',
-        title: 'Interventional Cardiologist',
-        specialty: 'Coronary Angioplasty & Pacemakers',
-        hospital: 'Gleneagles Hospital Penang',
-        experience: '16 years',
-        rating: 4.9,
-        reviews: 289,
-        availability: 'Tue, Thu — 10:00 AM to 3:00 PM',
-        bio: 'Renowned cardiologist specializing in coronary angioplasty, stent placements, and pacemaker installations. Dr. Simon Lo has performed over 3,000 interventional procedures and leads Gleneagles cardiac catheterization lab.',
-      },
-      {
-        name: 'Dr. Tan Seng Hock',
-        avatar: 'TH',
-        title: 'Senior Consultant Cardiologist',
-        specialty: 'Heart Valve Disease & Arrhythmias',
-        hospital: 'Island Hospital',
-        experience: '15 years',
-        rating: 4.9,
-        reviews: 142,
-        availability: 'Mon, Tue, Thu — 9:00 AM to 4:00 PM',
-        bio: 'Expert in valvular heart disease and cardiac rhythm management. Dr. Tan Seng Hock is known for his patient-centered care and diagnostic diligence at Island Hospital.',
-      },
-      {
-        name: 'Dr. Lim Boon Yee',
-        avatar: 'LY',
-        title: 'Consultant Cardiologist',
-        specialty: 'Heart Failure & Electro-physiology',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '14 years',
-        rating: 4.8,
-        reviews: 125,
-        availability: 'Mon, Wed — 9:00 AM to 4:00 PM',
-        bio: 'Dedicated public sector cardiologist managing complex heart failure cases and pacemaker checkups at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Ramesh Kumar',
-        avatar: 'RK',
-        title: 'Cardiologist',
-        specialty: 'Hypertensive Heart & Preventive Care',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '11 years',
-        rating: 4.7,
-        reviews: 94,
-        availability: 'Tue, Thu — 8:30 AM to 4:30 PM',
-        bio: 'Expert in preventive cardiology and hypertension management serving patients in the mainland Seberang Perai region.',
-      },
-    ],
+    match: (d) => /cardio/i.test(d.department) || /electrophysiology/i.test(d.department),
   },
   {
     id: 'internal-medicine',
-    name: 'Internal Medicine & Infectious Diseases',
-    icon: FlaskConical,
-    color: 'from-teal-500 to-teal-600',
+    name: 'Internal Medicine & Subspecialties',
+    icon: Activity,
+    color: 'from-teal-500 to-emerald-600',
     bg: 'bg-teal-50',
     border: 'border-teal-100',
     iconColor: 'text-teal-600',
-    desc: 'Complex metabolic & infectious conditions',
-    overview:
-      'Specialist care for multi-system and infectious diseases, managing complex metabolic disorders, viral epidemics, and critical primary triage across Penang General Hospital.',
+    desc: 'Complex chronic illnesses, metabolic & infectious care',
+    overview: 'Holistic clinical management of multi-system medical conditions, diabetes, renal diseases, respiratory conditions, geriatric care, and rheumatologic disorders.',
     conditions: [
-      'Metabolic Syndrome',
-      'Type 2 Diabetes Complications',
-      'Dengue & Viral Fevers',
-      'Tuberculosis Management',
-      'HIV/AIDS Care',
-      'Sepsis & Critical Infections',
-      'Epidemiological Tracing',
+      'Type 1 & 2 Diabetes Mellitus',
+      'Chronic Kidney Disease (Nephrology)',
+      'Respiratory & Lung Diseases',
+      'Rheumatoid Arthritis & Autoimmune',
+      'Infectious Diseases & Fevers',
+      'Geriatric & Metabolic Health',
     ],
-    doctors: [
-      {
-        name: 'Dr. Azmi Bin Osman',
-        avatar: 'AO',
-        title: 'Senior Consultant — Internal Medicine',
-        specialty: 'Complex Metabolic Diseases',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '18 years',
-        rating: 4.9,
-        reviews: 312,
-        availability: 'Mon–Fri — 9:00 AM to 4:00 PM',
-        bio: 'Senior Consultant managing complex metabolic diseases and critical primary triage pathways at Penang General Hospital. Dr. Azmi is widely respected for his evidence-based approach to managing high-risk multi-system patients.',
-      },
-      {
-        name: 'Dr. Chow Ting Soo',
-        avatar: 'CT',
-        title: 'Infectious Diseases Specialist',
-        specialty: 'Epidemiology & Viral Containment',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '14 years',
-        rating: 4.8,
-        reviews: 178,
-        availability: 'Mon, Wed, Fri — 8:00 AM to 1:00 PM',
-        bio: 'Highly respected clinical researcher specializing in epidemiological tracing and viral contagion containment. Dr. Chow Ting Soo has led several state-wide public health interventions for dengue, COVID-19, and emerging respiratory outbreaks.',
-      },
-      {
-        name: 'Dr. Nur Farah Hana',
-        avatar: 'FH',
-        title: 'Internal Medicine Specialist',
-        specialty: 'Endocrinology & Acute Fevers',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '10 years',
-        rating: 4.8,
-        reviews: 115,
-        availability: 'Mon, Wed, Fri — 9:00 AM to 4:00 PM',
-        bio: 'Dedicated internist focused on acute tropical disease triage, metabolic syndrome tracking, and diabetes complications.',
-      },
-      {
-        name: 'Dr. Alan Wong',
-        avatar: 'AW',
-        title: 'Consultant Physician',
-        specialty: 'Infectious Diseases & Travel Health',
-        hospital: 'Pantai Hospital Penang',
-        experience: '13 years',
-        rating: 4.9,
-        reviews: 136,
-        availability: 'Tue, Thu — 9:00 AM to 3:00 PM',
-        bio: 'Private consultant managing complex clinical infections, travel medicine reviews, and chronic system inflammations.',
-      },
-    ],
+    match: (d) =>
+      /internal medicine/i.test(d.department) ||
+      /geriatric/i.test(d.department) ||
+      /nephrology/i.test(d.department) ||
+      /rheumatology/i.test(d.department) ||
+      /endocrin/i.test(d.department) ||
+      /respiratory/i.test(d.department),
   },
   {
     id: 'pediatrics',
-    name: 'Pediatrics',
+    name: 'Paediatrics & Child Health',
     icon: Baby,
-    color: 'from-sky-500 to-blue-600',
-    bg: 'bg-sky-50',
-    border: 'border-sky-100',
-    iconColor: 'text-sky-650',
-    desc: 'Child & newborn healthcare',
-    overview:
-      'Complete healthcare for infants, children, and adolescents — neonatal care, developmental assessments, vaccinations, childhood illness management, and pediatric emergency care.',
-    conditions: [
-      'Neonatal Jaundice',
-      'Childhood Asthma & Allergies',
-      'Growth & Developmental Delay',
-      'Febrile Seizures',
-      'Childhood Infections',
-      'Infantile Colic',
-      'Pediatric Nutrition',
-    ],
-    doctors: [
-      {
-        name: 'Dr. Siti Aminah',
-        avatar: 'SA',
-        title: 'Senior Paediatrician',
-        specialty: 'Neonatology & Paediatric Emergencies',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '15 years',
-        rating: 4.9,
-        reviews: 284,
-        availability: 'Mon–Fri — 8:00 AM to 4:30 PM',
-        bio: 'Dedicated to neonatal health, youth developmental assessments, and urgent pediatric emergencies. Dr. Siti Aminah has led Seberang Jaya Hospital neonatology unit for over a decade, improving survival rates for premature infants in the Seberang Perai region.',
-      },
-      {
-        name: 'Dr. Priscilla Ooi Sze Kee',
-        avatar: 'PO',
-        title: 'Paediatrician',
-        specialty: 'Infantile Allergies & Paediatric Nutrition',
-        hospital: 'Island Hospital',
-        experience: '10 years',
-        rating: 4.8,
-        reviews: 196,
-        availability: 'Mon, Wed, Fri — 9:00 AM to 2:00 PM',
-        bio: 'Renowned childhood practitioner focused on infantile allergies, asthma management, and general pediatric nutrition. Dr. Priscilla Ooi is known for her gentle bedside manner and ability to put anxious parents at ease during complex diagnoses.',
-      },
-      {
-        name: 'Dr. Wong Lai Kuan',
-        avatar: 'WK',
-        title: 'Consultant Pediatrician',
-        specialty: 'Child Development & Immunisation',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '12 years',
-        rating: 4.8,
-        reviews: 98,
-        availability: 'Wed, Fri — 9:00 AM to 1:00 PM',
-        bio: 'Specializes in early childhood developmental health and allergy management at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Chew Wei Lik',
-        avatar: 'CW',
-        title: 'Paediatric Specialist',
-        specialty: 'Asthma & Respiratory Triage',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '11 years',
-        rating: 4.7,
-        reviews: 87,
-        availability: 'Mon, Tue, Thu — 8:30 AM to 4:30 PM',
-        bio: 'Focuses on pediatric respiratory constraints, chronic childhood asthma management, and childhood infection protocols.',
-      },
-      {
-        name: 'Dr. Melissa Lim',
-        avatar: 'ML',
-        title: 'Consultant Paediatrician',
-        specialty: 'Neonatal Intensive Care & Development',
-        hospital: 'Gleneagles Hospital Penang',
-        experience: '14 years',
-        rating: 4.9,
-        reviews: 154,
-        availability: 'Tue, Thu — 9:00 AM to 4:00 PM',
-        bio: 'Expert in neonatal intensive care (NICU) monitoring, newborn developmental checking, and parent counseling.',
-      },
-    ],
-  },
-  {
-    id: 'general-surgery',
-    name: 'General Surgery',
-    icon: Scissors,
-    color: 'from-slate-600 to-slate-700',
-    bg: 'bg-slate-50',
-    border: 'border-slate-200',
-    iconColor: 'text-slate-600',
-    desc: 'Surgical & operative care',
-    overview:
-      'Open and minimally-invasive surgery for abdominal, thoracic, and laparoscopic procedures. Covering emergency trauma, elective surgery, and post-operative care across both public and private Penang hospitals.',
-    conditions: [
-      'Acute Abdomen & Appendicitis',
-      'Hernia Repair',
-      'Gallbladder Disease (Cholecystectomy)',
-      'Colorectal Surgery',
-      'Trauma & Emergency Surgery',
-      'Laparoscopic Procedures',
-      'Post-Surgical Wound Care',
-    ],
-    doctors: [
-      {
-        name: 'Dr. Mohd Fakhrulsani',
-        avatar: 'MF',
-        title: 'General Surgeon',
-        specialty: 'Emergency Surgery & Trauma',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '13 years',
-        rating: 4.8,
-        reviews: 167,
-        availability: 'Mon–Fri — 8:00 AM to 3:00 PM',
-        bio: 'Focuses on acute abdominal traumas, emergency laparotomies, and low-income clinic operations. Dr. Mohd Fakhrulsani is one of Seberang Jaya Hospital most active surgeons, handling a high volume of emergency and elective abdominal cases.',
-      },
-      {
-        name: 'Dr. Tan Chee Khuan',
-        avatar: 'TK',
-        title: 'General & Laparoscopic Surgeon',
-        specialty: 'Minimally Invasive Surgery',
-        hospital: 'Hospital Lam Wah Ee',
-        experience: '17 years',
-        rating: 4.9,
-        reviews: 241,
-        availability: 'Tue, Thu — 9:00 AM to 2:00 PM',
-        bio: 'Accomplished surgeon specializing in modern, minimally invasive laparoscopic internal organ operations. Dr. Tan Chee Khuan is a pioneer in single-incision laparoscopic techniques in Penang, drastically reducing patient recovery time.',
-      },
-      {
-        name: 'Dr. Raymond Chew',
-        avatar: 'RC',
-        title: 'Consultant General Surgeon',
-        specialty: 'Laparoscopic & Hernia Surgery',
-        hospital: 'Gleneagles Hospital Penang',
-        experience: '13 years',
-        rating: 4.9,
-        reviews: 95,
-        availability: 'Mon, Wed — 9:00 AM to 4:00 PM',
-        bio: 'A veteran surgeon focusing on minimally invasive gastrointestinal operations and hernia repairs with standard robotic-assisted procedures.',
-      },
-      {
-        name: 'Dr. Hanafiah Harun',
-        avatar: 'HH',
-        title: 'Senior Surgeon',
-        specialty: 'Trauma & Hepatobiliary Surgery',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '19 years',
-        rating: 4.8,
-        reviews: 182,
-        availability: 'Mon, Wed, Fri — 9:00 AM to 4:00 PM',
-        bio: 'Senior public sector trauma surgeon leading the emergency surgical team at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Ong Keat Jin',
-        avatar: 'OJ',
-        title: 'Consultant General Surgeon',
-        specialty: 'Colorectal Surgery & Endoscopy',
-        hospital: 'Pantai Hospital Penang',
-        experience: '15 years',
-        rating: 4.9,
-        reviews: 121,
-        availability: 'Tue, Thu — 9:00 AM to 3:00 PM',
-        bio: 'Specialist in colorectal cancer screenings, laparoscopic bowel operations, and complex hernia reconstructions.',
-      },
-    ],
-  },
-  {
-    id: 'orthopedics',
-    name: 'Orthopedics & Sports Medicine',
-    icon: Bone,
-    color: 'from-amber-500 to-orange-500',
-    bg: 'bg-amber-50',
-    border: 'border-amber-100',
-    iconColor: 'text-amber-600',
-    desc: 'Bones, joints & sports injuries',
-    overview:
-      'Surgical and non-surgical treatment for musculoskeletal conditions — joint replacements, fracture fixation, arthroscopic surgery, and sports injury rehabilitation.',
-    conditions: [
-      'Knee & Hip Replacement',
-      'Fractures & Bone Injuries',
-      'ACL/Ligament Tears',
-      'Spinal Disorders',
-      'Osteoarthritis',
-      'Tendon Injuries',
-      'Sports Injury Rehabilitation',
-    ],
-    doctors: [
-      {
-        name: 'Mr. Boon Huck Wee',
-        avatar: 'BH',
-        title: 'Consultant Orthopedic Surgeon',
-        specialty: 'Joint Replacement & Sports Injuries',
-        hospital: 'Pantai Hospital Penang',
-        experience: '19 years',
-        rating: 4.9,
-        reviews: 318,
-        availability: 'Mon, Wed, Fri — 8:00 AM to 1:00 PM',
-        bio: 'Specialist surgeon focusing on bone fractures, joint replacements, and high-impact sports injury restorations. Mr. Boon Huck Wee has performed over 2,500 joint replacement surgeries and is one of Penang most sought-after orthopedic consultants in private practice.',
-      },
-      {
-        name: 'Dr. Susan Lim',
-        avatar: 'SL',
-        title: 'Orthopedic & Joint Reconstruction Surgeon',
-        specialty: 'Knee & Hip Reconstruction',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '11 years',
-        rating: 4.8,
-        reviews: 88,
-        availability: 'Mon, Wed, Fri — 10:00 AM to 4:00 PM',
-        bio: 'Specializes in reconstructive orthopedic surgeries, knee arthroscopies, and trauma fracture fixations at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Zulkarnean',
-        avatar: 'ZK',
-        title: 'Consultant Orthopaedic Surgeon',
-        specialty: 'Trauma & Fracture Fixation',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '14 years',
-        rating: 4.7,
-        reviews: 105,
-        availability: 'Tue, Thu — 9:00 AM to 5:00 PM',
-        bio: 'Active public orthopedic specialist handling high-volume sports injuries, motor trauma reconstructions, and joint arthritis.',
-      },
-      {
-        name: 'Dr. Terence Oak',
-        avatar: 'TO',
-        title: 'Sports Medicine Specialist',
-        specialty: 'Arthroscopy & Ligament Reconstruction',
-        hospital: 'Island Hospital',
-        experience: '12 years',
-        rating: 4.9,
-        reviews: 147,
-        availability: 'Wed, Fri — 9:00 AM to 4:00 PM',
-        bio: 'Specializes in arthroscopic ACL repairs, rotator cuff surgeries, and high-performance athletic rehabilitation programs.',
-      },
-    ],
-  },
-  {
-    id: 'neurology',
-    name: 'Neurology',
-    icon: Brain,
-    color: 'from-violet-500 to-purple-600',
-    bg: 'bg-violet-50',
-    border: 'border-violet-100',
-    iconColor: 'text-violet-650',
-    desc: 'Brain & nervous system disorders',
-    overview:
-      'Diagnosis and treatment of neurological conditions including stroke, epilepsy, migraine, Parkinson disease, and peripheral neuropathies using EEG, MRI, and nerve conduction studies.',
-    conditions: [
-      'Stroke & TIA',
-      'Epilepsy & Seizures',
-      'Migraine & Chronic Headache',
-      'Parkinson Disease',
-      'Multiple Sclerosis',
-      'Peripheral Neuropathy',
-      'Neuromuscular Abnormalities',
-    ],
-    doctors: [
-      {
-        name: 'Dr. Sim Bee Fung',
-        avatar: 'SF',
-        title: 'Consultant Neurologist',
-        specialty: 'Stroke Recovery & Neuromuscular Disorders',
-        hospital: 'Gleneagles Hospital Penang',
-        experience: '14 years',
-        rating: 4.9,
-        reviews: 227,
-        availability: 'Mon, Tue, Thu — 9:00 AM to 3:00 PM',
-        bio: 'Expert clinician managing degenerative stroke recovery loops, neuromuscular abnormalities, and chronic migraines. Dr. Sim Bee Fung leads the neurology department at Gleneagles and has pioneered several rehabilitation protocols for post-stroke patients in Penang.',
-      },
-      {
-        name: 'Dr. Lee Hock Heng',
-        avatar: 'LH',
-        title: 'Consultant Neurologist',
-        specialty: 'Stroke & Epilepsy Management',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '14 years',
-        rating: 4.9,
-        reviews: 112,
-        availability: 'Tue, Thu — 9:00 AM to 4:30 PM',
-        bio: 'An experienced public neurologist specializing in epilepsy monitoring, neuro-triage, and acute stroke intervention protocols.',
-      },
-      {
-        name: 'Dr. Faridah Kamal',
-        avatar: 'FK',
-        title: 'Senior Neurologist',
-        specialty: 'Parkinson & Degenerative Disorders',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '17 years',
-        rating: 4.8,
-        reviews: 136,
-        availability: 'Mon, Wed — 8:30 AM to 4:00 PM',
-        bio: 'Expert public consultant managing movement disorders, Parkinson therapy regimes, and chronic migraine checks.',
-      },
-      {
-        name: 'Dr. Tan Kay Seng',
-        avatar: 'KS',
-        title: 'Consultant Neurologist',
-        specialty: 'Neuromuscular & Sleep Diagnostics',
-        hospital: 'Hospital Lam Wah Ee',
-        experience: '15 years',
-        rating: 4.8,
-        reviews: 94,
-        availability: 'Tue, Thu — 9:00 AM to 3:00 PM',
-        bio: 'Specialist in nerve conduction studies, electromyography, and sleep apnea related neurological profiles.',
-      },
-    ],
-  },
-  {
-    id: 'gastro-urology',
-    name: 'Gastroenterology & Urology',
-    icon: Microscope,
-    color: 'from-emerald-500 to-green-600',
-    bg: 'bg-emerald-50',
-    border: 'border-emerald-100',
-    iconColor: 'text-emerald-650',
-    desc: 'Digestive system & urinary tract',
-    overview:
-      'Advanced endoscopic procedures and management of gastrointestinal, liver, and urological conditions — from irritable bowel syndrome and liver pathologies to complex renal stone extraction.',
-    conditions: [
-      'Irritable Bowel Syndrome',
-      'Liver Disease & Cirrhosis',
-      'GERD & Peptic Ulcers',
-      'Colonoscopy & Polypectomy',
-      'Kidney Stones (Renal Calculi)',
-      'Urinary Tract Infections',
-      'Bladder & Prostate Issues',
-    ],
-    doctors: [
-      {
-        name: 'Dr. Mohamad Fadli Bin Abd Rahman',
-        avatar: 'MD',
-        title: 'Gastroenterologist & Hepatologist',
-        specialty: 'GI Endoscopy & Liver Pathologies',
-        hospital: 'Island Hospital',
-        experience: '12 years',
-        rating: 4.8,
-        reviews: 189,
-        availability: 'Mon, Wed, Fri — 9:00 AM to 4:00 PM',
-        bio: 'Specializes in advanced gastrointestinal endoscopic procedures, liver pathologies, and irritable bowel management. Dr. Mohamad Fadli is accredited for ERCP and advanced endoscopic ultrasound procedures, making him one of Penang leading GI specialists.',
-      },
-      {
-        name: 'Dr. Ng Cheok Man',
-        avatar: 'NM',
-        title: 'Urology Consultant',
-        specialty: 'Renal Stone Extraction & Urology',
-        hospital: 'Hospital Lam Wah Ee',
-        experience: '16 years',
-        rating: 4.8,
-        reviews: 208,
-        availability: 'Tue, Thu — 8:00 AM to 1:00 PM',
-        bio: 'Senior practitioner dealing with advanced renal calculous extractions and complex urinary tract health. Dr. Ng Cheok Man specialises in ureteroscopy, percutaneous nephrolithotomy, and laparoscopic urology, with an impressive clinical track record at Lam Wah Ee.',
-      },
-      {
-        name: 'Dr. Rosli Md Ali',
-        avatar: 'RM',
-        title: 'Consultant Urologist',
-        specialty: 'Renal Calculi & Prostate Health',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '18 years',
-        rating: 4.8,
-        reviews: 154,
-        availability: 'Mon, Wed — 9:00 AM to 4:30 PM',
-        bio: 'Senior urologist managing kidney stone extractions, prostate checks, and urological surgeries at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Jeffrey Tan',
-        avatar: 'JT',
-        title: 'Gastroenterology Consultant',
-        specialty: 'GERD & Colorectal Screening',
-        hospital: 'Pantai Hospital Penang',
-        experience: '13 years',
-        rating: 4.9,
-        reviews: 112,
-        availability: 'Tue, Thu — 9:00 AM to 4:00 PM',
-        bio: 'Specialist in digestive health, colonoscopies, acid reflux treatments, and chronic liver care.',
-      },
-    ],
-  },
-  {
-    id: 'gp-family',
-    name: 'General Practice & Family Medicine',
-    icon: Stethoscope,
-    color: 'from-sky-400 to-sky-600',
+    color: 'from-sky-400 to-blue-500',
     bg: 'bg-sky-50',
     border: 'border-sky-100',
     iconColor: 'text-sky-600',
-    desc: 'Primary care & outpatient services',
-    overview:
-      'Comprehensive primary care for all ages — acute illness management, chronic disease follow-up, occupational health, maternal health, family planning, and preventive screenings at government clinics and private practices.',
+    desc: 'Infant, child & adolescent developmental health',
+    overview: 'Specialized healthcare from neonates to adolescents, encompassing general paediatrics, paediatric cardiology, neonatal care, and growth development tracking.',
     conditions: [
-      'Fever & Viral Infections',
-      'Hypertension & Diabetes',
-      'Maternal & Child Health',
-      'Occupational Health Screening',
-      'Acute & Chronic Wound Care',
-      'Family Planning',
-      'Health Certification',
+      'Neonatal Jaundice & Infant Care',
+      'Childhood Asthma & Bronchitis',
+      'Paediatric Heart Conditions',
+      'Growth & Nutritional Deficits',
+      'Paediatric Allergy & Dermatology',
+      'Childhood Immunization & Fever',
     ],
-    doctors: [
-      {
-        name: 'Dr. K. Loganathan',
-        avatar: 'KL',
-        title: 'General Practitioner',
-        specialty: 'Community Wellness & Outpatient Diagnostics',
-        hospital: 'Klinik Kesihatan Jalan Perak',
-        experience: '14 years',
-        rating: 4.8,
-        reviews: 267,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Experienced public health coordinator handling everyday community wellness diagnostics and outpatient sorting. Dr. Loganathan is a pillar of the Georgetown community, providing affordable primary care to thousands of patients annually.',
-      },
-      {
-        name: 'Dr. Noraini Ahmad',
-        avatar: 'NA',
-        title: 'Maternal & Child Health Specialist',
-        specialty: 'Prenatal Care & Child Vaccination',
-        hospital: 'Klinik Kesihatan Jalan Perak',
-        experience: '11 years',
-        rating: 4.9,
-        reviews: 341,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Dedicated to prenatal checkups, family planning counseling, and early child vaccination schedules. Dr. Noraini Ahmad is one of the most requested practitioners at KK Jalan Perak for her warm, patient-centered approach to maternal health.',
-      },
-      {
-        name: 'Dr. Farah Alwani',
-        avatar: 'FA',
-        title: 'General Practitioner',
-        specialty: 'Community & Childhood Health',
-        hospital: 'Poliklinik Perdana',
-        experience: '6 years',
-        rating: 4.7,
-        reviews: 132,
-        availability: 'Mon–Fri — 8:00 AM to 5:30 PM',
-        bio: 'Community doctor focused on childhood fevers, wellness counseling, and early physical health checkups. Dr. Farah Alwani is passionate about preventive care and patient education for young families in the Penang community.',
-      },
-      {
-        name: 'Dr. Tan Aik Kah',
-        avatar: 'AK',
-        title: 'Medical Officer',
-        specialty: 'Outpatient Triage & Primary Care',
-        hospital: 'Hospital Pulau Pinang',
-        experience: '10 years',
-        rating: 4.8,
-        reviews: 142,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Manages outpatient triage, fever sorting, and routine health screenings at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Nor Aziah',
-        avatar: 'NA',
-        title: 'Primary Care Doctor',
-        specialty: 'Family Health & Triage',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '9 years',
-        rating: 4.7,
-        reviews: 121,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Coordinates primary care reviews, acute fever triage, and generic prescription extensions at Seberang Jaya Hospital.',
-      },
-      {
-        name: 'Dr. Mohd Razali',
-        avatar: 'MR',
-        title: 'Medical Officer',
-        specialty: 'Outpatient Medical Care & Triage',
-        hospital: 'Hospital Bukit Mertajam',
-        experience: '9 years',
-        rating: 4.7,
-        reviews: 154,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Handles daily family medicine clinics, acute care management, and health screenings at Hospital Bukit Mertajam.',
-      },
-      {
-        name: 'Dr. Nurul Huda',
-        avatar: 'NH',
-        title: 'Family Medicine Specialist',
-        specialty: 'Diabetes & Non-Communicable Diseases',
-        hospital: 'Klinik Kesihatan Bayan Baru',
-        experience: '10 years',
-        rating: 4.8,
-        reviews: 312,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Manages long-term chronic illness interventions, emphasizing public diabetes control programs. Dr. Nurul Huda regularly conducts community health talks on diabetes prevention and is a key figure in Penang MOH wellness programs.',
-      },
-      {
-        name: 'Dr. Tan Wei Shen',
-        avatar: 'TW',
-        title: 'General Practitioner',
-        specialty: 'Occupational & Acute Care',
-        hospital: 'Klinik Kesihatan Bayan Baru',
-        experience: '8 years',
-        rating: 4.7,
-        reviews: 189,
-        availability: 'Mon–Fri — 8:00 AM to 5:00 PM',
-        bio: 'Handles occupational injury triage and common acute illness screenings for local industrial zone employees. Dr. Tan Wei Shen is known for his efficient, no-frills approach to acute care and his commitment to underserved communities.',
-      },
-      {
-        name: 'Dr. Lee Shen Rong',
-        avatar: 'LS',
-        title: 'General Practitioner',
-        specialty: 'Family Medicine & Prescriptions',
-        hospital: 'Klinik Singapore',
-        experience: '9 years',
-        rating: 4.7,
-        reviews: 201,
-        availability: 'Mon–Sat — 8:00 AM to 6:00 PM',
-        bio: 'A trusted community family physician handling urgent medical checkups and long-term generic prescriptions. Dr. Lee Shen Rong runs an efficient outpatient clinic and maintains strong continuity of care for long-standing patients.',
-      },
-      {
-        name: 'Dr. Jane Lim',
-        avatar: 'JL',
-        title: 'General Practitioner',
-        specialty: 'Adolescent Health & Minor Procedures',
-        hospital: 'Klinik Singapore',
-        experience: '7 years',
-        rating: 4.7,
-        reviews: 154,
-        availability: 'Mon–Sat — 8:00 AM to 6:00 PM',
-        bio: 'Handles adolescent physical checkups, standard seasonal influenza symptoms, and minor wound suturing. Dr. Jane Lim is particularly popular among younger patients for her approachable communication style.',
-      },
-      {
-        name: 'Dr. Sarah Lim',
-        avatar: 'SR',
-        title: 'General Medicine & Dermatologist',
-        specialty: 'Skin Disorders & General Wellness',
-        hospital: 'O2 Klinik',
-        experience: '9 years',
-        rating: 4.8,
-        reviews: 217,
-        availability: 'Mon–Sat — 8:30 AM to 9:00 PM',
-        bio: 'Primary care practitioner managing skin disorders, chronic eczema outbreaks, and youth wellness. Dr. Sarah Lim bridges general medicine and dermatology, offering combined consultations that save patients multiple referrals.',
-      },
-      {
-        name: 'Dr. Benjamin Koay',
-        avatar: 'BK',
-        title: 'General Practitioner',
-        specialty: 'Preventive Health & Elderly Care',
-        hospital: 'O2 Klinik',
-        experience: '11 years',
-        rating: 4.8,
-        reviews: 198,
-        availability: 'Mon–Sat — 8:30 AM to 9:00 PM',
-        bio: 'Focuses on preventative health assessments, diagnostic blood panels, and elderly home health support. Dr. Benjamin Koay is a strong advocate of proactive wellness screening and early disease interception in the ageing Penang population.',
-      },
-      {
-        name: 'Dr. Michael Tan',
-        avatar: 'MT',
-        title: 'Occupational Health & GP',
-        specialty: 'Corporate Medicals & Industrial Health',
-        hospital: 'Poliklinik Perdana',
-        experience: '13 years',
-        rating: 4.8,
-        reviews: 176,
-        availability: 'Mon–Fri — 8:00 AM to 5:30 PM',
-        bio: 'Performs corporate medical screenings, industrial health clearance reviews, and sudden onset acute care. Dr. Michael Tan works closely with Penang industrial zone employers to maintain workforce health standards and safety compliance.',
-      },
-    ],
+    match: (d) => /paediatric|pediatric/i.test(d.department),
   },
   {
-    id: 'emergency',
-    name: 'Emergency Medicine',
-    icon: AlertTriangle,
-    color: 'from-red-500 to-rose-600',
-    bg: 'bg-red-50',
-    border: 'border-red-100',
-    iconColor: 'text-red-650',
-    desc: 'Critical care & trauma triage',
-    overview:
-      'Immediate medical evaluation, resuscitation, and life support preparation for acute illnesses and traumatic injuries ahead of hospital self-arrival.',
+    id: 'general-surgery',
+    name: 'General & Upper GI Surgery',
+    icon: Scissors,
+    color: 'from-slate-600 to-slate-800',
+    bg: 'bg-slate-50',
+    border: 'border-slate-200',
+    iconColor: 'text-slate-700',
+    desc: 'Laparoscopic, colorectal & abdominal surgical procedures',
+    overview: 'Minimally invasive keyhole surgeries, emergency trauma operations, gallbladder removal, hernia repair, colorectal oncologic resections, and upper GI surgery.',
     conditions: [
-      'Severe Bleeding & Trauma',
-      'Unconsciousness & Fainting',
-      'Cardiac Arrest & Chest Pain',
-      'Poisoning & Overdose',
-      'Respiratory Failure',
-      'Stroke & Sudden Weakness',
-      'Critical Accidents',
+      'Acute Appendicitis & Peritonitis',
+      'Inguinal & Ventral Hernias',
+      'Gallbladder Stones (Cholecystectomy)',
+      'Colorectal Tumors & Polyps',
+      'Upper Gastrointestinal Disorders',
+      'Thyroid & Soft Tissue Masses',
     ],
-    doctors: [
-      {
-        name: 'Dr. Marcus Vance',
-        avatar: 'MV',
-        title: 'Emergency Medicine Specialist',
-        specialty: 'Emergency Medicine & Trauma Care',
-        hospital: 'Hospital Pulau Penang',
-        experience: '11 years',
-        rating: 4.9,
-        reviews: 184,
-        availability: '24/7 Shift Rotation — Call Hospital',
-        bio: 'Senior emergency physician specializing in trauma resuscitation, advanced life support, and disaster medicine. Coordinates primary trauma responses at Penang General Hospital.',
-      },
-      {
-        name: 'Dr. Sarah Mitchell',
-        avatar: 'SM',
-        title: 'Consultant Trauma & Emergency',
-        specialty: 'Emergency & Critical Triage',
-        hospital: 'Hospital Seberang Jaya',
-        experience: '13 years',
-        rating: 4.9,
-        reviews: 142,
-        availability: '24/7 Shift Rotation — Call Hospital',
-        bio: 'Expert in critical care triage, toxicological emergencies, and cardiac resuscitation. Leads the mainland emergency preparedness training protocols.',
-      },
-      {
-        name: 'Dr. Kelvin Tan',
-        avatar: 'KT',
-        title: 'Emergency Physician',
-        specialty: 'Emergency & Resuscitation Care',
-        hospital: 'Pantai Hospital Penang',
-        experience: '9 years',
-        rating: 4.8,
-        reviews: 96,
-        availability: '24/7 Shift Rotation — Call Hospital',
-        bio: 'Specialized in acute medical emergencies, pediatric resuscitation, and trauma stabilization. Experienced in private hospital emergency room workflow.',
-      },
+    match: (d) =>
+      /general surgery/i.test(d.department) ||
+      /colorectal/i.test(d.department) ||
+      /git surgery/i.test(d.department),
+  },
+  {
+    id: 'orthopedics',
+    name: 'Orthopaedics, Sports & Spine Surgery',
+    icon: Bone,
+    color: 'from-amber-500 to-orange-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-100',
+    iconColor: 'text-amber-600',
+    desc: 'Bones, joints, spine reconstruction & sports injuries',
+    overview: 'Advanced joint replacement, arthroscopic ligament repair, sports medicine, complex bone fracture trauma, foot & ankle surgery, and spinal surgery.',
+    conditions: [
+      'ACL, PCL & Meniscal Knee Tears',
+      'Hip & Knee Osteoarthritis',
+      'Lumbar Disc Herniation & Spine Pain',
+      'Rotator Cuff & Shoulder Instability',
+      'Bone Fractures & Dislocations',
+      'Sports Injury Rehabilitation',
     ],
+    match: (d) =>
+      /orthop/i.test(d.department) ||
+      /sports medicine/i.test(d.department) ||
+      /spine/i.test(d.department) ||
+      /rehabilitation/i.test(d.department),
+  },
+  {
+    id: 'neurology',
+    name: 'Neurology & Neurosurgery',
+    icon: Brain,
+    color: 'from-purple-500 to-indigo-600',
+    bg: 'bg-purple-50',
+    border: 'border-purple-100',
+    iconColor: 'text-purple-600',
+    desc: 'Brain, spine & peripheral nervous system disorders',
+    overview: 'Hyperacute stroke management, cranial neurosurgery, epilepsy evaluation, brain tumor resection, and management of neuromuscular disorders.',
+    conditions: [
+      'Ischemic & Hemorrhagic Stroke',
+      'Brain Tumors & Cranial Lesions',
+      'Epilepsy & Unexplained Seizures',
+      'Migraine, Headaches & Neuropathy',
+      'Parkinson’s Disease & Tremors',
+      'Spinal Cord Decompression',
+    ],
+    match: (d) => /neuro/i.test(d.department),
+  },
+  {
+    id: 'gastro-urology',
+    name: 'Gastroenterology, Hepatology & Urology',
+    icon: Microscope,
+    color: 'from-emerald-500 to-teal-700',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-100',
+    iconColor: 'text-emerald-700',
+    desc: 'Digestive tract, liver health & urinary system care',
+    overview: 'Diagnostic and therapeutic endoscopy, colonoscopy, chronic liver disease management, minimally invasive kidney stone removal, and prostate surgeries.',
+    conditions: [
+      'Gastroesophageal Reflux Disease (GERD)',
+      'Hepatitis & Fatty Liver Disease',
+      'Kidney & Bladder Stones',
+      'Benign Prostatic Hyperplasia (BPH)',
+      'Inflammatory Bowel Disease (IBD)',
+      'Urological Oncology & Haematuria',
+    ],
+    match: (d) =>
+      /gastro/i.test(d.department) ||
+      /hepatology/i.test(d.department) ||
+      /urology/i.test(d.department),
+  },
+  {
+    id: 'obgyn',
+    name: 'Obstetrics & Gynaecology (O&G)',
+    icon: Heart,
+    color: 'from-pink-500 to-rose-600',
+    bg: 'bg-pink-50',
+    border: 'border-pink-100',
+    iconColor: 'text-pink-600',
+    desc: "Women's health, maternity & reproductive care",
+    overview: 'Comprehensive antenatal care, safe deliveries, high-risk pregnancy monitoring, fertility evaluation, and laparoscopic gynaecological surgery.',
+    conditions: [
+      'Antenatal Care & Delivery Options',
+      'Uterine Fibroids & Endometriosis',
+      'Ovarian Cysts & Pelvic Pain',
+      'Menstrual Disorders & PCOS',
+      'Cervical Cancer Screening & HPV',
+      'Menopause & Hormone Health',
+    ],
+    match: (d) => /obstetric|gynaecolog/i.test(d.department),
+  },
+  {
+    id: 'oncology',
+    name: 'Oncology & Radiotherapy',
+    icon: FlaskConical,
+    color: 'from-violet-600 to-purple-800',
+    bg: 'bg-violet-50',
+    border: 'border-violet-100',
+    iconColor: 'text-violet-700',
+    desc: 'Comprehensive cancer therapeutics & radiotherapy',
+    overview: 'Multidisciplinary tumor management, systemic chemotherapy, targeted biological therapies, immunotherapy, and high-precision linear accelerator radiotherapy.',
+    conditions: [
+      'Solid Tumors (Breast, Lung, GI)',
+      'Colorectal & Gynaecological Cancers',
+      'Radiotherapy & Intensity-Modulated Radiation',
+      'Post-Surgical Adjuvant Therapy',
+      'Palliative Oncology & Pain Care',
+      'Cancer Surveillance & Screening',
+    ],
+    match: (d) => /oncology|radiotherapy/i.test(d.department),
+  },
+  {
+    id: 'ent',
+    name: 'Ear, Nose & Throat (ENT)',
+    icon: Activity,
+    color: 'from-cyan-500 to-blue-600',
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-100',
+    iconColor: 'text-cyan-700',
+    desc: 'Hearing, sinus, throat & head-neck conditions',
+    overview: 'Endoscopic sinus surgery, functional nasal surgery, tonsillectomy, hearing assessments, tympanoplasty, and head-and-neck tumor evaluations.',
+    conditions: [
+      'Chronic Sinusitis & Nasal Polyps',
+      'Hearing Loss & Tinnitus',
+      'Otitis Media & Ear Infections',
+      'Tonsillitis & Sleep Apnea',
+      'Allergic Rhinitis & Deviated Septum',
+      'Vocal Cord & Swallowing Disorders',
+    ],
+    match: (d) => /ear|throat|otorhino/i.test(d.department),
+  },
+  {
+    id: 'ophthalmology',
+    name: 'Ophthalmology (Eye Care)',
+    icon: Search,
+    color: 'from-blue-500 to-sky-600',
+    bg: 'bg-blue-50',
+    border: 'border-blue-100',
+    iconColor: 'text-blue-600',
+    desc: 'Vision correction, cataract & retinal care',
+    overview: 'Advanced phacoemulsification cataract extraction, premium intraocular lens implantation, glaucoma management, diabetic retinopathy screening, and ocular trauma.',
+    conditions: [
+      'Cataracts & Refractive Errors',
+      'Glaucoma & High Intraocular Pressure',
+      'Diabetic Retinopathy & Maculopathy',
+      'Age-Related Macular Degeneration',
+      'Dry Eye Syndrome & Blepharitis',
+      'Corneal & Conjunctival Disorders',
+    ],
+    match: (d) => /ophthalm/i.test(d.department),
+  },
+  {
+    id: 'dermatology',
+    name: 'Dermatology & Skin',
+    icon: Sparkles,
+    color: 'from-fuchsia-500 to-pink-500',
+    bg: 'bg-fuchsia-50',
+    border: 'border-fuchsia-100',
+    iconColor: 'text-fuchsia-600',
+    desc: 'Medical dermatology & therapeutic skin care',
+    overview: 'Clinical dermatology providing targeted management for acute and chronic skin rashes, inflammatory dermatoses, eczema, psoriasis, acne vulgaris, and skin lesions.',
+    conditions: [
+      'Eczema & Atopic Dermatitis',
+      'Psoriasis & Plaque Lesions',
+      'Urticaria & Allergic Eruptions',
+      'Severe Acne Vulgaris & Rosacea',
+      'Fungal & Bacterial Skin Infections',
+      'Suspicious Skin Lesions & Moles',
+    ],
+    match: (d) => /dermatolog/i.test(d.department),
+  },
+  {
+    id: 'radiology',
+    name: 'Clinical & Interventional Radiology',
+    icon: Activity,
+    color: 'from-indigo-500 to-blue-700',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-100',
+    iconColor: 'text-indigo-600',
+    desc: 'Advanced imaging, CT/MRI & catheter interventions',
+    overview: 'High-resolution MRI, multi-slice CT, ultrasound, digital mammography, and image-guided diagnostic biopsies and vascular catheter interventions.',
+    conditions: [
+      'High-Resolution Neuro & Spine MRI',
+      'Multi-Slice CT Chest & Abdomen',
+      'Digital Mammography & Breast Ultrasound',
+      'Interventional Angiography & Stenting',
+      'Image-Guided Fine Needle Biopsies',
+      'Musculoskeletal Ultrasound & X-Ray',
+    ],
+    match: (d) => /radiology/i.test(d.department) && !/oncology/i.test(d.department),
+  },
+  {
+    id: 'anaesthesiology',
+    name: 'Anaesthesiology & Critical Care',
+    icon: Activity,
+    color: 'from-teal-600 to-cyan-700',
+    bg: 'bg-teal-50',
+    border: 'border-teal-100',
+    iconColor: 'text-teal-700',
+    desc: 'Perioperative anaesthesia & intensive ICU care',
+    overview: 'Comprehensive general and regional anaesthesia for major surgeries, post-operative acute pain relief, and round-the-clock tertiary Intensive Care Unit (ICU) care.',
+    conditions: [
+      'General & Regional Surgical Anaesthesia',
+      'Post-Operative Epidural Analgesia',
+      'Acute Sepsis & Multi-Organ Failure',
+      'Mechanical Ventilation & Hemodynamic Care',
+      'Sedation for Diagnostic Endoscopies',
+      'Critical Care Resuscitation',
+    ],
+    match: (d) =>
+      /anaesthes/i.test(d.department) ||
+      /critical care/i.test(d.department) ||
+      /intensive care/i.test(d.department),
+  },
+  {
+    id: 'dental',
+    name: 'Dental & Maxillofacial Surgery',
+    icon: Stethoscope,
+    color: 'from-cyan-600 to-teal-700',
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-100',
+    iconColor: 'text-cyan-700',
+    desc: 'Oral surgery, orthodontics & reconstructive dentistry',
+    overview: 'Surgical extraction of impacted teeth, reconstructive oral and maxillofacial surgery, dental implantology, and corrective orthodontics.',
+    conditions: [
+      'Impacted Third Molar (Wisdom Teeth)',
+      'Orthodontic Misalignment & Malocclusion',
+      'Dental Implants & Bone Grafting',
+      'Temporomandibular Joint (TMJ) Dysfunction',
+      'Facial Trauma & Jaw Fractures',
+      'Periodontal Disease & Oral Health',
+    ],
+    match: (d) => /dental|dentistry|orthodontic/i.test(d.department),
+  },
+  {
+    id: 'psychiatry',
+    name: 'Psychiatry & Mental Health',
+    icon: Brain,
+    color: 'from-violet-500 to-indigo-600',
+    bg: 'bg-violet-50',
+    border: 'border-violet-100',
+    iconColor: 'text-violet-600',
+    desc: 'Clinical psychiatry & cognitive psychotherapy',
+    overview: 'Compassionate psychiatric assessment, medication management, and psychotherapy for mood disorders, anxiety disorders, and child & adolescent mental health.',
+    conditions: [
+      'Major Depressive Disorder',
+      'Generalized Anxiety & Panic Disorders',
+      'Bipolar Mood Disorders',
+      'Child & Adolescent ADHD',
+      'Insomnia & Chronic Stress Disorders',
+      'Obsessive-Compulsive Disorder (OCD)',
+    ],
+    match: (d) => /psych/i.test(d.department),
+  },
+  {
+    id: 'plastic-surgery',
+    name: 'Plastic & Reconstructive Surgery',
+    icon: Scissors,
+    color: 'from-rose-400 to-pink-600',
+    bg: 'bg-rose-50',
+    border: 'border-rose-100',
+    iconColor: 'text-rose-600',
+    desc: 'Reconstructive surgery & microsurgical procedures',
+    overview: 'Post-traumatic reconstruction, scar revision, burn contracture management, cosmetic facial and body contouring, and fine microsurgery.',
+    conditions: [
+      'Post-Traumatic Soft Tissue Defects',
+      'Burn & Surgical Scar Revision',
+      'Breast Reconstruction & Symmetry',
+      'Cosmetic Facial & Eyelid Procedures',
+      'Skin Cancer Excision with Flap Closure',
+      'Hand Soft Tissue Injuries',
+    ],
+    match: (d) => /plastic/i.test(d.department),
+  },
+  {
+    id: 'gp-family',
+    name: 'General Practice & Emergency Medicine',
+    icon: Stethoscope,
+    color: 'from-sky-500 to-teal-600',
+    bg: 'bg-sky-50',
+    border: 'border-sky-100',
+    iconColor: 'text-sky-600',
+    desc: 'Primary outpatient care & 24/7 urgent consultations',
+    overview: 'Routine primary medical consultations, preventative checkups, vaccinations, chronic disease follow-ups, and urgent outpatient triage.',
+    conditions: [
+      'Acute Fevers, Coughs & Flu',
+      'Hypertension & Cholesterol Monitoring',
+      'Minor Cuts, Wounds & Dressing',
+      'Routine Health Screenings & Blood Tests',
+      'Travel Vaccines & Medical Checkups',
+      'Prescription Refills & Preventive Care',
+    ],
+    match: (d) =>
+      /emergency/i.test(d.department) ||
+      /general practice/i.test(d.department) ||
+      /family/i.test(d.department),
   },
 ];
+
+// Dynamically construct specialties from the official 160 PantaiCare doctors dataset
+export const specialties: Specialty[] = SPECIALTY_DEFINITIONS.map((def) => {
+  const matchedDoctors = allPantaiDoctors.filter(def.match);
+  return {
+    id: def.id,
+    name: def.name,
+    icon: def.icon,
+    color: def.color,
+    bg: def.bg,
+    border: def.border,
+    iconColor: def.iconColor,
+    desc: def.desc,
+    overview: def.overview,
+    conditions: def.conditions,
+    doctors: matchedDoctors.map(mapPantaiDoctor),
+  };
+});
 
 // ─────────────────────────────────────────────
 // Props
@@ -862,6 +521,7 @@ export default function DoctorsPage({
     const params = new URLSearchParams(window.location.search);
     return params.get('hospital');
   });
+
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const specId = params.get('specialty');
@@ -870,6 +530,7 @@ export default function DoctorsPage({
     }
     return null;
   });
+
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [search, setSearch] = useState('');
 
@@ -879,12 +540,22 @@ export default function DoctorsPage({
     return 'list';
   });
 
+  // Collect credentialed doctors practicing at the selected hospital
   const doctorsAtHospital = useMemo(() => {
     if (!hospitalFilter) return [];
+    const filterLower = hospitalFilter.toLowerCase().trim();
     const list: { doctor: Doctor; specialty: Specialty }[] = [];
+    const seenDoctorNames = new Set<string>();
+
     specialties.forEach((sp) => {
       sp.doctors.forEach((doc) => {
-        if (doc.hospital.toLowerCase() === hospitalFilter.toLowerCase()) {
+        const docHosp = doc.hospital.toLowerCase().trim();
+        const matches =
+          docHosp === filterLower ||
+          docHosp.includes(filterLower) ||
+          filterLower.includes(docHosp);
+        if (matches && !seenDoctorNames.has(doc.name)) {
+          seenDoctorNames.add(doc.name);
           list.push({ doctor: doc, specialty: sp });
         }
       });
@@ -892,15 +563,20 @@ export default function DoctorsPage({
     return list;
   }, [hospitalFilter]);
 
-  // ── filtered specialties ──
+  // Filtered specialties
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = search.toLowerCase().trim();
     if (!q) return specialties;
     return specialties.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.desc.toLowerCase().includes(q) ||
-        s.doctors.some((d) => d.name.toLowerCase().includes(q))
+        s.doctors.some(
+          (d) =>
+            d.name.toLowerCase().includes(q) ||
+            d.hospital.toLowerCase().includes(q) ||
+            d.specialty.toLowerCase().includes(q)
+        )
     );
   }, [search]);
 
@@ -911,7 +587,9 @@ export default function DoctorsPage({
   };
 
   const openDoctor = (doc: Doctor) => {
-    const sp = specialties.find((s) => s.doctors.some((d) => d.name === doc.name)) || specialties[0];
+    const sp =
+      specialties.find((s) => s.doctors.some((d) => d.name === doc.name)) ||
+      specialties[0];
     setSelectedSpecialty(sp);
     setSelectedDoctor(doc);
     setView('profile');
@@ -930,7 +608,19 @@ export default function DoctorsPage({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ── render ──
+  const handleBookDoctor = (doc: Doctor) => {
+    try {
+      localStorage.setItem('pantai_booking_preselected_clinic', doc.hospital);
+      localStorage.setItem('pantai_booking_preselected_doctor', doc.name);
+      localStorage.setItem('pantai_booking_preselected_specialty', doc.specialty);
+      localStorage.setItem('pantai_booking_initial_step', '4');
+    } catch (e) {
+      // ignore localStorage errors
+    }
+    onNavigateLogin();
+  };
+
+  // ── Render ──
   if (view === 'profile' && selectedDoctor && selectedSpecialty) {
     return (
       <DoctorProfileView
@@ -941,12 +631,10 @@ export default function DoctorsPage({
             setView('list');
             setSelectedDoctor(null);
           } else {
-            setView('detail');
-            setSelectedDoctor(null);
+            backToDetail();
           }
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onNavigateLogin={onNavigateLogin}
+        onBookDoctor={handleBookDoctor}
       />
     );
   }
@@ -957,7 +645,7 @@ export default function DoctorsPage({
         specialty={selectedSpecialty}
         onBack={backToList}
         onSelectDoctor={openDoctor}
-        onNavigateLogin={onNavigateLogin}
+        onBookDoctor={handleBookDoctor}
       />
     );
   }
@@ -969,11 +657,11 @@ export default function DoctorsPage({
         doctors={doctorsAtHospital}
         onSelectDoctor={openDoctor}
         onClearFilter={() => {
-          window.history.replaceState({}, "", "/doctors");
+          window.history.replaceState({}, '', '/doctors');
           setHospitalFilter(null);
         }}
         onNavigateBack={onNavigateBack}
-        onNavigateLogin={onNavigateLogin}
+        onBookDoctor={handleBookDoctor}
       />
     );
   }
@@ -986,8 +674,6 @@ export default function DoctorsPage({
       onSearch={setSearch}
       onSelectSpecialty={openSpecialty}
       onNavigateBack={onNavigateBack}
-      onNavigateHospitals={() => onNavigateHospitals()}
-      onNavigateLogin={onNavigateLogin}
     />
   );
 }
@@ -1002,8 +688,6 @@ interface SpecialtyListViewProps {
   onSearch: (v: string) => void;
   onSelectSpecialty: (s: Specialty) => void;
   onNavigateBack: () => void;
-  onNavigateHospitals: () => void;
-  onNavigateLogin: () => void;
 }
 
 function SpecialtyListView({
@@ -1013,49 +697,37 @@ function SpecialtyListView({
   onSearch,
   onSelectSpecialty,
   onNavigateBack,
-  onNavigateHospitals,
-  onNavigateLogin,
 }: SpecialtyListViewProps) {
   const totalDoctors = allSpecialties.reduce((acc, s) => acc + s.doctors.length, 0);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* Sticky top bar */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <button
-            onClick={onNavigateBack}
-            className="flex items-center gap-1.5 text-slate-600 hover:text-sky-600 transition-colors font-bold text-xs cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-xs">
-              <Activity className="w-4 h-4 text-white" />
+      {/* Sticky top bar - matching HospitalsPage layout & branding */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3.5 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onNavigateBack}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-teal-600 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
+            </button>
+
+            <div className="h-4 w-[1px] bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-xs">
+                <Activity className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-slate-900 text-sm">PantaiCare</span>
             </div>
-            <span className="font-extrabold text-slate-900 text-sm">PenangHealth</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onNavigateHospitals}
-              className="flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3.5 py-1.5 rounded-xl transition cursor-pointer"
-            >
-              <Building2 className="w-3.5 h-3.5 text-sky-600" />
-              <span>Hospitals &amp; Clinics</span>
-            </button>
-            <button
-              onClick={onNavigateLogin}
-              className="text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 px-4 py-1.5 rounded-xl transition cursor-pointer shadow-xs"
-            >
-              Sign In
-            </button>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-sky-500 via-sky-600 to-blue-600 py-14 px-4 text-white">
+      <div className="bg-gradient-to-br from-teal-600 via-sky-600 to-blue-600 py-14 px-4 text-white">
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4 border border-white/20">
             <Stethoscope className="w-4 h-4 text-white" />
@@ -1063,21 +735,18 @@ function SpecialtyListView({
               {allSpecialties.length} Specialties · {totalDoctors} Doctors
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-3 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-8 tracking-tight">
             Find Your Specialist Doctor
           </h1>
-          <p className="text-sky-100 text-sm max-w-2xl mx-auto mb-8 font-medium">
-            Browse medical specialties and connect with credentialed doctors across Penang's accredited private hospitals.
-          </p>
           {/* Search */}
           <div className="relative max-w-xl mx-auto">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search specialties or doctor names…"
+              placeholder="Search specialties, doctor names, or facilities…"
               value={search}
               onChange={(e) => onSearch(e.target.value)}
-              className="w-full pl-11 pr-5 py-3.5 rounded-2xl bg-white shadow-md text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 text-xs sm:text-sm font-medium"
+              className="w-full pl-11 pr-5 py-3.5 rounded-2xl bg-white shadow-md text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 text-xs sm:text-sm font-medium"
             />
           </div>
         </div>
@@ -1090,7 +759,7 @@ function SpecialtyListView({
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-gray-500 text-lg">No specialties found for "{search}"</p>
+            <p className="text-gray-500 text-lg">No specialties or doctors found for "{search}"</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1100,8 +769,6 @@ function SpecialtyListView({
           </div>
         )}
       </div>
-
-
     </div>
   );
 }
@@ -1109,28 +776,33 @@ function SpecialtyListView({
 // ─────────────────────────────────────────────
 // Specialty Card
 // ─────────────────────────────────────────────
-const SpecialtyCard: React.FC<{ specialty: Specialty; onClick: () => void }> = ({ specialty: sp, onClick }) => {
+const SpecialtyCard: React.FC<{ specialty: Specialty; onClick: () => void }> = ({
+  specialty: sp,
+  onClick,
+}) => {
   const Icon = sp.icon;
   return (
     <div
       onClick={onClick}
-      className={`group relative bg-white rounded-3xl border ${sp.border} shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden`}
+      className={`group relative bg-white rounded-3xl border ${sp.border} shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between`}
     >
       {/* Colored top strip */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${sp.color}`} />
 
-      <div className="p-6">
-        {/* Icon */}
-        <div
-          className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${sp.color} flex items-center justify-center mb-5 shadow-md`}
-        >
-          <Icon className="w-7 h-7 text-white" />
+      <div className="p-6 flex-1 flex flex-col justify-between">
+        <div>
+          {/* Icon */}
+          <div
+            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${sp.color} flex items-center justify-center mb-5 shadow-sm`}
+          >
+            <Icon className="w-7 h-7 text-white" />
+          </div>
+
+          <h3 className="font-bold text-gray-900 text-lg leading-snug mb-1">{sp.name}</h3>
+          <p className="text-gray-500 text-xs sm:text-sm mb-5 leading-relaxed">{sp.desc}</p>
         </div>
 
-        <h3 className="font-bold text-gray-900 text-lg leading-snug mb-1">{sp.name}</h3>
-        <p className="text-gray-500 text-sm mb-4">{sp.desc}</p>
-
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <span
             className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full ${sp.bg} ${sp.iconColor}`}
           >
@@ -1145,7 +817,7 @@ const SpecialtyCard: React.FC<{ specialty: Specialty; onClick: () => void }> = (
       </div>
     </div>
   );
-}
+};
 
 // ═════════════════════════════════════════════
 // VIEW 2 — Specialty Detail
@@ -1154,42 +826,54 @@ interface SpecialtyDetailViewProps {
   specialty: Specialty;
   onBack: () => void;
   onSelectDoctor: (d: Doctor) => void;
-  onNavigateLogin: () => void;
+  onBookDoctor: (d: Doctor) => void;
 }
 
 function SpecialtyDetailView({
   specialty: sp,
   onBack,
   onSelectDoctor,
-  onNavigateLogin,
+  onBookDoctor,
 }: SpecialtyDetailViewProps) {
   const Icon = sp.icon;
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sticky back bar */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors font-medium text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            All Specialties
-          </button>
-          <span className="text-gray-300">/</span>
-          <span className={`text-sm font-semibold ${sp.iconColor} truncate`}>{sp.name}</span>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* Sticky top bar */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3.5 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-teal-600 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>All Specialties</span>
+            </button>
+
+            <div className="h-4 w-[1px] bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-xs">
+                <Activity className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-slate-900 text-sm">PantaiCare</span>
+            </div>
+
+            <div className="h-4 w-[1px] bg-slate-200" />
+            <span className={`text-xs font-bold ${sp.iconColor} truncate`}>{sp.name}</span>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Gradient specialty hero */}
-      <div className={`bg-gradient-to-br ${sp.color} py-14 px-4`}>
+      <div className={`bg-gradient-to-br ${sp.color} py-14 px-4 text-white`}>
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center flex-shrink-0 shadow-lg">
+          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shrink-0 shadow-lg border border-white/20">
             <Icon className="w-10 h-10 text-white" />
           </div>
           <div className="flex-1">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">{sp.name}</h1>
-            <p className="text-white/80 text-base max-w-2xl leading-relaxed">{sp.overview}</p>
+            <p className="text-white/90 text-sm sm:text-base max-w-2xl leading-relaxed">{sp.overview}</p>
           </div>
         </div>
       </div>
@@ -1199,16 +883,16 @@ function SpecialtyDetailView({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left — Conditions */}
           <div>
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sticky top-20">
-              <h2 className="font-bold text-gray-900 text-lg mb-5 flex items-center gap-2">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 sticky top-20">
+              <h2 className="font-bold text-slate-900 text-base mb-5 flex items-center gap-2">
                 <CheckCircle className={`w-5 h-5 ${sp.iconColor}`} />
                 Conditions Treated
               </h2>
               <ul className="space-y-3">
                 {sp.conditions.map((c) => (
                   <li key={c} className="flex items-start gap-3">
-                    <CheckCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${sp.iconColor}`} />
-                    <span className="text-gray-700 text-sm leading-snug">{c}</span>
+                    <CheckCircle className={`w-4 h-4 mt-0.5 shrink-0 ${sp.iconColor}`} />
+                    <span className="text-slate-700 text-xs sm:text-sm leading-snug">{c}</span>
                   </li>
                 ))}
               </ul>
@@ -1217,9 +901,12 @@ function SpecialtyDetailView({
 
           {/* Right — Doctor cards (2 cols inside) */}
           <div className="lg:col-span-2">
-            <h2 className="font-bold text-gray-900 text-xl mb-5">
-              {sp.doctors.length} {sp.doctors.length === 1 ? 'Doctor' : 'Doctors'} in {sp.name}
-            </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold text-slate-900 text-lg">
+                {sp.doctors.length} {sp.doctors.length === 1 ? 'Credentialed Doctor' : 'Credentialed Doctors'} in {sp.name}
+              </h2>
+              <span className="text-xs text-slate-500 font-medium">Across PantaiCare Penang</span>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {sp.doctors.map((doc) => (
                 <DoctorCard
@@ -1227,7 +914,7 @@ function SpecialtyDetailView({
                   doctor={doc}
                   specialty={sp}
                   onViewProfile={() => onSelectDoctor(doc)}
-                  onNavigateLogin={onNavigateLogin}
+                  onBook={() => onBookDoctor(doc)}
                 />
               ))}
             </div>
@@ -1239,63 +926,60 @@ function SpecialtyDetailView({
 }
 
 // ─────────────────────────────────────────────
-// Doctor Card (used in specialty detail)
+// Doctor Card (used in specialty detail & hospital view)
 // ─────────────────────────────────────────────
 const DoctorCard: React.FC<{
   doctor: Doctor;
   specialty: Specialty;
   onViewProfile: () => void;
-  onNavigateLogin: () => void;
-}> = ({ doctor: doc, specialty: sp, onViewProfile, onNavigateLogin }) => {
+  onBook: () => void;
+}> = ({ doctor: doc, specialty: sp, onViewProfile, onBook }) => {
   return (
-    <div className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
+    <div className="group bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
       <div className="p-5 flex-1 flex flex-col">
         {/* Avatar + name row */}
-        <div className="flex items-start gap-4 mb-4">
+        <div className="flex items-start gap-3.5 mb-3.5">
           <div
-            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${sp.color} flex items-center justify-center flex-shrink-0 shadow-md`}
+            className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${sp.color} flex items-center justify-center shrink-0 shadow-sm text-white font-extrabold text-sm`}
           >
-            <span className="text-white font-bold text-base">{doc.avatar}</span>
+            {doc.avatar}
           </div>
-          <div className="min-w-0">
-            <h3 className="font-bold text-gray-900 text-sm leading-snug">{doc.name}</h3>
-            <p className={`text-xs font-semibold ${sp.iconColor} mt-0.5`}>{doc.title}</p>
-            <div className="flex items-center gap-1 mt-1">
-              <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-              <span className="text-xs text-gray-500 truncate">{doc.hospital}</span>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-slate-900 text-sm leading-snug truncate" title={doc.name}>
+              {doc.name}
+            </h3>
+            <p className={`text-xs font-semibold ${sp.iconColor} mt-0.5 truncate`}>{doc.title}</p>
+            <div className="flex items-center gap-1.5 mt-1.5 text-slate-500 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="truncate">{doc.hospital}</span>
             </div>
           </div>
         </div>
 
-        {/* Rating + experience */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-full">
-            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-            <span className="text-xs font-bold text-amber-700">{doc.rating}</span>
-            <span className="text-xs text-amber-600">({doc.reviews})</span>
-          </div>
-          <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
-            {doc.experience}
+        {/* Availability Badge */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[11px] text-teal-700 bg-teal-50 border border-teal-200/80 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 truncate">
+            <Clock className="w-3 h-3 text-teal-600 shrink-0" />
+            <span className="truncate">{doc.availability}</span>
           </span>
         </div>
 
         {/* Bio — line clamped */}
-        <p className="text-gray-600 text-xs leading-relaxed line-clamp-2 mb-4 flex-1">
+        <p className="text-slate-600 text-xs leading-relaxed line-clamp-2 mb-4 flex-1">
           {doc.bio}
         </p>
 
         {/* Actions */}
-        <div className="flex gap-2 mt-auto">
+        <div className="flex gap-2 mt-auto pt-2">
           <button
             onClick={onViewProfile}
-            className={`flex-1 text-center text-xs font-bold py-2.5 rounded-xl border-2 ${sp.border} ${sp.iconColor} hover:bg-opacity-10 transition-colors`}
-            style={{ borderColor: 'currentColor' }}
+            className={`flex-1 text-center text-xs font-bold py-2.5 rounded-xl border ${sp.border} ${sp.iconColor} hover:bg-slate-50 transition-colors cursor-pointer`}
           >
             View Profile
           </button>
           <button
-            onClick={onNavigateLogin}
-            className={`flex-1 text-xs font-bold py-2.5 rounded-xl bg-gradient-to-r ${sp.color} text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-1`}
+            onClick={onBook}
+            className={`flex-1 text-xs font-bold py-2.5 rounded-xl bg-gradient-to-r ${sp.color} text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 shadow-xs cursor-pointer`}
           >
             <Calendar className="w-3.5 h-3.5" />
             Book
@@ -1304,7 +988,7 @@ const DoctorCard: React.FC<{
       </div>
     </div>
   );
-}
+};
 
 // ═════════════════════════════════════════════
 // VIEW 3 — Doctor Profile
@@ -1313,47 +997,58 @@ interface DoctorProfileViewProps {
   doctor: Doctor;
   specialty: Specialty;
   onBack: () => void;
-  onNavigateLogin: () => void;
+  onBookDoctor: (d: Doctor) => void;
 }
 
 function DoctorProfileView({
   doctor: doc,
   specialty: sp,
   onBack,
-  onNavigateLogin,
+  onBookDoctor,
 }: DoctorProfileViewProps) {
   const Icon = sp.icon;
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sticky back bar */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors font-medium text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to {sp.name}
-          </button>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* Sticky top bar */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3.5 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-teal-600 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to {sp.name}</span>
+            </button>
+
+            <div className="h-4 w-[1px] bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-xs">
+                <Activity className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-slate-900 text-sm">PantaiCare</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Profile hero header card */}
-      <div className={`bg-gradient-to-br ${sp.color} py-12 px-4`}>
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center sm:items-end gap-8">
+      <div className={`bg-gradient-to-br ${sp.color} py-12 px-4 text-white`}>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8">
           {/* Large avatar */}
-          <div className="w-28 h-28 rounded-3xl bg-white/25 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-xl border-4 border-white/40">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 shadow-xl border-2 border-white/40">
             <span className="text-white font-extrabold text-3xl tracking-wide">{doc.avatar}</span>
           </div>
           <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight mb-1">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-tight mb-1">
               {doc.name}
             </h1>
-            <p className="text-white/90 font-semibold text-lg">{doc.title}</p>
-            <p className="text-white/70 text-sm mt-1">{doc.specialty}</p>
+            <p className="text-white/90 font-semibold text-base sm:text-lg">{doc.title}</p>
+            <p className="text-white/80 text-xs sm:text-sm mt-1">{doc.specialty}</p>
             <div className="flex items-center gap-2 mt-3">
-              <Building2 className="w-4 h-4 text-white/80" />
-              <span className="text-white/80 text-sm font-medium">{doc.hospital}</span>
+              <Building2 className="w-4 h-4 text-white/90" />
+              <span className="text-white/90 text-xs sm:text-sm font-medium">{doc.hospital}</span>
             </div>
           </div>
         </div>
@@ -1362,104 +1057,104 @@ function DoctorProfileView({
       {/* 3-col body */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column — quick info */}
+          {/* Left column — Quick Info */}
           <div className="space-y-5">
-            {/* Stats card */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-              <h2 className="font-bold text-gray-900 text-base mb-5">Quick Info</h2>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6">
+              <h2 className="font-bold text-slate-900 text-sm uppercase tracking-wider mb-5">
+                Doctor Information
+              </h2>
               <div className="space-y-4">
-                {/* Experience */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${sp.color} flex items-center justify-center flex-shrink-0`}>
-                    <Activity className="w-5 h-5 text-white" />
+                {/* Facility */}
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`w-9 h-9 rounded-xl bg-gradient-to-br ${sp.color} flex items-center justify-center shrink-0 shadow-xs text-white`}
+                  >
+                    <Building2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">Experience</p>
-                    <p className="text-sm font-bold text-gray-900">{doc.experience}</p>
-                  </div>
-                </div>
-                {/* Rating */}
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center flex-shrink-0">
-                    <Star className="w-5 h-5 text-white fill-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Rating</p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {doc.rating} <span className="text-gray-400 font-normal">({doc.reviews} reviews)</span>
+                    <p className="text-[11px] text-slate-500 font-semibold">Practicing Facility</p>
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                      {doc.hospital}
                     </p>
                   </div>
                 </div>
+
                 {/* Specialty */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${sp.color} flex items-center justify-center flex-shrink-0`}>
-                    <Icon className="w-5 h-5 text-white" />
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`w-9 h-9 rounded-xl bg-gradient-to-br ${sp.color} flex items-center justify-center shrink-0 shadow-xs text-white`}
+                  >
+                    <Icon className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">Specialty</p>
-                    <p className="text-sm font-bold text-gray-900 leading-tight">{doc.specialty}</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">Department &amp; Specialty</p>
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                      {doc.specialty}
+                    </p>
                   </div>
                 </div>
+
                 {/* Availability */}
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-5 h-5 text-white" />
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center shrink-0 shadow-xs text-white">
+                    <Clock className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">Availability</p>
-                    <p className="text-sm font-bold text-gray-900 leading-snug">{doc.availability}</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">Consultation Hours</p>
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                      {doc.availability}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* CTA buttons */}
+            {/* Book Appointment CTA button */}
             <button
-              onClick={onNavigateLogin}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white font-bold text-base hover:opacity-90 transition-all hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2"
+              onClick={() => onBookDoctor(doc)}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-sky-600 hover:from-teal-600 hover:to-sky-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Calendar className="w-5 h-5" />
-              Book Appointment
+              <Calendar className="w-4 h-4" />
+              <span>Book Appointment with {doc.name.replace(/^(Dato'|Dr\.?|Datin)\s+/i, '').split(' ')[0]}</span>
             </button>
           </div>
 
           {/* Right 2 columns — bio + CTA card */}
           <div className="lg:col-span-2 space-y-6">
             {/* About */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-              <h2 className="font-bold text-gray-900 text-xl mb-4 flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${sp.color} flex items-center justify-center`}>
-                  <Stethoscope className="w-4 h-4 text-white" />
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-8">
+              <h2 className="font-bold text-slate-900 text-lg mb-4 flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-xl bg-gradient-to-br ${sp.color} flex items-center justify-center text-white`}
+                >
+                  <Stethoscope className="w-4 h-4" />
                 </div>
-                About {doc.name.split(' ')[0]} {doc.name.split(' ')[1]}
+                About {doc.name}
               </h2>
-              <p className="text-gray-600 leading-relaxed text-base">{doc.bio}</p>
+              <p className="text-slate-600 leading-relaxed text-sm sm:text-base">{doc.bio}</p>
             </div>
 
             {/* Specialty context card */}
-            <div className={`bg-gradient-to-br from-teal-50 to-sky-50 rounded-3xl border border-teal-100 p-8`}>
+            <div className="bg-gradient-to-br from-teal-50 to-sky-50 rounded-3xl border border-teal-100 p-8">
               <div className="flex items-start gap-4">
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${sp.color} flex items-center justify-center flex-shrink-0 shadow-md`}>
-                  <Icon className="w-6 h-6 text-white" />
+                <div
+                  className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${sp.color} flex items-center justify-center shrink-0 shadow-sm text-white`}
+                >
+                  <Icon className="w-6 h-6" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-lg mb-1">{sp.name}</h3>
-                  <p className="text-gray-600 text-sm leading-relaxed mb-4">{sp.overview}</p>
+                <div className="flex-1">
+                  <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-1">{sp.name}</h3>
+                  <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-4">{sp.overview}</p>
                   <div className="flex flex-wrap gap-2">
-                    {sp.conditions.slice(0, 4).map((c) => (
+                    {sp.conditions.map((c) => (
                       <span
                         key={c}
-                        className={`inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full ${sp.bg} ${sp.iconColor}`}
+                        className={`inline-flex items-center gap-1 text-[11px] font-medium px-3 py-1 rounded-full ${sp.bg} ${sp.iconColor}`}
                       >
-                        <CheckCircle className="w-3.5 h-3.5" />
+                        <CheckCircle className="w-3 h-3" />
                         {c}
                       </span>
                     ))}
-                    {sp.conditions.length > 4 && (
-                      <span className="text-xs text-gray-500 px-3 py-1 rounded-full bg-gray-100">
-                        +{sp.conditions.length - 4} more
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1480,7 +1175,7 @@ interface HospitalDoctorsListViewProps {
   onSelectDoctor: (d: Doctor) => void;
   onClearFilter: () => void;
   onNavigateBack: () => void;
-  onNavigateLogin: () => void;
+  onBookDoctor: (d: Doctor) => void;
 }
 
 function HospitalDoctorsListView({
@@ -1489,49 +1184,52 @@ function HospitalDoctorsListView({
   onSelectDoctor,
   onClearFilter,
   onNavigateBack,
-  onNavigateLogin,
+  onBookDoctor,
 }: HospitalDoctorsListViewProps) {
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* Sticky top bar */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <button
-            onClick={onNavigateBack}
-            className="flex items-center gap-1.5 text-slate-600 hover:text-sky-600 transition-colors font-bold text-xs cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Home</span>
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-xs">
-              <Activity className="w-4 h-4 text-white" />
+      {/* Sticky top bar - matching HospitalsPage layout & branding */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3.5 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onNavigateBack}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-teal-600 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
+            </button>
+
+            <div className="h-4 w-[1px] bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-xs">
+                <Activity className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-slate-900 text-sm">PantaiCare</span>
             </div>
-            <span className="font-extrabold text-slate-900 text-sm">PenangHealth</span>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-sky-500 via-sky-600 to-blue-600 py-14 px-4 text-white">
+      <div className="bg-gradient-to-br from-teal-600 via-sky-600 to-blue-600 py-14 px-4 text-white">
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4 border border-white/20">
             <Building2 className="w-4 h-4 text-white" />
-            <span className="text-white text-xs font-bold">
-              {hospitalName}
-            </span>
+            <span className="text-white text-xs font-bold">{hospitalName}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-3 tracking-tight">
             Clinical Specialists
           </h1>
           <p className="text-sky-100 text-xs sm:text-sm max-w-xl mx-auto mb-6 font-medium">
-            Consult with available doctors practicing at this facility. Clear filter to view all specialties.
+            Consult with credentialed medical specialists practicing at {hospitalName}.
           </p>
           <button
             onClick={onClearFilter}
-            className="bg-white text-teal-600 font-bold px-6 py-2.5 rounded-xl hover:bg-teal-50 transition-all text-sm shadow-md"
+            className="bg-white text-teal-700 font-bold px-5 py-2.5 rounded-xl hover:bg-slate-50 transition-all text-xs sm:text-sm shadow-md cursor-pointer"
           >
-            Show All Specialties
+            Show All Specialties ({doctors.length} Doctors Registered)
           </button>
         </div>
       </div>
@@ -1543,10 +1241,10 @@ function HospitalDoctorsListView({
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-gray-500 text-lg">No doctors currently registered for {hospitalName}.</p>
+            <p className="text-gray-500 text-base">No doctors currently registered for {hospitalName}.</p>
             <button
               onClick={onClearFilter}
-              className="mt-4 text-teal-600 font-semibold hover:underline"
+              className="mt-4 text-teal-600 font-semibold hover:underline text-sm cursor-pointer"
             >
               Browse all specialties
             </button>
@@ -1559,7 +1257,7 @@ function HospitalDoctorsListView({
                 doctor={item.doctor}
                 specialty={item.specialty}
                 onViewProfile={() => onSelectDoctor(item.doctor)}
-                onNavigateLogin={onNavigateLogin}
+                onBook={() => onBookDoctor(item.doctor)}
               />
             ))}
           </div>

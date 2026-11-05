@@ -5,9 +5,10 @@ import {
   AlertTriangle, 
   Layers, 
   Clock, 
-  BookOpen,
-  Volume2
+  Volume2,
+  Building2
 } from 'lucide-react';
+import { getStaffAccountByEmail, PANTAI_FACILITIES, getHospitalByFacilityId } from '../../../data/staffAccounts';
 
 interface BroadcastHistoryLog {
   id: string;
@@ -16,17 +17,117 @@ interface BroadcastHistoryLog {
   level: string;
 }
 
-export default function AdminSettingsSection() {
+interface AdminSettingsSectionProps {
+  isSuperAdmin?: boolean;
+}
+
+export default function AdminSettingsSection({ isSuperAdmin = false }: AdminSettingsSectionProps) {
+  const loggedEmail = localStorage.getItem('lifelink_user_email') || '';
+  const adminAccount = React.useMemo(() => getStaffAccountByEmail(loggedEmail), [loggedEmail]);
+  const defaultFacId = adminAccount?.facility_id || 1;
+  const [targetFacilityId, setTargetFacilityId] = useState<number | 'ALL'>(isSuperAdmin ? 'ALL' : defaultFacId);
+
   // Broadcast states
   const [broadcastCategory, setBroadcastCategory] = useState<'Emergency Alert' | 'Maintenance Warning' | 'Health Advisory'>('Emergency Alert');
-  const [broadcastTarget, setBroadcastTarget] = useState<'All Users' | 'All Registered Patients' | 'All Staff'>('All Users');
+  const [broadcastTarget, setBroadcastTarget] = useState<string>('Entire Facility / All Patients & Staff');
+  const [selectedDepartment, setSelectedDepartment] = useState('General Medicine');
+  const [selectedAdminEmail, setSelectedAdminEmail] = useState('pantaipenangadmin@gmail.com');
+  const [selectedPatientEmail, setSelectedPatientEmail] = useState('');
+  const [patientUsers, setPatientUsers] = useState<{ email: string; fullName: string }[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [historyLogs, setHistoryLogs] = useState<BroadcastHistoryLog[]>([]);
 
-  // Policy CMS states
-  const [policyVersion, setPolicyVersion] = useState('v2.4.1');
-  const [isSavingPolicy, setIsSavingPolicy] = useState(false);
+  // Branch Admins Directory
+  const BRANCH_ADMIN_ACCOUNTS = React.useMemo(() => [
+    { facility_id: 1, name: "Main Pantai Hospital Penang Admin", email: "pantaipenangadmin@gmail.com", hospital: "Pantai Hospital Penang (Main Hospital)" },
+    { facility_id: 2, name: "Georgetown Pavilion Admin", email: "pantaipavilionadmin@gmail.com", hospital: "Pantai Heart & Wellness Pavilion" },
+    { facility_id: 3, name: "Bayan Baru Clinic Admin", email: "pantaiclinicadmin@gmail.com", hospital: "Pantai Premier Clinic & Day Surgery" },
+    { facility_id: 4, name: "Ayer Itam Centre Admin", email: "pantaicentreadmin@gmail.com", hospital: "Pantai Specialist Centre" }
+  ], []);
+
+  // Facility-specific departments directory
+  const FACILITY_DEPARTMENTS: Record<number, string[]> = React.useMemo(() => ({
+    1: [
+      "Internal Medicine",
+      "General Surgery",
+      "Accident & Emergency (A&E)",
+      "Respiratory Medicine",
+      "Paediatrics",
+      "Hospital Administration"
+    ],
+    2: [
+      "Cardiology",
+      "Heart & Vascular",
+      "Health Screening & Wellness",
+      "Hospital Administration"
+    ],
+    3: [
+      "Gastroenterology & Hepatology",
+      "Dermatology",
+      "Family Medicine",
+      "Hospital Administration"
+    ],
+    4: [
+      "Orthopaedic Surgery",
+      "Ear, Nose & Throat (ENT)",
+      "Ophthalmology",
+      "Hospital Administration"
+    ]
+  }), []);
+
+  const availableDepartments = React.useMemo(() => {
+    if (targetFacilityId === 'ALL') {
+      const allDepts = new Set<string>();
+      Object.values(FACILITY_DEPARTMENTS).forEach(arr => arr.forEach(d => allDepts.add(d)));
+      return Array.from(allDepts);
+    }
+    return FACILITY_DEPARTMENTS[targetFacilityId] || ["General Medicine", "Hospital Administration"];
+  }, [targetFacilityId, FACILITY_DEPARTMENTS]);
+
+  // Keep selected department valid
+  useEffect(() => {
+    if (availableDepartments.length > 0 && !availableDepartments.includes(selectedDepartment)) {
+      setSelectedDepartment(availableDepartments[0]);
+    }
+  }, [availableDepartments, selectedDepartment]);
+
+  // Filter available branch admins
+  const availableBranchAdmins = React.useMemo(() => {
+    if (targetFacilityId === 'ALL') {
+      return BRANCH_ADMIN_ACCOUNTS;
+    }
+    return BRANCH_ADMIN_ACCOUNTS.filter(a => a.facility_id === targetFacilityId);
+  }, [targetFacilityId, BRANCH_ADMIN_ACCOUNTS]);
+
+  // Filter available patients: strictly patients who have had at least one appointment at the selected hospital
+  const availablePatients = React.useMemo(() => {
+    if (targetFacilityId === 'ALL') {
+      return patientUsers;
+    }
+    const branchPatientEmails = new Set(
+      appointments
+        .filter((a: any) => {
+          const facId = a.facility_id ? Number(a.facility_id) : (getStaffAccountByEmail(a.doctorEmail)?.facility_id || 1);
+          return facId === targetFacilityId;
+        })
+        .map((a: any) => (a.patientEmail || '').toLowerCase().trim())
+        .filter(Boolean)
+    );
+    return patientUsers.filter(p => branchPatientEmails.has(p.email.toLowerCase().trim()));
+  }, [targetFacilityId, patientUsers, appointments]);
+
+  // Keep selected patient valid
+  useEffect(() => {
+    if (availablePatients.length > 0) {
+      if (!availablePatients.some(p => p.email === selectedPatientEmail)) {
+        setSelectedPatientEmail(availablePatients[0].email);
+      }
+    } else {
+      setSelectedPatientEmail('');
+    }
+  }, [availablePatients, selectedPatientEmail]);
 
   const fetchBroadcastHistory = () => {
     fetch("/api/logs")
@@ -66,36 +167,49 @@ export default function AdminSettingsSection() {
 
   useEffect(() => {
     fetchBroadcastHistory();
+    Promise.all([
+      fetch("/api/admin/users").then(res => res.json()),
+      fetch("/api/appointments").then(res => res.json())
+    ]).then(([usersData, aptsData]) => {
+      if (Array.isArray(usersData)) {
+        const pts = usersData.filter((u: any) => u.role === 'Patient').map((u: any) => ({
+          email: u.email,
+          fullName: u.fullName || u.email
+        }));
+        setPatientUsers(pts);
+      }
+      if (Array.isArray(aptsData)) {
+        setAppointments(aptsData);
+      }
+    }).catch(() => {});
   }, []);
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!broadcastMessage.trim()) {
-      alert("Please enter a broadcast message.");
-      return;
-    }
+    if (!broadcastMessage.trim()) return alert("Please enter a broadcast message.");
+    if (broadcastTarget === 'Specific Patient' && !selectedPatientEmail.trim()) return alert("Please select a target patient.");
 
-    if (!window.confirm("Verify Broadcast: Dispatching this memo immediately transmits notifications to selected dashboards. Proceed?")) return;
+    let audience = broadcastTarget as string;
+    if (broadcastTarget === 'Specific Department') audience = `Specific Department: ${selectedDepartment}`;
+    else if (broadcastTarget === 'Branch Administrator') audience = `Branch Administrator: ${selectedAdminEmail}`;
+    else if (broadcastTarget === 'Specific Patient') audience = `Specific Patient: ${selectedPatientEmail.trim()}`;
+    if (targetFacilityId !== 'ALL') audience += ` [${getHospitalByFacilityId(targetFacilityId)}]`;
 
+    if (!window.confirm("Verify Broadcast: Dispatching this memo immediately transmits notifications. Proceed?")) return;
     setIsSending(true);
     try {
       const res = await fetch("/api/admin/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category: broadcastCategory,
-          targetAudience: broadcastTarget,
-          message: broadcastMessage
-        })
+        body: JSON.stringify({ category: broadcastCategory, targetAudience: audience, specificPatientEmail: broadcastTarget === 'Specific Patient' ? selectedPatientEmail.trim() : undefined, message: broadcastMessage })
       });
-
-      if (res.ok) {
-        alert("System-wide broadcast dispatched successfully!");
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("System broadcast dispatched successfully!");
         setBroadcastMessage('');
         fetchBroadcastHistory();
       } else {
-        const err = await res.json();
-        alert(`Failed to dispatch: ${err.error || "Server error"}`);
+        alert(`Failed to dispatch: ${data.error || "Server error"}`);
       }
     } catch (e: any) {
       alert(`Network error: ${e.message}`);
@@ -104,88 +218,169 @@ export default function AdminSettingsSection() {
     }
   };
 
-  const handleSavePolicy = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingPolicy(true);
-    setTimeout(() => {
-      alert("Terms of Service and Privacy Policy metadata successfully synced to HL7 core server!");
-      setPolicyVersion(prev => `v${(parseFloat(prev.substring(1)) + 0.1).toFixed(1)}`);
-      setIsSavingPolicy(false);
-    }, 1000);
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans text-neutral-800">
+    <div className="max-w-4xl mx-auto space-y-6 font-sans text-neutral-800">
       
-      {/* Col 1 & 2: Emergency Broadcast Sender */}
-      <div className="lg:col-span-2 space-y-6">
-        
-        {/* Broadcast Composer */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
-          <div className="border-b border-neutral-100 pb-4 mb-5 flex items-center gap-3">
-            <div className="p-2.5 bg-red-50 text-red-750 border border-red-100 rounded-xl">
-              <Megaphone className="w-5 h-5" />
-            </div>
+      {/* Broadcast Composer */}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
+        <div className="border-b border-neutral-100 pb-4 mb-5">
+          <h3 className="font-bold text-base text-neutral-900">System Broadcast & Clinical Memo Dispatcher</h3>
+        </div>
+
+        <form onSubmit={handleSendBroadcast} className="space-y-4">
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            {/* 1. Target Hospital Scope */}
             <div>
-              <h3 className="font-bold text-base text-neutral-900">System-Wide Emergency Broadcast announcement</h3>
-              <p className="text-xs text-neutral-500 mt-0.5 font-medium">Broadcast urgent alerts, maintenance alerts, or clinical warnings to all dashboards simultaneously.</p>
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">
+                Target Hospital / Scope
+              </label>
+              {isSuperAdmin ? (
+                <select
+                  value={targetFacilityId}
+                  onChange={(e) => setTargetFacilityId(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                  className="w-full bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-xs text-neutral-900 font-bold outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 h-9 cursor-pointer"
+                >
+                  <option value="ALL">All Facilities (Group-Wide)</option>
+                  {PANTAI_FACILITIES.map(f => (
+                    <option key={f.id} value={f.id}>{f.shortTag} ({f.location})</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 font-bold h-9 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                  <span className="truncate">{adminAccount?.hospital || 'Pantai Hospital Penang (Main Hospital)'}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Broadcast Category */}
+            <div>
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">
+                Broadcast Category
+              </label>
+              <select
+                value={broadcastCategory}
+                onChange={(e) => setBroadcastCategory(e.target.value as any)}
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
+              >
+                <option value="Emergency Alert">Emergency Alert / Triage Warning</option>
+                <option value="Maintenance Warning">Maintenance Warning</option>
+                <option value="Health Advisory">Health Advisory / Vaccination Drive</option>
+              </select>
+            </div>
+
+            {/* 3. Target Audience */}
+            <div>
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">
+                Target Audience
+              </label>
+              <select
+                value={broadcastTarget}
+                onChange={(e) => setBroadcastTarget(e.target.value)}
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
+              >
+                <option value="Entire Facility / All Patients & Staff">
+                  {targetFacilityId === 'ALL' ? "Entire Healthcare Group (All Patients & Staff)" : "Entire Facility (All Patients & Staff)"}
+                </option>
+                <option value="Specific Department">Specific Department</option>
+                {isSuperAdmin && <option value="Branch Administrator">Branch Administrator</option>}
+                <option value="Specific Patient">Specific Patient</option>
+                <option value="Clinical Staff / Doctors Only">Clinical Staff / Doctors Only</option>
+                <option value="Patients Only">Patients Only</option>
+              </select>
             </div>
           </div>
 
-          <form onSubmit={handleSendBroadcast} className="space-y-4">
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">Broadcast Category</label>
-                <select
-                  value={broadcastCategory}
-                  onChange={(e) => setBroadcastCategory(e.target.value as any)}
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
-                >
-                  <option value="Emergency Alert">🚨 Emergency Alert / Triage Warning</option>
-                  <option value="Maintenance Warning">⚠️ Maintenance Warning</option>
-                  <option value="Health Advisory">📢 Health Advisory / Vaccination Drive</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">Target Audience</label>
-                <select
-                  value={broadcastTarget}
-                  onChange={(e) => setBroadcastTarget(e.target.value as any)}
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
-                >
-                  <option value="All Users">All Dashboard Sessions (Patients & Staff)</option>
-                  <option value="All Registered Patients">Outpatient Portals Only (Notifications)</option>
-                  <option value="All Staff">Clinician Portals Only (System Logs Feed)</option>
-                </select>
-              </div>
-            </div>
-
+          {/* Sub-selector for Specific Department */}
+          {broadcastTarget === 'Specific Department' && (
             <div>
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">Alert Message</label>
-              <textarea
-                value={broadcastMessage}
-                onChange={(e) => setBroadcastMessage(e.target.value)}
-                placeholder="Enter alert memo to dispatch... E.g., 'Penang General Outpatient System maintenance starts at 12:00 AM. Expect transient connection interruptions.'"
-                rows={4}
-                required
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 font-sans leading-relaxed resize-none"
-              ></textarea>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-neutral-100">
-              <button
-                type="submit"
-                disabled={isSending}
-                className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">
+                Select Department {targetFacilityId !== 'ALL' && `(${getHospitalByFacilityId(targetFacilityId)})`}
+              </label>
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
               >
-                {isSending ? "Dispatching Broadcast..." : "Dispatch Channel Broadcast"}
-              </button>
+                {availableDepartments.map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
             </div>
+          )}
 
-          </form>
-        </div>
+          {/* Sub-selector for Branch Administrator */}
+          {isSuperAdmin && broadcastTarget === 'Branch Administrator' && (
+            <div>
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">
+                Select Branch Administrator
+              </label>
+              <select
+                value={selectedAdminEmail}
+                onChange={(e) => setSelectedAdminEmail(e.target.value)}
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
+              >
+                {availableBranchAdmins.map(adm => (
+                  <option key={adm.email} value={adm.email}>
+                    {adm.name} — {adm.hospital} ({adm.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Sub-selector for Specific Patient (filtered strictly to this facility) */}
+          {broadcastTarget === 'Specific Patient' && (
+            <div>
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">
+                Target Patient {targetFacilityId !== 'ALL' && `(${getHospitalByFacilityId(targetFacilityId)})`}
+              </label>
+              {availablePatients.length > 0 ? (
+                <select
+                  value={selectedPatientEmail}
+                  onChange={(e) => setSelectedPatientEmail(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
+                >
+                  {availablePatients.map(p => (
+                    <option key={p.email} value={p.email}>
+                      {p.fullName} ({p.email})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-500 italic h-9 flex items-center">
+                  No patients found with booking/appointment history at this facility.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">Alert Message</label>
+            <textarea
+              value={broadcastMessage}
+              onChange={(e) => setBroadcastMessage(e.target.value)}
+              placeholder="Enter alert memo to dispatch..."
+              rows={4}
+              required
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 font-sans leading-relaxed resize-none"
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-neutral-100">
+            <button
+              type="submit"
+              disabled={isSending}
+              className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSending ? "Dispatching Broadcast..." : "Dispatch Channel Broadcast"}
+            </button>
+          </div>
+
+        </form>
+      </div>
 
         {/* Broadcast history logs list */}
         <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
@@ -239,80 +434,6 @@ export default function AdminSettingsSection() {
             </table>
           </div>
         </div>
-
-      </div>
-
-      {/* Col 3: Content Management Policy system */}
-      <div className="lg:col-span-1 space-y-6">
-        
-        {/* CMS Updates */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs">
-          <div className="border-b border-neutral-100 pb-4 mb-5 flex items-center gap-3">
-            <div className="p-2.5 bg-neutral-50 text-neutral-800 border border-neutral-200 rounded-xl">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base text-neutral-900">CMS policy updates</h3>
-              <p className="text-xs text-neutral-500 mt-0.5 font-medium">Publish terms of service & privacy metadata.</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSavePolicy} className="space-y-4">
-            <div>
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">Active Policy Version</label>
-              <input
-                type="text"
-                value={policyVersion}
-                disabled
-                className="w-full bg-neutral-150 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono text-neutral-500 outline-none h-9 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-0.5 block mb-1">Update Summary</label>
-              <textarea
-                placeholder="E.g., Added GDPR & PDPA 2010 details regarding electronic health records storage policies."
-                rows={3}
-                required
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 font-sans leading-relaxed resize-none"
-              ></textarea>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-neutral-100">
-              <button
-                type="submit"
-                disabled={isSavingPolicy}
-                className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs"
-              >
-                {isSavingPolicy ? "Saving Policy..." : "Publish Policy Version"}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Global bypass toggles */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-          <h4 className="font-bold text-sm text-neutral-900">Infrastructure overrides</h4>
-          
-          <div className="space-y-3.5 pt-1.5">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-neutral-600">Secure Edge SSL Mode</span>
-              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded text-[10px] font-bold">STRICT</span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-neutral-600">HL7 Integration Engine</span>
-              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded text-[10px] font-bold">CONNECTED</span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-neutral-600">Backup DB Redundancy</span>
-              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded text-[10px] font-bold">OPTIMAL</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
 
     </div>
   );

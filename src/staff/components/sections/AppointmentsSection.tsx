@@ -9,10 +9,21 @@ import {
   Plus, 
   AlertCircle,
   FileCheck2,
-  CalendarCheck2
+  CalendarCheck2,
+  Lock,
+  Phone,
+  UserCheck
 } from 'lucide-react';
 import { mockAppointments } from '../../data/mockData';
 import { Appointment } from '../../types';
+import { 
+  getStaffAccountByEmail, 
+  getFacilityIdByHospital, 
+  matchesSpecialty,
+  getDepartmentQueueCode,
+  formatQueueNumber
+} from '../../../data/staffAccounts';
+import { allPantaiDoctors } from '../../../data/pantaiHospitalsData';
 
 function getClinicFromEmail(email: string): string {
   const emailLower = (email || '').toLowerCase().trim();
@@ -49,43 +60,255 @@ export default function AppointmentsSection() {
   const [editStatus, setEditStatus] = useState<string>('Pending');
   const [editRemarks, setEditRemarks] = useState('');
   
-  // Telephone manual booking states
+  // User & role info
+  const loggedEmail = (localStorage.getItem("lifelink_user_email") || localStorage.getItem("carepoint_user_email") || '').toLowerCase();
+  const staffAccount = getStaffAccountByEmail(loggedEmail);
+  const isSuperAdmin = staffAccount?.role === 'super_admin' || loggedEmail === 'superadmin@pantaicare.com' || loggedEmail === 'superadmin@gmail.com';
+  const isDoctor = staffAccount?.role?.toLowerCase() === "doctor" || loggedEmail.startsWith("dr_") || (localStorage.getItem("carepoint_user_role") || "").toLowerCase() === "doctor";
+  const isGeneralConsultant = loggedEmail === "doctor@hospital.com" || 
+                              (staffAccount?.name || "").toLowerCase().includes("consultant (main hospital)");
+  const isSpecificDoctor = isDoctor && !isGeneralConsultant;
+  const loggedDoctorName = staffAccount?.name || localStorage.getItem("lifelink_user_name") || localStorage.getItem("carepoint_user_name") || "";
+  const doctorDept = staffAccount?.department || localStorage.getItem("lifelink_user_department") || "";
+
+  // Intake time slots matching patient 1-hour consultation slots
+  const INTAKE_TIME_SLOTS: Array<{ slot: string; startHour: number; endHour: number; isBuffer: boolean; isLunch: boolean }> = [
+    { slot: '08:00 - 09:00', startHour: 8, endHour: 9, isBuffer: false, isLunch: false },
+    { slot: '09:00 - 10:00', startHour: 9, endHour: 10, isBuffer: false, isLunch: false },
+    { slot: '10:00 - 11:00', startHour: 10, endHour: 11, isBuffer: false, isLunch: false },
+    { slot: '11:00 - 12:00', startHour: 11, endHour: 12, isBuffer: true, isLunch: false },
+    { slot: '13:00 - 14:00', startHour: 13, endHour: 14, isBuffer: false, isLunch: false },
+    { slot: '14:00 - 15:00', startHour: 14, endHour: 15, isBuffer: false, isLunch: false },
+    { slot: '15:00 - 16:00', startHour: 15, endHour: 16, isBuffer: false, isLunch: false },
+    { slot: '16:00 - 17:00', startHour: 16, endHour: 17, isBuffer: true, isLunch: false },
+  ];
+
+  // Manual booking states (Walk-in & Telephone)
   const [showIntakeModal, setShowIntakeModal] = useState(false);
+  const [intakeType, setIntakeType] = useState<'walk-in' | 'phone'>('walk-in');
   const [intakePatientName, setIntakePatientName] = useState('');
   const [intakePatientPhone, setIntakePatientPhone] = useState('');
   const [intakePatientEmail, setIntakePatientEmail] = useState('');
-  const [intakeDoctorName, setIntakeDoctorName] = useState('');
-  const [intakeDate, setIntakeDate] = useState('');
-  const [intakeTimeSlot, setIntakeTimeSlot] = useState('10:00 AM');
+  const [intakeDoctorName, setIntakeDoctorName] = useState(loggedDoctorName || '');
+  const [intakeDate, setIntakeDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [intakeTimeSlot, setIntakeTimeSlot] = useState('10:00 - 11:00');
   const [intakeRemarks, setIntakeRemarks] = useState('');
   const [clinicians, setClinicians] = useState<any[]>([]);
+  const [allBookingsForSlots, setAllBookingsForSlots] = useState<any[]>([]);
+
+  const handleOpenIntakeModal = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setIntakeType('walk-in');
+    setIntakeDate(today);
+    if (isSpecificDoctor && loggedDoctorName) {
+      setIntakeDoctorName(loggedDoctorName);
+    } else {
+      setIntakeDoctorName('');
+    }
+    // Refresh latest appointments from DB so slot counts are instantly up to date with patient bookings
+    fetch("/api/appointments")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAllBookingsForSlots(data);
+        }
+      })
+      .catch(() => {});
+    setShowIntakeModal(true);
+  };
+
+  const getSlotAvailability = (slotStr: string, date: string, docName: string, excludeAptId?: string | number) => {
+    const slotDef = INTAKE_TIME_SLOTS.find(s => s.slot === slotStr) || {
+      slot: slotStr,
+      startHour: parseInt(slotStr.split(':')[0] || '10', 10),
+      endHour: parseInt(slotStr.split(':')[0] || '10', 10) + 1,
+      isBuffer: slotStr.startsWith('11:') || slotStr.startsWith('16:'),
+      isLunch: slotStr.startsWith('12:')
+    };
+
+    const baseCapacity = slotDef.isLunch ? 0 : slotDef.isBuffer ? 2 : 3;
+    if (!date) return { remaining: baseCapacity, max: baseCapacity, dynamicCapacity: baseCapacity, booked: 0, isUnavailable: false, reason: '' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = date === todayStr;
+    const isPast = date < todayStr;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const slotStartMinutes = slotDef.startHour * 60;
+    const slotEndMinutes = slotDef.endHour * 60;
+
+    let dynamicCapacity = baseCapacity;
+    let reason = '';
+
+    if (slotDef.isLunch) {
+      dynamicCapacity = 0;
+      reason = 'Lunch Break (Closed)';
+    } else if (isPast) {
+      dynamicCapacity = 0;
+      reason = 'Expired (Time Passed)';
+    } else if (isToday) {
+      if (now.getHours() >= 17) {
+        dynamicCapacity = 0;
+        reason = 'Clinic Closed for Today';
+      } else if (currentMinutes >= slotEndMinutes) {
+        dynamicCapacity = 0;
+        reason = 'Expired (Time Passed)';
+      } else if (currentMinutes >= slotStartMinutes) {
+        const elapsed = currentMinutes - slotStartMinutes;
+        if (slotDef.isBuffer) {
+          if (elapsed <= 15) {
+            dynamicCapacity = 1;
+          } else {
+            dynamicCapacity = 0;
+            reason = 'Expired (Time Passed)';
+          }
+        } else {
+          if (elapsed <= 15) {
+            dynamicCapacity = 2;
+          } else if (elapsed <= 30) {
+            dynamicCapacity = 1;
+          } else {
+            dynamicCapacity = 0;
+            reason = 'Expired (Time Passed)';
+          }
+        }
+      }
+    }
+
+    const cleanDoc = (docName || '').toLowerCase().replace(/^(dr\.|dato' dr\.|dr)\s*/, "").trim();
+    const sourceList = allBookingsForSlots.length > 0 ? allBookingsForSlots : appointments;
+    const booked = sourceList.filter(ap => {
+      if (excludeAptId && String(ap.id) === String(excludeAptId)) return false;
+      if (ap.status === 'Cancelled' || ap.status === 'CANCELLED' || ap.status === 'Rejected') return false;
+      const apDate = ap.date || (ap.dateTime ? ap.dateTime.split(' ')[0] : '');
+      if (apDate !== date) return false;
+
+      const apDoc = (ap.doctorName || '').toLowerCase().replace(/^(dr\.|dato' dr\.|dr)\s*/, "").trim();
+      const docMatches = !cleanDoc || apDoc === cleanDoc || apDoc.includes(cleanDoc) || cleanDoc.includes(apDoc);
+      if (!docMatches) return false;
+
+      const apSlot = (ap.timeSlot || (ap.dateTime ? ap.dateTime.split(' ')[1] : '') || '').trim().toLowerCase();
+      const targetSlot = slotStr.trim().toLowerCase();
+      if (apSlot === targetSlot || apSlot.includes(targetSlot) || targetSlot.includes(apSlot)) return true;
+      const startHour = targetSlot.split("-")[0].trim().toLowerCase();
+      if (startHour && apSlot.startsWith(startHour)) return true;
+      return false;
+    }).length;
+
+    const remaining = Math.max(0, dynamicCapacity - booked);
+    const isUnavailable = remaining === 0;
+    if (isUnavailable && !reason) {
+      reason = 'Fully Booked';
+    }
+
+    return { 
+      remaining, 
+      max: baseCapacity, 
+      dynamicCapacity, 
+      booked, 
+      isUnavailable, 
+      reason 
+    };
+  };
+
+  // Auto-select valid slot when opening modal or changing date/doctor
+  React.useEffect(() => {
+    if (!showIntakeModal) return;
+    const docTarget = (isSpecificDoctor && loggedDoctorName) ? loggedDoctorName : intakeDoctorName;
+    const curAvailability = getSlotAvailability(intakeTimeSlot, intakeDate, docTarget);
+    if (curAvailability.isUnavailable) {
+      const firstAvailable = INTAKE_TIME_SLOTS.find(s => {
+        const a = getSlotAvailability(s.slot, intakeDate, docTarget);
+        return !a.isUnavailable;
+      });
+      if (firstAvailable) {
+        setIntakeTimeSlot(firstAvailable.slot);
+      }
+    }
+  }, [intakeDate, intakeDoctorName, showIntakeModal, allBookingsForSlots]);
+
+  React.useEffect(() => {
+    if (!editModalApt) return;
+    const curAvailability = getSlotAvailability(
+      editTimeSlot, 
+      editDate, 
+      editModalApt.doctorName || '', 
+      editModalApt.id
+    );
+    if (curAvailability.isUnavailable) {
+      const firstAvailable = INTAKE_TIME_SLOTS.find(s => {
+        const a = getSlotAvailability(s.slot, editDate, editModalApt.doctorName || '', editModalApt.id);
+        return !a.isUnavailable;
+      });
+      if (firstAvailable) {
+        setEditTimeSlot(firstAvailable.slot);
+      }
+    }
+  }, [editDate, editModalApt]);
 
   const handleConfirmIntakeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!intakePatientName || !intakePatientPhone || !intakeDate || !intakeDoctorName) {
+    const finalDoctor = (isSpecificDoctor && loggedDoctorName) ? loggedDoctorName : intakeDoctorName;
+    if (!intakePatientName || !intakePatientPhone || !intakeDate || !finalDoctor) {
       alert("Please fill in all required fields.");
       return;
     }
 
-    const currentClinic = getLoggedUserClinic();
-    const docObj = clinicians.find(c => c.name.toLowerCase() === intakeDoctorName.toLowerCase());
-    const specialty = docObj ? docObj.specialty : "General Medicine";
-    const doctorId = intakeDoctorName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    const { remaining, isUnavailable, reason } = getSlotAvailability(intakeTimeSlot, intakeDate, finalDoctor);
+    if (isUnavailable || remaining === 0) {
+      alert(`The selected time slot (${intakeTimeSlot}) is unavailable (${reason || 'Fully Booked'}). Please choose another time.`);
+      return;
+    }
+
+    const currentClinic = staffAccount?.hospital || getLoggedUserClinic();
+    const docObj = clinicians.find(c => c.name.toLowerCase() === finalDoctor.toLowerCase());
+    const specialty = docObj ? docObj.specialty : (staffAccount?.department || "General Medicine");
+    const doctorId = finalDoctor.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    const isWalkIn = intakeType === 'walk-in';
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const isToday = intakeDate === todayStr;
+
+    const deptCode = getDepartmentQueueCode(specialty || finalDoctor);
+    const sameDayDeptApts = appointments.filter(apt => {
+      if (apt.date !== intakeDate) return false;
+      if ((apt.status || '').toLowerCase() === "cancelled") return false;
+      const aDeptCode = getDepartmentQueueCode(apt.specialty || apt.remarks || apt.symptoms || apt.doctorName);
+      return aDeptCode === deptCode;
+    });
+
+    let maxSeq = 0;
+    for (const a of sameDayDeptApts) {
+      const qStr = (a.queueNumber || '').replace(/^#/, '');
+      const m = qStr.match(/Q-(\d+)/i);
+      if (m) {
+        const numPart = m[1];
+        const deptPrefix = String(deptCode);
+        if (numPart.startsWith(deptPrefix) && numPart.length === deptPrefix.length + 2) {
+          const seq = parseInt(numPart.slice(deptPrefix.length), 10);
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      }
+    }
+    const nextQueueNumber = formatQueueNumber(deptCode, maxSeq + 1);
 
     const payload = {
       patientName: intakePatientName,
-      patientEmail: intakePatientEmail || `phone-${intakePatientPhone}@lifelink.my`,
-      patientId: `p-phone-${Date.now()}`,
+      patientPhone: intakePatientPhone,
+      patientEmail: intakePatientEmail || (isWalkIn ? `walkin-${intakePatientPhone}@lifelink.my` : `phone-${intakePatientPhone}@lifelink.my`),
       doctorId,
-      doctorName: intakeDoctorName,
+      doctorName: finalDoctor,
       specialty,
-      doctorImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(intakeDoctorName)}&background=0d9488&color=fff`,
+      doctorImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(finalDoctor)}&background=0d9488&color=fff`,
       date: intakeDate,
       timeSlot: intakeTimeSlot,
-      status: "Approved",
-      type: "In-Clinic",
+      status: isWalkIn && isToday ? "Checked In" : "Approved",
+      checkedIn: isWalkIn && isToday,
+      checkInTime: isWalkIn && isToday ? nowTimeStr : undefined,
+      type: isWalkIn ? "Walk-in" : "In-Clinic",
       clinic: currentClinic || "General Clinic",
-      symptoms: intakeRemarks || "Telephone Booking Triage"
+      symptoms: intakeRemarks || (isWalkIn ? "Walk-in Patient Triage" : "Telephone Booking Triage"),
+      queueNumber: nextQueueNumber
     };
 
     try {
@@ -97,39 +320,70 @@ export default function AppointmentsSection() {
       if (res.ok) {
         const saved = await res.json();
         setAppointments(prev => [saved, ...prev]);
+        setAllBookingsForSlots(prev => [saved, ...prev]);
         setShowIntakeModal(false);
         setIntakePatientName('');
         setIntakePatientPhone('');
         setIntakePatientEmail('');
-        setIntakeDoctorName('');
-        setIntakeDate('');
+        if (!isDoctor) setIntakeDoctorName('');
         setIntakeRemarks('');
       } else {
         const errData = await res.json();
-        alert(`Error: ${errData.error || "Failed to save phone appointment."}`);
+        alert(`Error: ${errData.error || "Failed to save appointment."}`);
       }
     } catch (err) {
       console.error("Failed to post manual intake appointment", err);
-      alert("Network error: failed to submit phone booking.");
+      alert("Network error: failed to submit booking.");
     }
   };
   const [selectedHospital, setSelectedHospital] = useState(() => {
-    const isAdmin = localStorage.getItem('lifelink_user_role') === 'Admin';
-    return isAdmin ? 'ALL' : getLoggedUserClinic();
+    if (isSuperAdmin) return 'ALL';
+    if (staffAccount?.hospital) return staffAccount.hospital;
+    return localStorage.getItem('lifelink_user_clinic') || 'ALL';
   });
-  const isAdmin = localStorage.getItem('lifelink_user_role') === 'Admin';
+  const isAdmin = (localStorage.getItem('lifelink_user_role') || '').toLowerCase() === 'admin' || isSuperAdmin;
 
   const handleOpenEditModal = (apt: Appointment) => {
     setEditModalApt(apt);
     setEditDate(apt.date || (apt.dateTime ? apt.dateTime.split(' ')[0] : ''));
-    setEditTimeSlot(apt.timeSlot || (apt.dateTime ? apt.dateTime.split(' ')[1] : '10:00 AM'));
+    setEditTimeSlot(apt.timeSlot || (apt.dateTime ? apt.dateTime.split(' ')[1] : '10:00 - 11:00'));
     setEditStatus(apt.status);
     setEditRemarks(apt.remarks || '');
+
+    fetch("/api/appointments")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAllBookingsForSlots(data);
+        }
+      })
+      .catch(() => {});
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editModalApt) return;
+
+    if (!editDate || !editTimeSlot) {
+      alert("Please select a date and time slot.");
+      return;
+    }
+
+    const { isUnavailable, reason } = getSlotAvailability(
+      editTimeSlot, 
+      editDate, 
+      editModalApt.doctorName || '', 
+      editModalApt.id
+    );
+
+    if (isUnavailable) {
+      alert(`The selected time slot (${editTimeSlot}) is unavailable (${reason || 'Fully Booked'}). Please choose an active time slot.`);
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to update this appointment's schedule and status?")) {
+      return;
+    }
 
     const payload = {
       date: editDate,
@@ -146,18 +400,17 @@ export default function AppointmentsSection() {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        setAppointments(prev => prev.map(ap => 
-          ap.id === editModalApt.id 
-            ? { 
-                ...ap, 
-                date: editDate, 
-                timeSlot: editTimeSlot, 
-                dateTime: `${editDate} ${editTimeSlot}`,
-                status: editStatus, 
-                remarks: editRemarks 
-              } 
-            : ap
-        ));
+        const updatedItem = { 
+          ...editModalApt, 
+          date: editDate, 
+          timeSlot: editTimeSlot, 
+          dateTime: `${editDate} ${editTimeSlot}`,
+          status: editStatus, 
+          remarks: editRemarks,
+          symptoms: editRemarks
+        };
+        setAppointments(prev => prev.map(ap => ap.id === editModalApt.id ? updatedItem : ap));
+        setAllBookingsForSlots(prev => prev.map(ap => ap.id === editModalApt.id ? updatedItem : ap));
         setEditModalApt(null);
       }
     } catch (err) {
@@ -165,41 +418,128 @@ export default function AppointmentsSection() {
     }
   };
 
-  const handleToggleDone = async (apt: Appointment) => {
-    const nextStatus = apt.status === 'Done' ? 'Approved' : 'Done';
-    try {
-      const res = await fetch(`/api/appointments/${apt.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus })
-      });
-      if (res.ok) {
-        setAppointments(prev => prev.map(ap => 
-          ap.id === apt.id 
-            ? { ...ap, status: nextStatus } 
-            : ap
-        ));
-      }
-    } catch (err) {
-      console.error("Failed to toggle done status", err);
+  const isSlotOverdue = (dateStr?: string, timeSlot?: string) => {
+    if (!dateStr) return false;
+    const now = new Date();
+    const myFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kuala_Lumpur',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const parts = myFormatter.formatToParts(now);
+    const p: Record<string, string> = {};
+    parts.forEach(x => { p[x.type] = x.value; });
+    const todayStr = `${p.year}-${p.month}-${p.day}`;
+    if (dateStr < todayStr) return true;
+    if (dateStr > todayStr) return false;
+
+    // dateStr === todayStr
+    if (!timeSlot) return false;
+    const currentMins = parseInt(p.hour, 10) * 60 + parseInt(p.minute, 10);
+    const dashSplit = timeSlot.split(/[-–—]/);
+    const targetStr = (dashSplit.length > 1 ? dashSplit[1] : dashSplit[0]).trim();
+    const isPM = /pm/i.test(targetStr);
+    const isAM = /am/i.test(targetStr);
+    const match = targetStr.match(/(\d{1,2}):(\d{2})/);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      if (isPM && h < 12) h += 12;
+      if (isAM && h === 12) h = 0;
+      return currentMins >= (h * 60 + m);
     }
+    return false;
+  };
+
+  const resolveAutoStatus = (ap: any): string => {
+    if (ap.status === 'Cancelled' || ap.status === 'Rejected') {
+      return 'Cancelled';
+    }
+    if (ap.status === 'Done' || ap.status === 'Completed') return 'Completed';
+
+    const dateStr = ap.date || (ap.dateTime ? ap.dateTime.split(' ')[0] : '');
+    const slotStr = ap.timeSlot || (ap.dateTime ? ap.dateTime.split(' ')[1] : '');
+    const overdue = isSlotOverdue(dateStr, slotStr);
+
+    if (overdue) {
+      if (ap.checkedIn || ap.status === 'Checked In' || ap.status === 'In Consultation') {
+        return 'Completed';
+      }
+      return 'Absent';
+    }
+
+    if (ap.checkedIn || ap.status === 'Checked In') return 'Checked In';
+    if (ap.status === 'In Consultation') return 'In Consultation';
+    if (ap.status === 'Pending') return 'Pending';
+    if (ap.status === 'Rescheduled') return 'Rescheduled';
+    return ap.status || 'Approved';
   };
 
   React.useEffect(() => {
-    const currentClinic = getLoggedUserClinic();
+    const loggedEmail = localStorage.getItem("lifelink_user_email") || '';
+    const staffAccount = getStaffAccountByEmail(loggedEmail);
+    const currentClinic = staffAccount?.hospital || getLoggedUserClinic();
+    const currentDepartment = staffAccount?.department || localStorage.getItem("lifelink_user_department") || "All";
+    const currentFacilityId = staffAccount?.facility_id || getFacilityIdByHospital(currentClinic);
+    const isDoctor = staffAccount?.role?.toLowerCase() === "doctor" || loggedEmail.toLowerCase().startsWith("dr_");
+    const isGeneralConsultant = loggedEmail.toLowerCase() === "doctor@hospital.com" || 
+                                currentDepartment === "All" || 
+                                (staffAccount?.name || "").toLowerCase().includes("consultant (main hospital)");
+    const isSpecificDoctor = isDoctor && !isGeneralConsultant;
+    const doctorName = isSpecificDoctor ? staffAccount?.name : "";
 
     fetch("/api/appointments")
       .then(res => res.json())
       .then(data => {
-        let mapped = data;
-        if (localStorage.getItem('lifelink_user_role') !== 'Admin' && currentClinic) {
-          mapped = data.filter((ap: any) => (ap.clinic || ap.hospital || '').toLowerCase() === currentClinic.toLowerCase());
+        let mapped = (Array.isArray(data) ? data : []).map((ap: any) => {
+          const effective = resolveAutoStatus(ap);
+          return { ...ap, status: effective };
+        });
+        const isAdmin = (localStorage.getItem('lifelink_user_role')?.toLowerCase() === 'admin') || isSuperAdmin;
+        if (isAdmin && !isSuperAdmin) {
+          // Branch Admin: strictly scope to the admin's bound facility_id
+          if (currentFacilityId) {
+            mapped = mapped.filter((ap: any) => {
+              const aptFacilityId = ap.facility_id ? Number(ap.facility_id) : getFacilityIdByHospital(ap.clinic || ap.hospital);
+              return aptFacilityId === currentFacilityId;
+            });
+          }
+        } else if (!isAdmin && currentClinic) {
+          mapped = mapped.filter((ap: any) => {
+            // 1. Hospital / Facility match
+            const aptFacilityId = ap.facility_id ? Number(ap.facility_id) : getFacilityIdByHospital(ap.clinic || ap.hospital);
+            if (aptFacilityId !== currentFacilityId) return false;
+
+            // 2. Department match
+            if (currentDepartment !== 'All' && !matchesSpecialty(currentDepartment, ap.specialty)) {
+              return false;
+            }
+
+            // 3. Doctor match (only if logged in as a specific doctor desk)
+            if (isSpecificDoctor && doctorName) {
+              const docClean = doctorName.toLowerCase().replace(/^(dr\.|dato' dr\.)\s*/, "").trim();
+              const aptDoc = (ap.doctorName || "").toLowerCase().replace(/^(dr\.|dato' dr\.)\s*/, "").trim();
+              const aptDocEmail = (ap.doctorEmail || "").toLowerCase();
+              const isMatch = (
+                aptDoc.includes(docClean) || 
+                docClean.includes(aptDoc) || 
+                (aptDocEmail && aptDocEmail === loggedEmail.toLowerCase())
+              );
+              if (!isMatch) return false;
+            }
+
+            return true;
+          });
         }
-        setAppointments(mapped.map((ap: any) => ({ ...ap, checked: false })));
+        setAppointments(mapped.map((ap: any) => ({ ...ap, status: resolveAutoStatus(ap), checked: false })));
       })
       .catch(err => {
         console.warn("Failed to load appointments, using mock data.", err);
-        setAppointments(mockAppointments.map(ap => ({ ...ap, checked: false })));
+        setAppointments(mockAppointments.map(ap => ({ ...ap, status: resolveAutoStatus(ap), checked: false })));
       });
 
     fetch("/api/clinicians")
@@ -212,7 +552,24 @@ export default function AppointmentsSection() {
       .catch(err => console.warn("Failed to load clinicians list", err));
   }, []);
 
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'Approved' | 'Completed' | 'Absent' | 'Cancelled'>('ALL');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('ALL');
+
+  const loggedUserEmail = localStorage.getItem("lifelink_user_email") || '';
+  const currentStaffAccount = React.useMemo(() => getStaffAccountByEmail(loggedUserEmail), [loggedUserEmail]);
+  const currentHospitalClinic = currentStaffAccount?.hospital || getLoggedUserClinic();
+  const currentHospitalFacId = currentStaffAccount?.facility_id || getFacilityIdByHospital(currentHospitalClinic);
+
+  const hospitalDepartments = React.useMemo(() => {
+    return Array.from(
+      new Set(
+        allPantaiDoctors
+          .filter(doc => doc.hospital === currentHospitalClinic || getFacilityIdByHospital(doc.hospital) === currentHospitalFacId)
+          .map(doc => doc.department || doc.specialty)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [currentHospitalClinic, currentHospitalFacId]);
 
   // Mini-calendar state tracking current month dynamically
   const now = React.useMemo(() => new Date(), []);
@@ -232,9 +589,60 @@ export default function AppointmentsSection() {
 
   const [selectedDay, setSelectedDay] = useState<number | null>(now.getDate());
 
+  const isMatchCurrentDoctor = React.useCallback((ap: any) => {
+    if (!isDoctor) return true;
+    if (isGeneralConsultant) return true;
+
+    const cleanDoc = (loggedDoctorName || staffAccount?.name || '').toLowerCase().replace(/^(dr\.|dato' dr\.)\s*/, '').trim();
+    const aptDoc = (ap.doctorName || '').toLowerCase().replace(/^(dr\.|dato' dr\.)\s*/, '').trim();
+    const aptDocEmail = ((ap as any).doctorEmail || '').toLowerCase();
+
+    if (cleanDoc && (aptDoc.includes(cleanDoc) || cleanDoc.includes(aptDoc))) return true;
+    if (aptDocEmail && loggedEmail && aptDocEmail === loggedEmail) return true;
+
+    if (doctorDept && doctorDept !== 'All' && matchesSpecialty(doctorDept, ap.specialty)) return true;
+
+    return false;
+  }, [isDoctor, isGeneralConsultant, loggedDoctorName, staffAccount, loggedEmail, doctorDept]);
+
+  const matchesAppointmentFilters = React.useCallback((ap: any) => {
+    const matchesStatus = filterStatus === 'ALL' || 
+      (filterStatus === 'Completed' ? (ap.status === 'Completed' || ap.status === 'Done') :
+       filterStatus === 'Absent' ? (ap.status === 'Absent' || ap.status === 'Missing') :
+       filterStatus === 'Cancelled' ? (ap.status === 'Cancelled' || ap.status === 'Rejected') :
+       ap.status === filterStatus);
+    if (!matchesStatus) return false;
+
+    // Do not show cancelled/rejected in calendar dots or active list if filter is ALL
+    if (filterStatus === 'ALL' && (ap.status === 'Cancelled' || ap.status === 'Rejected')) {
+      return false;
+    }
+
+    const aptFacilityId = (ap as any).facility_id ? Number((ap as any).facility_id) : getFacilityIdByHospital(ap.clinic || ap.hospital);
+    const selFacilityId = selectedHospital === 'ALL' ? null : getFacilityIdByHospital(selectedHospital);
+
+    const matchesHospital = selectedHospital === 'ALL' || 
+      (aptFacilityId && selFacilityId ? aptFacilityId === selFacilityId : false) ||
+      (ap.clinic || ap.hospital || '').toLowerCase().includes(selectedHospital.toLowerCase()) ||
+      selectedHospital.toLowerCase().includes((ap.clinic || ap.hospital || '').toLowerCase());
+    if (!matchesHospital) return false;
+
+    // Department filter: only for non-doctors (doctors are scoped to their own department/patients)
+    if (!isDoctor && selectedDepartment !== 'ALL' && !matchesSpecialty(selectedDepartment, ap.specialty)) {
+      return false;
+    }
+
+    // Doctor filter
+    if (!isMatchCurrentDoctor(ap)) return false;
+
+    return true;
+  }, [filterStatus, selectedHospital, isDoctor, selectedDepartment, isMatchCurrentDoctor]);
+
   const scheduledDays = React.useMemo(() => {
     const days: number[] = [];
     appointments.forEach(ap => {
+      if (!matchesAppointmentFilters(ap)) return;
+
       const dateStr = ap.date || (ap.dateTime ? ap.dateTime.split(' ')[0] : '');
       if (dateStr) {
         const parts = dateStr.split('-');
@@ -249,7 +657,7 @@ export default function AppointmentsSection() {
       }
     });
     return Array.from(new Set(days));
-  }, [appointments, currentYear, currentMonthIdx]);
+  }, [appointments, currentYear, currentMonthIdx, matchesAppointmentFilters]);
 
   const handleSelectAll = (checked: boolean) => {
     setAppointments(prev => prev.map(ap => ({ ...ap, checked })));
@@ -281,37 +689,34 @@ export default function AppointmentsSection() {
     }));
   };
 
-  const filtered = appointments.filter(ap => {
-    const matchesStatus = filterStatus === 'ALL' || ap.status === filterStatus;
-    if (!matchesStatus) return false;
+  const filtered = React.useMemo(() => {
+    return appointments.filter(ap => {
+      if (!matchesAppointmentFilters(ap)) return false;
 
-    const matchesHospital = selectedHospital === 'ALL' || 
-      (ap.clinic || ap.hospital || '').toLowerCase().trim() === selectedHospital.toLowerCase().trim();
-    if (!matchesHospital) return false;
-
-    if (selectedDay !== null) {
-      const dateStr = ap.date || (ap.dateTime ? ap.dateTime.split(' ')[0] : '');
-      if (dateStr) {
-        const parts = dateStr.split('-');
-        if (parts.length === 3) {
-          const year = parseInt(parts[0], 10);
-          const month = parseInt(parts[1], 10) - 1;
-          const day = parseInt(parts[2], 10);
-          return year === currentYear && month === currentMonthIdx && day === selectedDay;
+      if (selectedDay !== null) {
+        const dateStr = ap.date || (ap.dateTime ? ap.dateTime.split(' ')[0] : '');
+        if (dateStr) {
+          const parts = dateStr.split('-');
+          if (parts.length === 3) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            return year === currentYear && month === currentMonthIdx && day === selectedDay;
+          }
         }
+        return false;
       }
-      return false;
-    }
-    return true;
-  }).sort((a, b) => {
-    const isAPriority = a.timeSlot === "Priority Triage";
-    const isBPriority = b.timeSlot === "Priority Triage";
-    if (isAPriority && !isBPriority) return -1;
-    if (!isAPriority && isBPriority) return 1;
-    return 0;
-  });
+      return true;
+    }).sort((a, b) => {
+      const isAPriority = a.timeSlot === "Priority Triage";
+      const isBPriority = b.timeSlot === "Priority Triage";
+      if (isAPriority && !isBPriority) return -1;
+      if (!isAPriority && isBPriority) return 1;
+      return 0;
+    });
+  }, [appointments, selectedDay, currentYear, currentMonthIdx, matchesAppointmentFilters]);
 
-  const checkedCount = appointments.filter(ap => ap.checked).length;
+    const checkedCount = appointments.filter(ap => ap.checked).length;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans text-neutral-800 select-none">
@@ -320,64 +725,72 @@ export default function AppointmentsSection() {
       <div className="lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs flex flex-col gap-5">
         
         {/* Header containing action buttons */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-5">
-          <div>
-            <h3 className="font-bold text-base text-neutral-900">Patient Scheduling Matrix</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-xs text-neutral-500">
+        <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5">
+          {/* Row 1: Title, Department badge, Date, and Hospital info */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="font-bold text-base text-neutral-900 whitespace-nowrap">Patient Scheduling Matrix</h3>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-mono whitespace-nowrap">
+                  Department: {staffAccount?.department || localStorage.getItem("lifelink_user_department") || 'General Medicine'}
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500 mt-1">
                 {selectedDay !== null 
                   ? `Appointments for ${selectedDay} ${currentMonthName} ${currentYear}`
                   : "All Scheduled Appointments"
                 }
               </p>
-              {selectedDay !== null && (
-                <button
-                  onClick={() => setSelectedDay(null)}
-                  className="text-[10px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/60 cursor-pointer"
-                >
-                  Show All Dates
-                </button>
-              )}
             </div>
-          </div>
 
-          {/* Quick tab filter & Hospital Selector */}
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {!isAdmin && (
-              <button
-                onClick={() => setShowIntakeModal(true)}
-                className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer h-9 shrink-0"
-              >
-                <Plus className="w-4 h-4" /> Telephone Booking
-              </button>
-            )}
-            {isAdmin && (
+            {isSuperAdmin ? (
               <select
                 value={selectedHospital}
                 onChange={(e) => setSelectedHospital(e.target.value)}
                 className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 cursor-pointer"
               >
-                <option value="ALL">All Facilities</option>
-                <option value="Hospital Pulau Pinang">Hospital Pulau Pinang</option>
-                <option value="Hospital Seberang Jaya">Hospital Seberang Jaya</option>
-                <option value="Klinik Kesihatan Jalan Perak">Klinik Kesihatan Jalan Perak</option>
-                <option value="Klinik Kesihatan Bayan Baru">Klinik Kesihatan Bayan Baru</option>
-                <option value="Hospital Bukit Mertajam">Hospital Bukit Mertajam</option>
-                <option value="Pantai Hospital Penang">Pantai Hospital Penang</option>
-                <option value="Hospital Lam Wah Ee">Hospital Lam Wah Ee</option>
-                <option value="Gleneagles Hospital Penang">Gleneagles Hospital Penang</option>
-                <option value="Island Hospital">Island Hospital</option>
-                <option value="Penang Adventist Hospital">Penang Adventist Hospital</option>
-                <option value="Loh Guan Lye Specialists Centre">Loh Guan Lye Specialists Centre</option>
-                <option value="KPJ Penang Specialist Hospital">KPJ Penang Specialist Hospital</option>
-                <option value="O2 Klinik">O2 Klinik</option>
-                <option value="Klinik Singapore">Klinik Singapore</option>
-                <option value="Poliklinik Perdana">Poliklinik Perdana</option>
+                <option value="ALL">All PantaiCare Facilities</option>
+                <option value="Pantai Hospital Penang (Main Hospital)">Pantai Hospital Penang (Main Hospital)</option>
+                <option value="Pantai Heart & Wellness Pavilion">Pantai Heart & Wellness Pavilion</option>
+                <option value="Pantai Premier Clinic & Day Surgery">Pantai Premier Clinic & Day Surgery</option>
+                <option value="Pantai Specialist Centre">Pantai Specialist Centre</option>
               </select>
-            )}
+            ) : isAdmin ? (
+              <div className="flex items-center gap-1.5 bg-neutral-50 border border-neutral-200 px-3 py-1.5 rounded-xl text-xs font-bold text-neutral-700 h-9 shrink-0">
+                <span className="truncate max-w-[260px]">{staffAccount?.hospital || "Branch Appointments"}</span>
+              </div>
+            ) : null}
+          </div>
 
-            <div className="flex gap-1 bg-neutral-100 p-1 rounded-xl text-xs font-semibold shrink-0">
-              {(['ALL', 'Pending', 'Approved'] as const).map((st) => (
+          {/* Row 2: Filter Toolbar (Department Selector + Status Buttons + Walk-in) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {!isAdmin && (
+                <button
+                  onClick={handleOpenIntakeModal}
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer h-9 shrink-0"
+                >
+                  <Plus className="w-4 h-4" /> Walk-In / Phone Booking
+                </button>
+              )}
+
+              {/* Department selector (Hidden for doctor accounts as scope is locked to their own department) */}
+              {!isDoctor && (
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-800 font-bold outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 cursor-pointer min-w-[160px]"
+                >
+                  <option value="ALL">All Departments</option>
+                  {hospitalDepartments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-xl text-xs font-semibold shrink-0">
+              {(['ALL', 'Approved', 'Completed', 'Absent', 'Cancelled'] as const).map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
@@ -394,173 +807,108 @@ export default function AppointmentsSection() {
           </div>
         </div>
 
-        {/* Action controllers for checked rows */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-90 bg-neutral-50 p-3 rounded-xl border border-neutral-200/60">
-          <div className="text-xs text-neutral-600 font-medium">
-            {checkedCount === 0 ? (
-              <span className="text-neutral-400">Select rows on left to perform bulk triage actions.</span>
-            ) : (
-              <span><strong className="text-neutral-900 font-bold">{checkedCount} row(s)</strong> selected for batch status modification.</span>
-            )}
-          </div>
-
-          <div className="flex gap-2 text-xs font-bold leading-5">
-            <button
-              onClick={() => handleBulkStatusChange('Approved')}
-              disabled={checkedCount === 0}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-emerald-705 ${
-                checkedCount > 0 
-                  ? 'bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-95 cursor-pointer' 
-                  : 'bg-neutral-100 border border-neutral-200 text-neutral-400 opacity-60'
-              }`}
-            >
-              <Check className="w-3.5 h-3.5" />
-              Approve Select
-            </button>
-            <button
-              onClick={() => handleBulkStatusChange('Rescheduled')}
-              disabled={checkedCount === 0}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-amber-705 ${
-                checkedCount > 0 
-                  ? 'bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-95 cursor-pointer' 
-                  : 'bg-neutral-100 border border-neutral-200 text-neutral-400 opacity-60'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              Reschedule Select
-            </button>
-            <button
-              onClick={() => handleBulkStatusChange('Rejected')}
-              disabled={checkedCount === 0}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-red-705 ${
-                checkedCount > 0 
-                  ? 'bg-red-50 border border-red-200 hover:bg-red-100 active:scale-95 cursor-pointer' 
-                  : 'bg-neutral-100 border border-neutral-200 text-neutral-400 opacity-60'
-              }`}
-            >
-              <X className="w-3.5 h-3.5" />
-              Reject Select
-            </button>
-          </div>
-        </div>
-
         {/* Primary Scheduling Grid Container */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className="border-b border-neutral-100 text-xs text-neutral-400 font-bold uppercase tracking-wider pb-2">
-                <th className="pb-3 pl-2">
-                  <input
-                    type="checkbox"
-                    id="table-select-all"
-                    checked={appointments.length > 0 && appointments.every(ap => ap.checked)}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-neutral-300 text-neutral-900 focus:outline-none w-4 h-4 cursor-pointer"
-                  />
-                </th>
-                <th className="pb-3 text-left">Patient Details</th>
-                <th className="pb-3 text-left">Consult Date & Time</th>
-                <th className="pb-3">Clinical Specialty</th>
-                <th className="pb-3 text-center">Status</th>
-                <th className="pb-3 pr-2">Diagnostic Remarks</th>
-                <th className="pb-3 text-right pr-4">Actions</th>
+              <tr className="border-b border-neutral-200 text-xs text-neutral-400 font-bold uppercase tracking-wider pb-2">
+                <th className="py-3.5 pl-5 pr-4 text-left">Patient Details</th>
+                <th className="py-3.5 px-4 text-left">Consult Date & Time</th>
+                <th className="py-3.5 px-4 text-left">Doctor & Specialty</th>
+                <th className="py-3.5 px-4 text-center">Status</th>
+                <th className="py-3.5 px-4 text-left">Diagnostic Remarks</th>
+                <th className="py-3.5 pl-4 pr-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-xs text-neutral-400 font-sans">
+                  <td colSpan={6} className="py-12 text-center text-xs text-neutral-400 font-sans">
                     No scheduled outpatient consults match status filters.
                   </td>
                 </tr>
               ) : (
                 filtered.map((ap) => {
-                  const initials = ap.patientName.split(' ').map(n => n[0]).join('');
-                  const isAppr = ap.status === 'Approved';
-                  const isPend = ap.status === 'Pending';
-                  const isResc = ap.status === 'Rescheduled';
-                  const isReje = ap.status === 'Rejected';
-                  const isDone = ap.status === 'Done';
-                  const isMiss = ap.status === 'Missing';
-                  const statusColors = isAppr 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                    : isPend 
-                      ? 'bg-rose-50 text-rose-700 border-rose-200' 
-                      : isResc 
-                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                        : isDone
-                          ? 'bg-sky-50 text-sky-700 border-sky-200'
-                          : isMiss
-                            ? 'bg-red-55 text-red-705 border-red-200'
-                            : 'bg-neutral-100 text-neutral-600 border-neutral-200';
+                  const isCompleted = ap.status === 'Completed' || ap.status === 'Done';
+                  const isAbsent = ap.status === 'Absent' || ap.status === 'Missing';
+                  const isCancelled = ap.status === 'Cancelled' || ap.status === 'Rejected';
+                  const isApproved = ap.status === 'Approved';
+                  const isCheckedIn = ap.status === 'Checked In';
+                  const isPending = ap.status === 'Pending';
+
+                  const statusBadge = isCompleted
+                    ? { label: 'Completed', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                    : isAbsent
+                      ? { label: 'Absent', color: 'bg-amber-50 text-amber-700 border-amber-200' }
+                      : isCancelled
+                        ? { label: 'Cancelled', color: 'bg-rose-50 text-rose-700 border-rose-200' }
+                        : isCheckedIn
+                          ? { label: 'Checked In', color: 'bg-teal-50 text-teal-700 border-teal-200' }
+                          : isApproved
+                            ? { label: 'Approved', color: 'bg-sky-50 text-sky-700 border-sky-200' }
+                            : isPending
+                              ? { label: 'Pending', color: 'bg-purple-50 text-purple-700 border-purple-200' }
+                              : { label: ap.status, color: 'bg-neutral-100 text-neutral-600 border-neutral-200' };
 
                   return (
-                    <tr key={ap.id} className="hover:bg-neutral-50/50 transition-colors">
-                      <td className="py-4 pl-2">
-                        <input
-                          type="checkbox"
-                          id={`table-select-row-${ap.id}`}
-                          checked={ap.checked || false}
-                          onChange={(e) => handleSelectRow(ap.id, e.target.checked)}
-                          className="rounded border-neutral-300 text-neutral-900 focus:outline-none w-4 h-4 cursor-pointer"
-                        />
-                      </td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-3">
-                          {ap.patientAvatar ? (
-                            <img src={ap.patientAvatar} alt={ap.patientName} className="w-8 h-8 rounded-full object-cover border border-neutral-200" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center justify-center border border-red-200">
-                               {initials}
+                    <tr key={ap.id} className="hover:bg-neutral-50/60 transition-colors">
+                      <td className="py-4 pl-5 pr-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-neutral-900 text-xs tracking-tight">
+                              {ap.patientName}
+                            </span>
+                            {ap.queueNumber && (
+                              <span className="font-mono text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">
+                                {ap.queueNumber}
+                              </span>
+                            )}
+                          </div>
+                          {ap.timeSlot === "Priority Triage" && (
+                            <div className="pt-0.5">
+                              <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase font-mono tracking-wider animate-pulse inline-block">
+                                EMERGENCY PRIORITY
+                              </span>
                             </div>
                           )}
-                          <div>
-                            <p className="font-bold text-neutral-900 text-xs flex items-center gap-1.5">
-                              {ap.patientName}
-                              {ap.timeSlot === "Priority Triage" && (
-                                <span className="bg-red-50 text-red-700 border border-red-200 text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase font-mono tracking-wider animate-pulse shrink-0">EMERGENCY PRIORITY</span>
-                              )}
-                              {ap.checkedIn && (
-                                <span className="bg-emerald-150 text-emerald-800 text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase font-mono tracking-wider scale-90 origin-left">CHECKED IN</span>
-                              )}
-                            </p>
-                            <p className="text-[10px] text-neutral-400 font-sans">Authorized: {ap.doctorName}</p>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <div className="font-bold text-neutral-800 font-mono text-xs">
+                            {ap.date || (ap.dateTime ? ap.dateTime.split(' ')[0] : '—')}
+                          </div>
+                          <div className="text-[11px] font-mono text-teal-700 font-semibold flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-teal-600 shrink-0" />
+                            <span>{ap.timeSlot || (ap.dateTime ? ap.dateTime.split(' ').slice(1).join(' ') : '—')}</span>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 text-xs font-mono font-bold text-neutral-700 whitespace-nowrap">
-                        {ap.dateTime || `${ap.date} ${ap.timeSlot}`}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <div className="font-extrabold text-neutral-900 text-xs flex items-center gap-1.5">
+                            <span>{ap.doctorName || 'Attending Specialist'}</span>
+                          </div>
+                          <div className="text-[11px] font-medium text-neutral-500">
+                            {ap.specialty || (ap as any).department || 'Outpatient Clinic'}
+                          </div>
+                        </div>
                       </td>
-                      <td className="py-4 text-xs font-semibold text-neutral-600 whitespace-nowrap">
-                        {ap.specialty}
-                      </td>
-                      <td className="py-4 text-center whitespace-nowrap">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${statusColors}`}>
-                          {ap.status}
+                      <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border ${statusBadge.color}`}>
+                          {statusBadge.label}
                         </span>
                       </td>
-                      <td className="py-4 text-xs text-neutral-500 max-w-xs pr-2 truncate" title={ap.remarks}>
-                        {ap.remarks}
+                      <td className="py-4 px-4 text-xs text-neutral-600 max-w-xs truncate" title={ap.remarks || 'No remarks recorded'}>
+                        {ap.remarks || <span className="text-neutral-350">—</span>}
                       </td>
-                      <td className="py-4 text-right pr-4 whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleToggleDone(ap)}
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition cursor-pointer ${
-                              ap.status === 'Done'
-                                ? 'bg-neutral-200 text-neutral-750 hover:bg-neutral-300'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                            }`}
-                          >
-                            {ap.status === 'Done' ? 'Not Done' : 'Done'}
-                          </button>
-                          <button
-                            onClick={() => handleOpenEditModal(ap)}
-                            className="bg-neutral-100 hover:bg-neutral-200 text-neutral-850 text-[10px] font-bold px-2 py-1 rounded transition cursor-pointer"
-                          >
-                            Reschedule
-                          </button>
-                        </div>
+                      <td className="py-4 pl-4 pr-5 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => handleOpenEditModal(ap)}
+                          className="bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer border border-neutral-200/60 shadow-2xs"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   );
@@ -604,7 +952,7 @@ export default function AppointmentsSection() {
                 <button
                   key={day}
                   id={`calendar-day-btn-${day}`}
-                  onClick={() => setSelectedDay(day)}
+                  onClick={() => setSelectedDay(selectedDay === day ? null : day)}
                   className={`p-1.5 font-bold rounded-lg relative text-xs flex flex-col items-center justify-center transition-all ${
                     isSelected
                       ? 'bg-sky-600 text-white font-extrabold shadow-xs'
@@ -629,7 +977,7 @@ export default function AppointmentsSection() {
             
             <div className="p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
               <div>
-                <h4 className="font-extrabold text-sm text-neutral-900">Reschedule Outpatient Booking</h4>
+                <h4 className="font-extrabold text-sm text-neutral-900">Edit Outpatient Booking</h4>
                 <p className="text-[10px] text-neutral-450 mt-0.5">Patient: {editModalApt.patientName}</p>
               </div>
               <button 
@@ -641,54 +989,111 @@ export default function AppointmentsSection() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
-              <div className="space-y-1.5 font-sans">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Consult Date</label>
-                <input
-                  type="date"
-                  value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-bold font-mono"
-                />
+              {/* Consultation Details: Editable Date & Time Slot */}
+              <div className="space-y-3 font-sans">
+                {editModalApt.doctorName && (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Attending Clinician</span>
+                    <span className="font-bold text-slate-800">{editModalApt.doctorName}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Booking Date *</label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    required
+                    className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Time Slot *</label>
+                    <span className="text-[10px] text-neutral-400 font-medium">Standard: 3 slots | Buffer: 2 slots</span>
+                  </div>
+                  <select
+                    value={editTimeSlot}
+                    onChange={(e) => setEditTimeSlot(e.target.value)}
+                    required
+                    className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold font-mono"
+                  >
+                    {INTAKE_TIME_SLOTS.map(slotDef => {
+                      const { remaining, max, isUnavailable, reason } = getSlotAvailability(
+                        slotDef.slot, 
+                        editDate, 
+                        editModalApt.doctorName || '', 
+                        editModalApt.id
+                      );
+                      return (
+                        <option key={slotDef.slot} value={slotDef.slot} disabled={isUnavailable}>
+                          {slotDef.slot} {editDate ? (isUnavailable ? `(${reason || '0 left'})` : `(${remaining} of ${max} slots left)`) : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  {/* Remaining Slots Indicator Banner in Edit Modal */}
+                  {editDate && (
+                    <div className="pt-1">
+                      {(() => {
+                        const { remaining, max, isUnavailable, reason } = getSlotAvailability(
+                          editTimeSlot, 
+                          editDate, 
+                          editModalApt.doctorName || '', 
+                          editModalApt.id
+                        );
+                        if (!isUnavailable && remaining > 0) {
+                          return (
+                            <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                              <span><strong>{remaining} of {max} slots left</strong> for {editTimeSlot} on {editDate}</span>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="text-[11px] font-semibold text-rose-800 bg-rose-50 border border-rose-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                              <span><strong>Slot Unavailable ({reason || '0 left'})</strong>. Please select an active time slot.</span>
+                            </div>
+                          );
+                        }
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1.5 font-sans">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Consult Time Slot</label>
-                <select
-                  value={editTimeSlot}
-                  onChange={(e) => setEditTimeSlot(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-bold"
-                >
-                  {['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'].map(slot => (
-                    <option key={slot} value={slot}>{slot}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5 font-sans">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Status</label>
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">
+                  Update Status *
+                </label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value as any)}
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-bold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 h-9 font-bold cursor-pointer"
                 >
+                  <option value="Completed">Completed</option>
+                  <option value="Absent">Absent (Missing / No-Show)</option>
+                  <option value="Cancelled">Cancelled</option>
                   <option value="Approved">Approved</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Rescheduled">Rescheduled</option>
-                  <option value="Rejected">Rejected</option>
-                  <option value="Done">Done</option>
-                  <option value="Missing">Missing</option>
+                  <option value="Checked In">Checked In</option>
                 </select>
               </div>
 
               <div className="space-y-1.5 font-sans">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Diagnostic Remarks</label>
+                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">
+                  Diagnostic Remarks / Notes
+                </label>
                 <textarea
                   rows={3}
                   value={editRemarks}
                   onChange={(e) => setEditRemarks(e.target.value)}
                   className="w-full bg-neutral-50 border border-neutral-205 rounded-xl p-3.5 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-neutral-400 leading-relaxed font-sans placeholder:text-neutral-400"
-                  placeholder="Enter symptoms or diagnostic remarks..."
+                  placeholder="Enter remarks or reason for status update..."
                 />
               </div>
 
@@ -717,17 +1122,68 @@ export default function AppointmentsSection() {
         <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in font-sans">
           <div className="bg-white rounded-2xl max-w-md w-full border border-neutral-200 shadow-xl overflow-hidden">
             
+            {/* Modal Header */}
             <div className="p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
               <div>
-                <h4 className="font-extrabold text-sm text-neutral-900">☎️ Register Telephone Call Booking</h4>
-                <p className="text-[10px] text-neutral-450 mt-0.5">Staff manual intake triage reservation.</p>
+                <h4 className="font-extrabold text-sm text-neutral-900 flex items-center gap-1.5">
+                  {intakeType === 'walk-in' ? (
+                    <>
+                      <UserCheck className="w-4 h-4 text-emerald-600" />
+                      <span>Register Walk-In Patient Intake</span>
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="w-4 h-4 text-sky-600" />
+                      <span>Register Telephone Call Booking</span>
+                    </>
+                  )}
+                </h4>
+                <p className="text-[10px] text-neutral-450 mt-0.5">
+                  {intakeType === 'walk-in' 
+                    ? 'Frontdesk counter walk-in patient triage reservation.' 
+                    : 'Staff manual telephone intake triage reservation.'}
+                </p>
               </div>
               <button 
+                type="button"
                 onClick={() => setShowIntakeModal(false)}
                 className="text-neutral-400 hover:text-neutral-600 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* Intake Type Selector Tabs */}
+            <div className="px-5 pt-4 pb-1">
+              <div className="grid grid-cols-2 p-1 bg-neutral-100 rounded-xl text-xs font-bold text-neutral-600">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIntakeType('walk-in');
+                    if (!intakeDate) setIntakeDate(new Date().toISOString().split('T')[0]);
+                  }}
+                  className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    intakeType === 'walk-in'
+                      ? 'bg-white text-neutral-900 shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-800'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Walk-In Patient</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntakeType('phone')}
+                  className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    intakeType === 'phone'
+                      ? 'bg-white text-neutral-900 shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-800'
+                  }`}
+                >
+                  <Phone className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Telephone Booking</span>
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleConfirmIntakeSubmit} className="p-5 space-y-4 max-h-[500px] overflow-y-auto">
@@ -766,28 +1222,40 @@ export default function AppointmentsSection() {
                 />
               </div>
 
+              {/* Attending Doctor Selection: Locked for Doctor accounts */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Attending Doctor *</label>
-                <select
-                  value={intakeDoctorName}
-                  onChange={(e) => setIntakeDoctorName(e.target.value)}
-                  required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold"
-                >
-                  <option value="">-- Select Clinician --</option>
-                  {clinicians
-                    .filter(c => !selectedHospital || selectedHospital === 'ALL' || c.hospital.toLowerCase() === selectedHospital.toLowerCase())
-                    .map(c => (
-                      <option key={c.id} value={c.name}>{c.name} ({c.specialty})</option>
-                    ))
-                  }
-                </select>
+                {isSpecificDoctor && loggedDoctorName ? (
+                  <select
+                    value={loggedDoctorName}
+                    disabled={true}
+                    className="w-full bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-700 outline-none h-9 font-bold cursor-not-allowed opacity-90"
+                  >
+                    <option value={loggedDoctorName}>{loggedDoctorName} ({staffAccount?.department || 'Consultant'})</option>
+                  </select>
+                ) : (
+                  <select
+                    value={intakeDoctorName}
+                    onChange={(e) => setIntakeDoctorName(e.target.value)}
+                    required
+                    className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold"
+                  >
+                    <option value="">-- Select Clinician --</option>
+                    {clinicians
+                      .filter(c => !selectedHospital || selectedHospital === 'ALL' || c.hospital.toLowerCase() === selectedHospital.toLowerCase())
+                      .map(c => (
+                        <option key={c.id} value={c.name}>{c.name} ({c.specialty})</option>
+                      ))
+                    }
+                  </select>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Booking Date *</label>
                 <input
                   type="date"
+                  min={new Date().toISOString().split('T')[0]}
                   value={intakeDate}
                   onChange={(e) => setIntakeDate(e.target.value)}
                   required
@@ -795,18 +1263,53 @@ export default function AppointmentsSection() {
                 />
               </div>
 
+              {/* Time Slot Selection with Remaining Slots */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Time Slot *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-neutral-550 uppercase tracking-widest pl-0.5">Time Slot *</label>
+                  <span className="text-[10px] text-neutral-400 font-medium">Standard: 3 slots | Buffer: 2 slots</span>
+                </div>
                 <select
                   value={intakeTimeSlot}
                   onChange={(e) => setIntakeTimeSlot(e.target.value)}
                   required
-                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold"
+                  className="w-full bg-neutral-50 border border-neutral-205 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 h-9 font-bold font-mono"
                 >
-                  {['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'].map(slot => (
-                    <option key={slot} value={slot}>{slot}</option>
-                  ))}
+                  {INTAKE_TIME_SLOTS.map(slotDef => {
+                    const docTarget = (isSpecificDoctor && loggedDoctorName) ? loggedDoctorName : intakeDoctorName;
+                    const { remaining, max, isUnavailable, reason } = getSlotAvailability(slotDef.slot, intakeDate, docTarget);
+                    return (
+                      <option key={slotDef.slot} value={slotDef.slot} disabled={isUnavailable}>
+                        {slotDef.slot} {intakeDate ? (isUnavailable ? `(${reason || '0 left'})` : `(${remaining} of ${max} slots left)`) : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+
+                {/* Remaining Slots Indicator Banner */}
+                {intakeDate && (
+                  <div className="pt-1">
+                    {(() => {
+                      const docTarget = (isSpecificDoctor && loggedDoctorName) ? loggedDoctorName : intakeDoctorName;
+                      const { remaining, max, isUnavailable, reason } = getSlotAvailability(intakeTimeSlot, intakeDate, docTarget);
+                      if (!isUnavailable && remaining > 0) {
+                        return (
+                          <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                            <span><strong>{remaining} of {max} slots left</strong> for {intakeTimeSlot} on {intakeDate}</span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="text-[11px] font-semibold text-rose-800 bg-rose-50 border border-rose-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                            <span><strong>Slot Unavailable ({reason || '0 left'})</strong>. Please select an active time slot.</span>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -816,7 +1319,7 @@ export default function AppointmentsSection() {
                   value={intakeRemarks}
                   onChange={(e) => setIntakeRemarks(e.target.value)}
                   className="w-full bg-neutral-50 border border-neutral-205 rounded-xl p-3 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 leading-relaxed font-sans placeholder:text-neutral-400"
-                  placeholder="Enter main symptoms reported over phone..."
+                  placeholder={intakeType === 'walk-in' ? "Enter main symptoms reported at counter..." : "Enter main symptoms reported over phone..."}
                 />
               </div>
 
@@ -830,9 +1333,21 @@ export default function AppointmentsSection() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+                  className={`${
+                    intakeType === 'walk-in' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+                  } text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-sm flex items-center gap-1.5`}
                 >
-                  Book Appointment
+                  {intakeType === 'walk-in' ? (
+                    <>
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>Admit Walk-In</span>
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>Book Telephone Consult</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

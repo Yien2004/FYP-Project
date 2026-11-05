@@ -29,12 +29,10 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
   const [selectedSpecialty, setSelectedSpecialty] = useState("Consultant Cardiologist");
 
   const partnerHospitals = [
-    { name: "Pantai Hospital Penang", area: "Bayan Baru", waitTime: "~14 Mins", badge: "Accredited JCI" },
-    { name: "Gleneagles Hospital Penang", area: "George Town", waitTime: "~16 Mins", badge: "Premier Tertiary" },
-    { name: "Island Hospital", area: "Peel Avenue", waitTime: "~11 Mins", badge: "Medical Tourism Centre" },
-    { name: "Loh Guan Lye Specialists Centre", area: "Logan Road", waitTime: "~12 Mins", badge: "Specialist Hub" },
-    { name: "Lam Wah Ee Hospital", area: "Jalan Perak", waitTime: "~15 Mins", badge: "Acute & Outpatient" },
-    { name: "KPJ Penang Specialist Hospital", area: "Bukit Mertajam", waitTime: "~22 Mins", badge: "Mainland Campus" },
+    { name: "Pantai Hospital Penang (Main Hospital)", area: "Bayan Lepas", waitTime: "~14 Mins", badge: "Accredited JCI" },
+    { name: "Pantai Premier Clinic & Day Surgery", area: "Bayan Baru", waitTime: "~8 Mins", badge: "Day Surgery Hub" },
+    { name: "Pantai Heart & Wellness Pavilion", area: "Georgetown", waitTime: "~16 Mins", badge: "Cardiology Centre" },
+    { name: "Pantai Specialist Centre", area: "Ayer Itam", waitTime: "~12 Mins", badge: "Specialist Outpatient" },
   ];
 
   const corePillars = [
@@ -149,7 +147,7 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
           <div className="lg:col-span-7 space-y-6">
             <div className="inline-flex items-center gap-2 bg-sky-50 border border-sky-200 text-sky-800 text-[11px] font-bold px-3 py-1 rounded-full">
               <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
-              <span>Multi-Hospital Outpatient Portal • State of Penang</span>
+              <span>PantaiCare • Smart Outpatient Portal</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
@@ -157,7 +155,7 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
-              Connect directly with credentialed medical specialists across <strong className="text-slate-900">Pantai Hospital Penang, Gleneagles, Island Hospital, Loh Guan Lye,</strong> and <strong className="text-slate-900">Lam Wah Ee</strong>. Manage appointments, monitor live wait times remotely, and schedule doorstep Grab transit.
+              Connect directly with credentialed medical specialists across <strong className="text-slate-900">Pantai Hospital Penang, Pantai Premier Clinic, Pantai Heart Pavilion,</strong> and <strong className="text-slate-900">Pantai Specialist Centre</strong>. Manage appointments, monitor live wait times remotely, and schedule doorstep transit.
             </p>
 
             {/* Bullet verification points */}
@@ -324,7 +322,7 @@ export default function LandingPage({ onNavigateLogin }: LandingPageProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="text-xs uppercase font-extrabold tracking-wider text-slate-400 font-mono">
-                Penang Healthcare Network Alliance
+                PantaiCare Healthcare Network Alliance
               </h2>
               <p className="text-sm font-extrabold text-slate-800 mt-0.5">
                 Integrated Private Hospitals & Specialist Centres

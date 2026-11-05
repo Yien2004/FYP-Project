@@ -15,7 +15,7 @@ import {
   Stethoscope,
   Phone,
   Menu,
-  X
+  X,
 } from "lucide-react";
 
 interface RootLandingPageProps {
@@ -43,12 +43,17 @@ export default function RootLandingPage({
           
           {/* Brand Identity: System Logo & Title */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-sm shrink-0">
               <Activity className="w-5 h-5 text-white" />
             </div>
-            <span className="font-extrabold text-slate-900 text-lg tracking-tight block">
-              Penang<span className="text-sky-600">Health</span>
-            </span>
+            <div>
+              <span className="font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
+                Pantai<span className="text-teal-600">Care</span>
+              </span>
+              <span className="text-[10px] font-medium text-slate-500 block leading-none mt-0.5 tracking-tight">
+                Smart Outpatient Portal
+              </span>
+            </div>
           </div>
 
           {/* Quick Links */}
@@ -128,7 +133,7 @@ export default function RootLandingPage({
           {/* Left Column (System Value Proposition) */}
           <div className="lg:col-span-7 space-y-6">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
-              Centralized Smart Outpatient Booking & Triage
+              Smart Outpatient Booking & Triage
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
@@ -162,7 +167,7 @@ export default function RootLandingPage({
                   <CheckCircle className="w-4 h-4 text-sky-600" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">Find nearest private facilities with zero delays</h4>
+                  <h4 className="text-sm font-bold text-slate-900">Find nearest branch with zero delays</h4>
                   <p className="text-xs text-slate-500">Browser-based GPS location calculation without external mapping API fees.</p>
                 </div>
               </div>
@@ -205,7 +210,7 @@ export default function RootLandingPage({
                   Access Your Health Portal
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Sign in to manage appointments, consult specialist doctors, and view your digital health records.
+                  Sign in to manage appointments and consult specialist doctors.
                 </p>
               </div>
 
@@ -241,9 +246,8 @@ export default function RootLandingPage({
               <AlertTriangle className="w-5 h-5 text-rose-600" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-xs sm:text-sm font-extrabold text-rose-900 uppercase tracking-wide flex items-center gap-2">
-                <span>Emergency Red-Flag Protocol</span>
-                <span className="text-[10px] bg-rose-200 text-rose-800 px-2 py-0.5 rounded font-mono font-bold">Immediate Action</span>
+              <h3 className="text-xs sm:text-sm font-extrabold text-rose-900 uppercase tracking-wide">
+                Emergency Red-Flag Protocol
               </h3>
               <p className="text-xs sm:text-sm text-rose-800 leading-relaxed max-w-3xl">
                 Experiencing severe chest pain, shortness of breath, or sudden trauma? This platform is for non-critical outpatient bookings only. Please call 999 or proceed immediately to the nearest Accident &amp; Emergency department.
@@ -263,20 +267,16 @@ export default function RootLandingPage({
         </div>
       </section>
 
+
+
       {/* ── 4. CORE FEATURE PREVIEW GRID (3-TIER HIGHLIGHTS) ── */}
       <section id="services" className="bg-white border-y border-slate-200 py-14 px-6 lg:px-10">
         <div className="max-w-7xl mx-auto space-y-10">
           
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-sky-700 font-mono">
-              Core System Architecture
-            </span>
+          <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Integrated Outpatient Care Management
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600">
-              Designed according to Jakob Nielsen's usability heuristics to eliminate delays, prevent redundant checkups, and streamline patient triage.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

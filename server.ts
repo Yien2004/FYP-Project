@@ -31,10 +31,22 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import * as db from "./db";
-import { localConsult, triageSymptom, initClassifier, getLocalIntent } from "./local-ml";
+import { localConsult, triageSymptom, initClassifier, getLocalIntent, performStructuredTriage } from "./local-ml";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import bcryptjs from "bcryptjs";
+import triageRouter from "./server/routes/triageRoutes";
+import queueRouter from "./server/routes/queueRoutes";
+import doctorRouter from "./server/routes/doctorRoutes";
+import broadcastRouter from "./server/routes/broadcastRoutes";
+import adminRouter from "./server/routes/adminRoutes";
+import adminHolidayRouter from "./server/routes/adminHolidayRoutes";
+import approvalRouter from "./server/routes/approvalRoutes";
+import adminApprovalsRouter from "./server/routes/adminApprovalsRoutes";
+import metadataRouter from "./server/routes/metadataRoutes";
+import inquiryRouter from "./server/routes/inquiryRoutes";
+import adminRosterRouter from "./server/routes/adminRosterRoutes";
+import { RBAC_STAFF_ACCOUNTS } from "./src/data/staffAccounts";
 
 dotenv.config();
 
@@ -43,6 +55,40 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Dual-stage Hybrid Carey AI Triage Router
+app.use("/api/triage", triageRouter);
+
+// Queue Verification & RBAC Check-in Router
+app.use("/api/queue", queueRouter);
+
+// Consultant Doctor Clinical Desk Router (IDOR Protected)
+app.use("/api/doctor", doctorRouter);
+
+// Hospital Broadcast & Targeted Patient Notification Router
+app.use("/api/broadcast", broadcastRouter);
+
+// Operations Admin Dashboard, Leave Management & Audit Router
+app.use("/api/admin", adminRouter);
+
+// 1. Facility Holidays & Slot Blocking
+app.use("/api/admin/holidays", adminHolidayRouter);
+app.use("/api/holidays", adminHolidayRouter);
+
+// 2. Department & Doctor Onboarding Approvals
+app.use("/api/admin/approvals", adminApprovalsRouter);
+app.use("/api/approvals", approvalRouter);
+
+// 3. Dynamic Metadata for Active Departments & Doctors
+app.use("/api/metadata", metadataRouter);
+app.use("/api/departments", metadataRouter);
+
+// 4. Patient-to-Staff Clinic Inquiries (Deprecated per Viva Clinical Safety Directive)
+// app.use("/api/inquiries", inquiryRouter);
+
+// 5. Doctor Roster & Sessional On-Demand Slot Scheduling
+app.use("/api/admin/roster", adminRosterRouter);
+app.use("/api/doctor", adminRosterRouter);
 
 // ============================================================
 // CORS headers (useful when frontend dev port differs)
@@ -71,6 +117,9 @@ app.post("/api/auth/register", async (req, res) => {
 
     if (!password) {
       return res.status(400).json({ error: "Password is required." });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters long." });
     }
 
     const fallbackEmail = (name?: string) => {
@@ -106,13 +155,17 @@ app.post("/api/auth/register", async (req, res) => {
       dateOfBirth:           "",
       gender:                "",
       phone:                 "",
-      nationality:           "Malaysian",
+      nationality:           "",
       bloodType:             "",
       allergies:             [],
       chronicConditions:     [],
+      emergencyContactName:  "",
+      emergencyContactPhone: "",
       insuranceProvider:     "",
       insurancePolicyNumber: "",
-      primaryPhysician:     "",
+      primaryPhysician:      "",
+      defaultRegion:         "",
+      language:              "English",
       avatarUrl:             `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || emailToUse)}&background=0d9488&color=fff`,
     };
 
@@ -157,43 +210,11 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    // Helper: is this a schema/table-not-found error (non-auth)?
-    const isSchemaError = (msg: string) =>
-      /profiles|schema cache|relation.*does not exist/i.test(msg);
-
-    // 1. Authenticate with Supabase Auth
     let authData: any;
     try {
       authData = await db.loginUser(email, password);
     } catch (err: any) {
-      const msg: string = err?.message ?? '';
-
-      // If it's a schema error (Supabase trigger trying to hit public.profiles),
-      // it may still have succeeded on the auth side — try fetching the session.
-      if (isSchemaError(msg)) {
-        console.warn("Login schema error (suppressed):", msg);
-        return res.status(500).json({
-          error:
-            "Database configuration issue detected. Please run the SQL fix script at " +
-            "supabase/migrations/002_fix_profiles_trigger.sql in your Supabase SQL editor, " +
-            "then try again.",
-        });
-      }
-
-      // Email not confirmed — try auto-confirm
-      if (/confirm/i.test(msg) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        try {
-          const confirmed = await db.confirmUserEmail(email);
-          if (confirmed) {
-            authData = await db.loginUser(email, password);
-          }
-        } catch (e) {
-          console.error("Auto-confirm failed:", e instanceof Error ? e.message : e);
-          return res.status(401).json({ error: msg || "Authentication failed." });
-        }
-      } else {
-        return res.status(401).json({ error: msg || "Authentication failed." });
-      }
+      return res.status(401).json({ error: err?.message || "Invalid login credentials" });
     }
 
     const authUser = authData?.user;
@@ -207,38 +228,15 @@ app.post("/api/auth/login", async (req, res) => {
     const approved = authProfile.approved;
 
     if ((role === "Doctor" || role === "Nurse") && !approved) {
-      return res.status(403).json({ error: "Your account is pending administrator approval. Please contact support." });
-    }
-
-    // 2. Fetch / create patient profile — errors here are non-fatal
-    let profile = null;
-    if (role === "Patient") {
-      try {
-        profile = await db.getPatientProfileByEmail(email);
-        if (!profile) {
-          profile = await db.updatePatientProfile(
-            email,
-            {
-              fullName: email.split("@")[0],
-              nationality: "Malaysian",
-              allergies: [],
-              chronicConditions: [],
-            },
-            authUser.id
-          );
-        }
-      } catch (profileErr: any) {
-        console.warn("Profile fetch/create failed (non-fatal):", profileErr?.message);
-      }
+      return res.status(403).json({ error: "Your account is pending administrator approval." });
     }
 
     return res.json({
+      success: true,
       user: { id: authUser.id, email: authUser.email, role, name, hospital: authProfile.hospital },
-      profile,
       accessToken: authData?.session?.access_token ?? null,
     });
   } catch (error: any) {
-    console.error("Login error:", error.message);
     return res.status(401).json({ error: error.message || "Authentication failed." });
   }
 });
@@ -255,10 +253,16 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       return res.status(404).json({ error: "No account found with this email." });
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetExpiry = new Date(Date.now() + 3600000).toISOString(); // 1 hour from now
+    // Check if user already has an active, valid token (< 1 hour old)
+    let resetToken = profile.resetToken;
+    let resetExpiry = profile.resetExpiry;
+    const isTokenActive = resetToken && resetExpiry && new Date(resetExpiry) > new Date();
 
-    await db.updatePatientProfile(email, { resetToken, resetExpiry });
+    if (!isTokenActive) {
+      resetToken = crypto.randomBytes(32).toString("hex");
+      resetExpiry = new Date(Date.now() + 3600000).toISOString(); // 1 hour from now
+      await db.updatePatientProfile(email, { resetToken, resetExpiry });
+    }
 
     const resetUrl = `${req.protocol}://${req.get("host")}/login?token=${resetToken}`;
 
@@ -268,7 +272,27 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     console.log(`🔗  RESET LINK: ${resetUrl}`);
     console.log(`======================================================\n`);
 
-    // Attempt to send email via SMTP if configured
+    // 1. Dispatch real email via Supabase Cloud Auth (Cloud-managed email delivery)
+    let cloudEmailSent = false;
+    let isRateLimited = false;
+    try {
+      const { error: supaEmailErr } = await db.supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: resetUrl,
+      });
+      if (!supaEmailErr) {
+        cloudEmailSent = true;
+        console.log(`📧  Supabase Cloud successfully sent password reset email to: ${email}`);
+      } else {
+        console.warn("Supabase Cloud email notice:", supaEmailErr.message);
+        if (supaEmailErr.message.toLowerCase().includes("rate limit")) {
+          isRateLimited = true;
+        }
+      }
+    } catch (supaEx: any) {
+      console.warn("Supabase Cloud email dispatch skipped:", supaEx.message);
+    }
+
+    // 2. Attempt to send email via SMTP if configured
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
         const transporter = nodemailer.createTransport({
@@ -302,18 +326,16 @@ app.post("/api/auth/forgot-password", async (req, res) => {
         await transporter.sendMail(mailOptions);
         return res.json({
           success: true,
-          message: "A password reset link has been sent to your email address.",
+          message: "A password recovery email has been sent to your email address. Please check your inbox (and Spam/Junk folder) to complete your password reset."
         });
       } catch (mailError: any) {
         console.error("Nodemailer failed to send reset email:", mailError.message);
-        // Fall back to console log message
       }
     }
 
     return res.json({
       success: true,
-      message: "Password reset link generated. (Check server logs to complete your reset in dev mode).",
-      resetUrl, // Expose resetUrl in response for easy dev sandbox access
+      message: "A password recovery email has been sent to your email address. Please check your inbox (and Spam/Junk folder) to complete your password reset."
     });
   } catch (error: any) {
     console.error("Forgot password error:", error.message);
@@ -327,44 +349,29 @@ app.post("/api/auth/reset-password", async (req, res) => {
     if (!token || !newPassword) {
       return res.status(400).json({ error: "Token and new password are required." });
     }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters long." });
+    }
 
+    const cleanToken = String(token || "").trim();
     const profiles = await db.getPatientProfiles();
-    const matched = profiles.find((p: any) => p.resetToken === token);
+    const matched = profiles.find((p: any) => 
+      (p.resetToken && p.resetToken.trim() === cleanToken) ||
+      (Array.isArray(p.previousTokens) && p.previousTokens.some((t: string) => t && t.trim() === cleanToken))
+    );
 
     if (!matched) {
       return res.status(400).json({ error: "Invalid or expired password reset token." });
     }
 
-    const expiry = new Date(matched.resetExpiry || "");
-    if (isNaN(expiry.getTime()) || expiry < new Date()) {
-      return res.status(400).json({ error: "Password reset token has expired." });
-    }
-
-    // Hash the password with bcryptjs
+    // Hash the password with bcryptjs and clear reset token
     const salt = await bcryptjs.genSalt(10);
     const hash = await bcryptjs.hash(newPassword, salt);
+    await db.updatePatientProfile(matched.email, { passwordHash: hash, resetToken: "", resetExpiry: "" });
 
-    // Save hash locally in profile nationality json and clear reset token
-    await db.updatePatientProfile(matched.email, {
-      passwordHash: hash,
-      resetToken: "",
-      resetExpiry: "",
-    });
-
-    // Sync the password to Supabase Auth using the Admin API
+    // Sync updated password to Supabase Auth via Admin API
     if (matched.userId) {
-      try {
-        const { error: authError } = await db.supabaseAdmin.auth.admin.updateUserById(matched.userId, {
-          password: newPassword,
-        });
-        if (authError) {
-          console.warn("Failed to sync new password to Supabase Auth:", authError.message);
-        } else {
-          console.log(`✅  Synced updated password for ${matched.email} to Supabase Auth`);
-        }
-      } catch (syncErr: any) {
-        console.warn("Auth sync error (non-fatal):", syncErr.message);
-      }
+      await db.supabaseAdmin.auth.admin.updateUserById(matched.userId, { password: newPassword }).catch(() => {});
     }
 
     return res.json({
@@ -372,7 +379,6 @@ app.post("/api/auth/reset-password", async (req, res) => {
       message: "Your password has been successfully reset. You may now log in.",
     });
   } catch (error: any) {
-    console.error("Reset password error:", error.message);
     return res.status(500).json({ error: error.message || "Reset failed." });
   }
 });
@@ -426,29 +432,18 @@ app.post("/api/auth/change-password", async (req, res) => {
 
 app.post("/api/ml/triage", async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query, region, patientInfo } = req.body;
     if (!query) {
       return res.status(400).json({ error: "Symptom query is required." });
     }
 
-    const department = triageSymptom(query);
-    const allDoctors = await db.getClinicians();
-
-    // Filter doctors whose specialty matches the department
-    const matchedDoctors = allDoctors.filter((doc: any) => {
-      const docSpec = (doc.specialty || "").toLowerCase();
-      const targetDept = department.toLowerCase();
-      // Special handle: "Internal Medicine & Infectious Diseases" or "General Practice & Family Medicine"
-      // we check for partial or full match.
-      return docSpec.includes(targetDept) || targetDept.includes(docSpec) ||
-             (targetDept.includes("infectious") && docSpec.includes("infectious")) ||
-             (targetDept.includes("general practice") && docSpec.includes("general practitioner")) ||
-             (targetDept.includes("pediatrics") && docSpec.includes("paediatric"));
-    });
-
+    const triage = await performStructuredTriage(query, region, patientInfo);
     return res.json({
-      department,
-      doctors: matchedDoctors,
+      ...triage,
+      isSymptom: triage.has_symptom,
+      isBooking: false,
+      department: triage.target_department || triage.recommended_specialty,
+      doctors: triage.doctors || []
     });
   } catch (error: any) {
     console.error("Triage endpoint error:", error.message);
@@ -510,8 +505,26 @@ app.post("/api/staff/requests", async (req, res) => {
 app.get("/api/admin/staff-requests", async (_req, res) => {
   try {
     const users = await db.listAllAuthUsers();
+    const legacyEmails = [
+      "hospitalpulaupinang@gmail.com",
+      "hospitalseberangjaya@gmail.com",
+      "kkjalanperak@gmail.com",
+      "kkbayanbaru@gmail.com",
+      "hospitalbukitmertajam@gmail.com",
+      "lamwahee@gmail.com",
+      "gleneagleshospital@gmail.com",
+      "islandhospital@gmail.com",
+      "penangadventisthospital@gmail.com",
+      "lohguanlye@gmail.com",
+      "kpjpenang@gmail.com",
+      "o2klinik@gmail.com",
+      "kliniksingapore@gmail.com",
+      "poliklinikperdana@gmail.com"
+    ];
     const pending = users
       .filter((u: any) => {
+        const emailLower = (u.email || '').toLowerCase().trim();
+        if (legacyEmails.includes(emailLower)) return false;
         const meta = u.user_metadata || {};
         const role = meta.role || 'Patient';
         const approved = meta.approved;
@@ -587,10 +600,18 @@ app.get("/api/profile", async (req, res) => {
     let profile = await db.getPatientProfileByEmail(email);
     if (!profile) {
       profile = await db.updatePatientProfile(email, {
-        fullName:          email.split("@")[0],
-        nationality:       "Malaysian",
-        allergies:         [],
-        chronicConditions: [],
+        fullName:              email.split("@")[0],
+        nationality:           "",
+        gender:                "",
+        bloodType:             "",
+        allergies:             [],
+        chronicConditions:     [],
+        emergencyContactName:  "",
+        emergencyContactPhone: "",
+        insuranceProvider:     "",
+        insurancePolicyNumber: "",
+        defaultRegion:         "",
+        language:              "English"
       });
     }
 
@@ -639,15 +660,15 @@ app.get("/api/patients", async (req, res) => {
         id: p.email, // Use email as the stable ID for the staff app lookup
         dbId: p.id,
         name: p.fullName || p.email.split("@")[0],
-        dob: p.dateOfBirth || "1994-08-22",
-        gender: p.gender || "Male",
-        phone: p.phone || "+60 12-345 6789",
+        dob: p.dateOfBirth || "—",
+        gender: p.gender || "—",
+        phone: p.phone || "—",
         email: p.email,
-        avatar: p.avatarUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200",
+        avatar: p.avatarUrl || "",
         history: p.chronicConditions || ["None"],
         prescriptions: p.prescriptions || [],
         attachments: p.attachments || [],
-        bloodType: p.bloodType || 'O+',
+        bloodType: p.bloodType || '—',
         allergies: p.allergies || [],
         chronicConditions: p.chronicConditions || [],
         lastVisited: new Date().toISOString().substring(0, 10),
@@ -1117,6 +1138,98 @@ async function notifyPatientAndStaff(
 app.post("/api/appointments", async (req, res) => {
   try {
     const apt = req.body;
+
+    // Server-side Roster & Holiday Interlocking
+    if (apt.date && (apt.doctorName || apt.doctorId)) {
+      const docIdentifier = apt.doctorId || apt.doctorName;
+      const docProfile = await db.findDoctorProfile(docIdentifier);
+
+      if (docProfile) {
+        const docDisplayName = /^(dr\.|dato' dr\.|dr)\s*/i.test(docProfile.name)
+          ? docProfile.name
+          : `Dr. ${docProfile.name}`;
+
+        // 1. Holiday Check
+        const holidays = await db.getFacilityHolidays(docProfile.facilityId);
+        const isHoliday = holidays.some((h: any) => (h.holiday_date === apt.date || h.date === apt.date));
+        if (isHoliday) {
+          return res.status(400).json({ error: "The facility is closed on this date for a scheduled public holiday." });
+        }
+
+        // 2. Doctor Leaves Check
+        const leaves = await db.getDoctorLeaves(docProfile.facilityId, docProfile.id);
+        const onLeave = leaves.some((l: any) => apt.date >= l.start_date && apt.date <= l.end_date);
+        if (onLeave) {
+          return res.status(400).json({ error: `${docDisplayName} is on leave on ${apt.date}.` });
+        }
+
+        // 3. Sessional Doctor Check (Supports both One Day Only and Every Week schedules)
+        if (docProfile.employmentType === 'SESSIONAL') {
+          const sessions = await db.getDoctorCustomSessions(docProfile.id, false);
+          const activeCustomSession = sessions.find((s: any) => s.session_date === apt.date && s.status === 'OPEN');
+
+          const weeklyRoster = await db.getDoctorWeeklyRoster(docProfile.id, 'SESSIONAL');
+          const [y, m, d] = apt.date.split('-').map(Number);
+          const jsDay = new Date(y, m - 1, d).getDay();
+          const isoDay = jsDay === 0 ? 7 : jsDay;
+          const activeWeeklyDay = weeklyRoster.find(r => r.day_of_week === isoDay && r.is_active);
+
+          const matchedSession = activeCustomSession || (activeWeeklyDay ? {
+            start_time: activeWeeklyDay.start_time,
+            end_time: activeWeeklyDay.end_time
+          } : null);
+
+          if (!matchedSession) {
+            return res.status(400).json({ 
+              error: `${docDisplayName} is a Sessional Specialist with no open clinic session on ${apt.date}. Booking is closed.` 
+            });
+          }
+
+          // Check time slot within session hours
+          if (apt.timeSlot && apt.timeSlot.includes('-')) {
+            const [slotStartStr, slotEndStr] = apt.timeSlot.split('-').map((s: string) => s.trim());
+            const [sH, sM] = (matchedSession.start_time || "09:00").split(':').map(Number);
+            const [eH, eM] = (matchedSession.end_time || "17:00").split(':').map(Number);
+            const sessStartMin = sH * 60 + (sM || 0);
+            const sessEndMin = eH * 60 + (eM || 0);
+
+            const [slotSH, slotSM] = slotStartStr.split(':').map(Number);
+            const [slotEH, slotEM] = slotEndStr.split(':').map(Number);
+            const slotStartMin = slotSH * 60 + (slotSM || 0);
+            const slotEndMin = slotEH * 60 + (slotEM || 0);
+
+            if (slotStartMin < sessStartMin || slotEndMin > sessEndMin) {
+              return res.status(400).json({
+                error: `Selected time slot (${apt.timeSlot}) is outside ${docDisplayName}'s open session hours (${matchedSession.start_time.substring(0, 5)} - ${matchedSession.end_time.substring(0, 5)}).`
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Concurrency Slot Lock & Capacity Protection (Figure 5.49)
+    if (apt.date && apt.timeSlot && (apt.doctorName || apt.doctorId)) {
+      const activeApts = await db.getAppointments();
+      const cleanTargetDoc = (apt.doctorName || "").toLowerCase().replace(/^(dr\.|dato' dr\.|dr)\s*/i, "").trim();
+      const bookedCount = activeApts.filter((a: any) => {
+        const s = (a.status || "").toLowerCase();
+        if (s === "cancelled" || s === "rejected") return false;
+        if (a.date !== apt.date || a.timeSlot !== apt.timeSlot) return false;
+        const cleanExistingDoc = (a.doctorName || "").toLowerCase().replace(/^(dr\.|dato' dr\.|dr)\s*/i, "").trim();
+        return cleanExistingDoc === cleanTargetDoc || Boolean(apt.doctorId && a.doctorId === apt.doctorId);
+      }).length;
+
+      const isBuffer = apt.timeSlot.includes("11:00") || apt.timeSlot.includes("16:00");
+      const maxCapacity = isBuffer ? 2 : 3;
+
+      if (bookedCount >= maxCapacity) {
+        return res.status(409).json({ 
+          error: `This consultation time slot (${apt.timeSlot}) on ${apt.date} is fully booked (${bookedCount}/${maxCapacity} capacity reached). Please choose another slot.` 
+        });
+      }
+    }
+
     const created = await db.addAppointment(apt);
     
     // Dispatch confirmation email
@@ -1179,7 +1292,7 @@ app.post("/api/appointments/:id/ai-reminder", async (req, res) => {
 
     const newNotif = {
       id: "notif-remind-" + Date.now(),
-      title: `🤖 AI Appointment Reminder: ${apt.clinic}`,
+      title: `Appointment Reminder: ${apt.clinic}`,
       body: reminderMessage,
       message: reminderMessage,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1259,39 +1372,19 @@ app.delete("/api/appointments/:id", async (req, res) => {
 });
 
 // ============================================================
-// MESSAGES ENDPOINTS
+// MESSAGES ENDPOINTS (Deprecated per Viva Clinical Safety Directive)
 // ============================================================
 
-/**
- * GET /api/messages?threadId=...
- */
 app.get("/api/messages", async (req, res) => {
-  try {
-    const threadId = req.query.threadId as string;
-    if (!threadId) return res.status(400).json({ error: "threadId is required." });
-
-    const list = await db.getMessages(threadId);
-    return res.json(list);
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message });
-  }
+  return res.json([]);
 });
 
-/**
- * POST /api/messages
- * Body: { threadId, sender, senderName, content, timestamp }
- */
 app.post("/api/messages", async (req, res) => {
-  try {
-    const msg = req.body;
-    if (!msg.threadId) {
-      return res.status(400).json({ error: "threadId is required in body." });
-    }
-    const created = await db.addMessage(msg);
-    return res.status(201).json(created);
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message });
-  }
+  return res.status(200).json({ success: true, deprecated: true });
+});
+
+app.get("/api/messages/threads", async (req, res) => {
+  return res.json([]);
 });
 
 /**
@@ -1458,6 +1551,20 @@ app.get("/api/clinicians", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/doctors
+ * Returns doctors in the system, optionally filtered by clinic_id.
+ */
+app.get("/api/doctors", async (req, res) => {
+  try {
+    const clinicId = req.query.clinic_id as string | undefined;
+    const list = await db.getDoctors(clinicId);
+    return res.json(list);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // FACILITIES ENDPOINTS
 // ============================================================
@@ -1474,6 +1581,18 @@ app.get("/api/facilities", async (req, res) => {
     return res.json(list);
   } catch (error: any) {
     console.error("API /api/facilities error:", error);
+    return res.status(500).json(error.message);
+  }
+});
+
+/**
+ * GET /api/clinics (alias for /api/facilities)
+ */
+app.get("/api/clinics", async (req, res) => {
+  try {
+    const list = await db.getFacilities();
+    return res.json(list);
+  } catch (error: any) {
     return res.status(500).json(error.message);
   }
 });
@@ -1529,20 +1648,86 @@ app.delete("/api/logs/:id", async (req, res) => {
 app.get("/api/admin/users", async (_req, res) => {
   try {
     const authUsers = await db.listAllAuthUsers();
-    const mapped = authUsers.map((u: any) => {
-      const meta = u.user_metadata || {};
-      const role = meta.role || 'Patient';
-      return {
-        id: u.id,
-        email: u.email,
-        fullName: meta.full_name || meta.fullName || u.email.split('@')[0],
-        role,
-        approved: meta.approved !== false,
-        status: meta.status || 'Active', // 'Active' | 'Suspended'
-        createdAt: u.created_at || new Date().toISOString(),
-        hospital: meta.hospital || ''
-      };
-    });
+    const legacyEmails = [
+      "hospitalpulaupinang@gmail.com",
+      "hospitalseberangjaya@gmail.com",
+      "kkjalanperak@gmail.com",
+      "kkbayanbaru@gmail.com",
+      "hospitalbukitmertajam@gmail.com",
+      "lamwahee@gmail.com",
+      "gleneagleshospital@gmail.com",
+      "islandhospital@gmail.com",
+      "penangadventisthospital@gmail.com",
+      "lohguanlye@gmail.com",
+      "kpjpenang@gmail.com",
+      "o2klinik@gmail.com",
+      "kliniksingapore@gmail.com",
+      "poliklinikperdana@gmail.com",
+      // Old duplicate branch admin accounts with underscores
+      "pantaicentre_admin@gmail.com",
+      "pantaiclinic_admin@gmail.com",
+      "pantaipavilion_admin@gmail.com",
+      "pantaipenang_admin@gmail.com",
+      // Old generic desk accounts
+      "pantaicentre_ent@gmail.com",
+      "pantaicentre_ortho@gmail.com",
+      "pantaiclinic_derma@gmail.com",
+      "pantaiclinic_gastro@gmail.com",
+      "pantaipavilion_cardio@gmail.com",
+      "pantaipavilion_wellness@gmail.com",
+      "pantaipenang_surgery@gmail.com",
+      "pantaipenang_internal@gmail.com",
+      "pantaipenang_ae@gmail.com",
+      "pantaipenang_respiratory@gmail.com",
+      // Old placeholder staff accounts
+      "pantaihospital@gmail.com",
+      "pantaihospitalpenang@gmail.com",
+      "pantaipremier@gmail.com",
+      "pantaiheart@gmail.com",
+      "pantaispecialist@gmail.com",
+      "pantaispecialistcentre@gmail.com",
+      "pantaipremierclinic@gmail.com",
+      "pantaiheartwellness@gmail.com",
+      // Test and duplicate accounts
+      "staff@gmail.com",
+      "12345@gmail.com",
+      "dr_neoh@pantaipenang.com", // Duplicate of dr_neoh_internal@pantaipenang.com
+      // Hidden front counter accounts (temporary until official accounts decided)
+      "pantaipenang_frontdesk@gmail.com",
+      "pantaipavilion_frontdesk@gmail.com",
+      "pantaiclinic_frontdesk@gmail.com",
+      "pantaicentre_frontdesk@gmail.com"
+    ];
+
+    const mapped = authUsers
+      .filter((u: any) => {
+        const emailLower = (u.email || '').toLowerCase().trim();
+        if (legacyEmails.includes(emailLower)) return false;
+        return true;
+      })
+      .map((u: any) => {
+        const meta = u.user_metadata || {};
+        let role = meta.role || 'Patient';
+        let fullName = meta.full_name || meta.fullName || u.email.split('@')[0];
+        const emailLower = (u.email || '').toLowerCase().trim();
+
+        // Enforce Super Admin role & persona (executive administrator, not a doctor)
+        if (emailLower === 'superadmin@pantaicare.com' || emailLower === 'superadmin@gmail.com' || role === 'super_admin') {
+          role = 'super_admin';
+          fullName = 'PantaiCare Super Admin';
+        }
+
+        return {
+          id: u.id,
+          email: u.email,
+          fullName,
+          role,
+          approved: meta.approved !== false,
+          status: meta.status || 'Active', // 'Active' | 'Suspended'
+          createdAt: u.created_at || new Date().toISOString(),
+          hospital: meta.hospital || ''
+        };
+      });
     return res.json(mapped);
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
@@ -1629,51 +1814,25 @@ app.delete("/api/admin/users/:id", async (req, res) => {
   }
 });
 
-/**
- * POST /api/admin/broadcast
- * Dispatches emergency alerts, maintenance warnings, or health advisories database-wide.
- */
+// POST /api/admin/broadcast - Dispatches broadcast alerts & updates patient notification inboxes
 app.post("/api/admin/broadcast", async (req, res) => {
   try {
-    const { category, message, targetAudience } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: "Message is required." });
-    }
+    const { category, message, targetAudience = 'All Patients', specificPatientEmail } = req.body;
+    if (!message) return res.status(400).json({ error: "Message is required." });
 
     const typePrefix = category === 'Emergency Alert' ? '🚨 EMERGENCY' : category === 'Maintenance Warning' ? '⚠️ MAINTENANCE' : '📢 HEALTH NOTICE';
-    const logMessage = `[Broadcast]: (${targetAudience}) [${typePrefix}] ${message}`;
+    await db.addSystemLog({ message: `[Broadcast]: (${targetAudience}) [${typePrefix}] ${message}`, level: category === 'Emergency Alert' ? 'error' : 'warning' });
 
-    // 1. Add log to system log database
-    await db.addSystemLog({
-      message: logMessage,
-      level: category === 'Emergency Alert' ? 'error' : 'warning'
-    });
+    const isAll = targetAudience.includes('All Patients') || targetAudience.includes('Entire') || targetAudience.includes('All Users');
+    const targetEmails: string[] = isAll
+      ? (await db.getPatientProfiles().catch(() => [])).map((p: any) => p.email).filter(Boolean)
+      : [specificPatientEmail || targetAudience.replace(/^.*Specific Patient:\s*/, '').trim()].filter(Boolean);
 
-    // 2. If patients are targeted, update all active patient profiles in-app notifications
-    if (targetAudience === 'All Registered Patients' || targetAudience === 'All Users') {
-      const profiles = await db.getPatientProfiles().catch(() => []);
-      const newNotif = {
-        id: `notif-admin-${Date.now()}`,
-        title: `🔔 System Broadcast: ${typePrefix}`,
-        body: message,
-        time: "Just now",
-        category: "general" as const,
-        read: false
-      };
-
-      await Promise.all(
-        profiles.map(async (p: any) => {
-          try {
-            const currentNotifs = p.notifications || [];
-            await db.updatePatientProfile(p.email, {
-              notifications: [newNotif, ...currentNotifs]
-            });
-          } catch (err) {
-            console.warn(`Failed to add broadcast notification to ${p.email}:`, err);
-          }
-        })
-      );
-    }
+    const newNotif = { id: `notif-admin-${Date.now()}`, title: `Broadcast: ${typePrefix}`, body: message, time: "Just now", category: "general" as const, read: false };
+    await Promise.all(targetEmails.map(async (email) => {
+      const p = await db.getPatientProfileByEmail(email).catch(() => null);
+      if (p) await db.updatePatientProfile(email, { notifications: [newNotif, ...(p.notifications || [])] }).catch(() => {});
+    }));
 
     return res.json({ success: true, message: "Broadcast dispatched successfully." });
   } catch (error: any) {
@@ -2031,178 +2190,352 @@ app.post("/api/translate", async (req, res) => {
  */
 app.post("/api/gemini/consult", async (req, res) => {
   try {
-    const { message, history, patientInfo } = req.body;
+    const { message, history, patientInfo, region } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: "Message is required." });
     }
 
-    const localIntent = getLocalIntent(message);
-    const apiKey = process.env.GEMINI_API_KEY;
-    const hasApiKey = apiKey && apiKey !== "MY_GEMINI_API_KEY" && apiKey.trim() !== "";
-
-    // If the local ML system successfully identifies a targeted intent (greetings, reviews, symptoms, vitals), use it immediately!
-    if (localIntent !== "fallback") {
-      const replyText = await localConsult(message, history || [], patientInfo);
-      return res.json({ text: replyText });
-    }
-
-    // Only route unhandled general inquiries to live Gemini API if the API key is active
-    if (hasApiKey) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        
-        // ground prompts with medical history and vitals
-        const systemPrompt = `You are "Carey", a state-of-the-art AI clinical consultation assistant for PenangHealth.
-Analyze the user's symptoms and guide them to the appropriate medical department or clinician.
-
-Patient Information:
-- Full Name: ${patientInfo?.fullName || "Ahmad"}
-- Chronic Conditions: ${patientInfo?.chronicConditions?.join(", ") || "None"}
-- Allergies: ${patientInfo?.allergies?.join(", ") || "None"}
-
-Available Clinics, Specialists & Facilities Directory:
-1. Pantai Hospital Penang:
-   - Cardiologists: Dr. Sarah Jenkins & Dr. Adrian Rahman (Cardiology).
-   - Facility Strengths: 24/7 Coronary Care Unit (CCU) and state-of-the-art cardiac catheterization lab. Best for chest pain, heart issues, and high BP.
-2. Loh Guan Lye Specialists Centre:
-   - Pediatrician: Dr. Ling Wey Shuan (Pediatrics).
-   - Facility Strengths: Neonatal intensive care unit (NICU). Best for children's immunization, infant colds, and pediatric checkups.
-3. Lam Wah Eee Hospital:
-   - General Surgeon: Dr. Simon Lo (General Surgery).
-   - Facility Strengths: Advanced operating theatres for minimally invasive procedures. Best for appendix pain, hernia, and gallbladder surgery.
-4. KPJ Penang Specialist Hospital:
-   - Internal Medicine: Dr. Ainol Shareha.
-   - Facility Strengths: Comprehensive isolation screening facilities for viral diseases. Best for diabetes, viral infections, and chronic disease.
-5. Island Hospital:
-   - Orthopedic Surgeon: Dr. Adrian Mitchell (Orthopedics & Sports Medicine).
-   - Facility Strengths: Regional hub for musculoskeletal rehabilitation. Best for broken bones, joint pain, sprains, and knee/hip replacements.
-6. Gleneagles Penang:
-   - Neurologist: Dr. Tan Mei Ling (Neurology).
-   - Facility Strengths: Certified Stroke Center with 24/7 MRI/CT imaging support. Best for strokes, migraines, headache, and vertigo.
-7. Penang Adventist Hospital:
-   - Gastroenterologist: Dr. Gary Yusuf (Gastroenterology & Urology).
-   - Facility Strengths: Specialized Endoscopy Suite. Best for acid reflux (GERD), stomach ulcers, and stomach aches.
-8. O2 Klinik (Bayan Baru):
-   - Family Medicine: Dr. Lisa Wong (General Practice).
-   - Facility Strengths: Primary care screening and colds/flu. Best for mild ailments, sore throat, and checkups.
-
-Clinical Guidelines:
-1. Ground your diagnosis and routing advice.
-2. Recommend the specific clinic/hospital and doctor from the directory above that matches their symptom's specialty.
-3. Explain WHY that clinic and doctor are a good fit (mention their facility strengths and specialty).
-4. If they describe severe emergency symptoms (crushing chest pain, severe heavy bleeding, unconsciousness), warn them and direct them to Emergency SOS.
-5. Keep your response concise, clear, and professional. Avoid markdown headings that are too large. Use bullet points for recommendations.
-
-Chat History:
-${(history || []).map((h: any) => `${h.sender === 'user' ? 'Patient' : 'Carey'}: ${h.content}`).join("\n")}
-Patient: "${message}"
-
-Carey:`;
-
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }]
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const result = data.contents?.[0]?.parts?.[0]?.text;
-          if (result) {
-            return res.json({ text: result });
-          }
-        }
-      } catch (err) {
-        console.warn("Gemini consultation call failed, falling back to local ML:", err);
-      }
-    }
-
-    // Default local fallback consulting menu if no API key or if call fails
-    const replyText = await localConsult(message, history || [], patientInfo);
-    return res.json({ text: replyText });
+    const triage = await performStructuredTriage(message, region || patientInfo?.defaultRegion, patientInfo);
+    return res.json({
+      text: cleanAiText(triage.bot_message),
+      triage
+    });
   } catch (error: any) {
     console.error("Local ML Consultation Error:", error.message);
     return res.status(500).json({ error: error.message || "Consultation engine error." });
   }
 });
 
+/**
+ * POST /api/ml/triage
+ * Direct endpoint for structured triage results.
+ */
+app.post("/api/ml/triage", async (req, res) => {
+  try {
+    const { query, region, patientInfo } = req.body;
+    if (!query) {
+      return res.status(400).json({ error: "Query is required." });
+    }
+    const triage = await performStructuredTriage(query, region || patientInfo?.defaultRegion, patientInfo);
+    return res.json(triage);
+  } catch (error: any) {
+    console.error("ML Triage Error:", error.message);
+    return res.status(500).json({ error: error.message || "Triage processing error." });
+  }
+});
+
+function cleanAiText(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/_{1,2}(.*?)_{1,2}/g, "$1")
+    .replace(/^>\s*(\[!.*?\])?\s*/gm, "")
+    .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+    .replace(/\$/g, "")
+    .trim();
+}
+
 // ============================================================
 // VITE DEV MIDDLEWARE OR STATIC PRODUCTION SERVING
 // ============================================================
 
 async function seedStaffAccounts() {
-  const staffAccounts = [
-    { email: "hospitalpulaupinang@gmail.com", name: "Hospital Pulau Pinang Staff" },
-    { email: "hospitalseberangjaya@gmail.com", name: "Hospital Seberang Jaya Staff" },
-    { email: "kkjalanperak@gmail.com", name: "Klinik Kesihatan Jalan Perak Staff" },
-    { email: "kkbayanbaru@gmail.com", name: "Klinik Kesihatan Bayan Baru Staff" },
-    { email: "hospitalbukitmertajam@gmail.com", name: "Hospital Bukit Mertajam Staff" },
-    { email: "pantaihospital@gmail.com", name: "Pantai Hospital Staff" },
-    { email: "lamwahee@gmail.com", name: "Hospital Lam Wah Ee Staff" },
-    { email: "gleneagleshospital@gmail.com", name: "Gleneagles Hospital Staff" },
-    { email: "islandhospital@gmail.com", name: "Island Hospital Staff" },
-    { email: "penangadventisthospital@gmail.com", name: "Penang Adventist Hospital Staff" },
-    { email: "lohguanlye@gmail.com", name: "Loh Guan Lye Specialists Centre Staff" },
-    { email: "kpjpenang@gmail.com", name: "KPJ Penang Specialist Hospital Staff" },
-    { email: "o2klinik@gmail.com", name: "O2 Klinik Staff" },
-    { email: "kliniksingapore@gmail.com", name: "Klinik Singapore Staff" },
-    { email: "poliklinikperdana@gmail.com", name: "Poliklinik Perdana Staff" }
+  const legacyEmails = [
+    "hospitalpulaupinang@gmail.com",
+    "hospitalseberangjaya@gmail.com",
+    "kkjalanperak@gmail.com",
+    "kkbayanbaru@gmail.com",
+    "hospitalbukitmertajam@gmail.com",
+    "lamwahee@gmail.com",
+    "gleneagleshospital@gmail.com",
+    "islandhospital@gmail.com",
+    "penangadventisthospital@gmail.com",
+    "lohguanlye@gmail.com",
+    "kpjpenang@gmail.com",
+    "o2klinik@gmail.com",
+    "kliniksingapore@gmail.com",
+    "poliklinikperdana@gmail.com",
+    // Old duplicate branch admin accounts with underscores
+    "pantaicentre_admin@gmail.com",
+    "pantaiclinic_admin@gmail.com",
+    "pantaipavilion_admin@gmail.com",
+    "pantaipenang_admin@gmail.com",
+    // Old generic desk accounts
+    "pantaicentre_ent@gmail.com",
+    "pantaicentre_ortho@gmail.com",
+    "pantaiclinic_derma@gmail.com",
+    "pantaiclinic_gastro@gmail.com",
+    "pantaipavilion_cardio@gmail.com",
+    "pantaipavilion_wellness@gmail.com",
+    "pantaipenang_surgery@gmail.com",
+    "pantaipenang_internal@gmail.com",
+    "pantaipenang_ae@gmail.com",
+    "pantaipenang_respiratory@gmail.com",
+    // Old placeholder staff accounts
+    "pantaihospital@gmail.com",
+    "pantaihospitalpenang@gmail.com",
+    "pantaipremier@gmail.com",
+    "pantaiheart@gmail.com",
+    "pantaispecialist@gmail.com"
   ];
 
-  console.log("🌱  Seeding staff accounts...");
-  for (const account of staffAccounts) {
+  // Fetch all existing users once into a lookup map to prevent memory exhaustion
+  let allUsers: any[] = [];
+  try {
+    allUsers = await db.listAllAuthUsers();
+  } catch (err: any) {
+    console.warn("Could not fetch auth users for seeding:", err.message);
+  }
+
+  const userMap = new Map<string, any>();
+  if (Array.isArray(allUsers)) {
+    for (const u of allUsers) {
+      if (u.email) {
+        userMap.set(u.email.toLowerCase().trim(), u);
+      }
+    }
+  }
+
+  // Purge legacy and duplicate accounts from database
+  for (const legacy of legacyEmails) {
+    const u = userMap.get(legacy);
+    if (u) {
+      console.log(`🧹 Removing legacy/duplicate staff account: ${u.email}`);
+      try {
+        await db.deleteAuthUser(u.id);
+        userMap.delete(legacy);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // Seed real clinician doctors and front counter staff from RBAC_STAFF_ACCOUNTS
+  const clinicalStaff = RBAC_STAFF_ACCOUNTS.filter(a => a.role === 'doctor' || a.role === 'staff');
+  console.log(`🌱  Synchronizing ${clinicalStaff.length} PantaiCare clinician doctors & front counters...`);
+  for (const account of clinicalStaff) {
     try {
-      const { data, error } = await db.supabaseAdmin.auth.admin.createUser({
-        email: account.email,
-        password: "12345678",
-        email_confirm: true,
-        user_metadata: {
-          full_name: account.name,
-          role: "Doctor",
-          approved: true
-        }
-      });
-      if (error) {
-        if (error.message.includes("already exists") || error.message.includes("already registered")) {
-          // normal case, already seeded
-        } else {
-          console.error(`Error seeding account ${account.email}:`, error.message);
+      const emailKey = (account.email || '').toLowerCase().trim();
+      const existing = userMap.get(emailKey);
+      if (existing) {
+        const meta = existing.user_metadata || {};
+        const expectedRole = account.role === 'doctor' ? 'Doctor' : 'staff';
+        const needsUpdate = meta.role !== expectedRole ||
+                            meta.full_name !== account.name ||
+                            meta.facility_id !== account.facility_id ||
+                            meta.department !== account.department;
+        if (needsUpdate) {
+          await db.supabaseAdmin.auth.admin.updateUserById(existing.id, {
+            user_metadata: {
+              ...meta,
+              full_name: account.name,
+              role: expectedRole,
+              approved: true,
+              hospital: account.hospital,
+              department: account.department,
+              facility_id: account.facility_id,
+              room_number: account.room_number || ''
+            }
+          });
         }
       } else {
-        console.log(`✅ Seeded staff account: ${account.email}`);
+        const { data, error } = await db.supabaseAdmin.auth.admin.createUser({
+          email: account.email,
+          password: "12345678",
+          email_confirm: true,
+          user_metadata: {
+            full_name: account.name,
+            role: account.role === 'doctor' ? 'Doctor' : 'staff',
+            approved: true,
+            hospital: account.hospital,
+            department: account.department,
+            facility_id: account.facility_id,
+            room_number: account.room_number || ''
+          }
+        });
+        if (data?.user) {
+          userMap.set(emailKey, data.user);
+          console.log(`✅ Seeded staff account: ${account.email}`);
+        } else if (error) {
+          console.error(`Error seeding account ${account.email}:`, error.message);
+        }
       }
     } catch (err: any) {
       console.error(`Failed to seed account ${account.email}:`, err.message);
     }
   }
 
-  // Seed admin account
-  console.log("🌱  Seeding admin account...");
-  try {
-    const { data, error } = await db.supabaseAdmin.auth.admin.createUser({
-      email: "admin@gmail.com",
-      password: "12345678",
-      email_confirm: true,
-      user_metadata: {
-        full_name: "System Administrator",
-        role: "Admin",
-        approved: true
-      }
-    });
-    if (error) {
-      if (error.message.includes("already exists") || error.message.includes("already registered")) {
-        // normal case, already seeded
-      } else {
-        console.error("Error seeding admin account:", error.message);
-      }
-    } else {
-      console.log("✅ Seeded admin account: admin@gmail.com");
+  // Seed PantaiCare Super Admin accounts
+  const superAdminAccounts = [
+    {
+      email: "superadmin@pantaicare.com",
+      name: "PantaiCare Group Super Admin",
+      facility_id: 0,
+      hospital: "PantaiCare Healthcare Group (All Facilities)",
+      department: "Executive Group Administration",
+      room_number: "HQ Suite 100"
+    },
+    {
+      email: "superadmin@gmail.com",
+      name: "PantaiCare Super Admin",
+      facility_id: 0,
+      hospital: "PantaiCare Healthcare Group (All Facilities)",
+      department: "Executive Group Administration",
+      room_number: "HQ Suite 100"
     }
-  } catch (err: any) {
-    console.error("Failed to seed admin account:", err.message);
+  ];
+
+  console.log("🌱  Synchronizing PantaiCare Super Admin accounts...");
+  for (const sa of superAdminAccounts) {
+    try {
+      const emailKey = sa.email.toLowerCase().trim();
+      const existing = userMap.get(emailKey);
+      if (existing) {
+        const meta = existing.user_metadata || {};
+        const needsUpdate = meta.role !== "super_admin" || meta.full_name !== sa.name;
+        if (needsUpdate) {
+          await db.supabaseAdmin.auth.admin.updateUserById(existing.id, {
+            password: "12345678",
+            user_metadata: {
+              ...meta,
+              full_name: sa.name,
+              role: "super_admin",
+              approved: true,
+              facility_id: sa.facility_id,
+              hospital: sa.hospital,
+              department: sa.department,
+              room_number: sa.room_number
+            }
+          });
+        }
+      } else {
+        const { data, error } = await db.supabaseAdmin.auth.admin.createUser({
+          email: sa.email,
+          password: "12345678",
+          email_confirm: true,
+          user_metadata: {
+            full_name: sa.name,
+            role: "super_admin",
+            approved: true,
+            facility_id: sa.facility_id,
+            hospital: sa.hospital,
+            department: sa.department,
+            room_number: sa.room_number
+          }
+        });
+        if (data?.user) {
+          userMap.set(emailKey, data.user);
+          console.log(`✅ Seeded Super Admin account: ${sa.email}`);
+        } else if (error) {
+          console.error(`Error seeding super admin ${sa.email}:`, error.message);
+        }
+      }
+    } catch (err: any) {
+      console.error(`Failed to seed super admin ${sa.email}:`, err.message);
+    }
+  }
+
+  // Seed 4 independent branch administrator accounts
+  console.log("🌱  Synchronizing 4 PantaiCare branch admin accounts matrix...");
+  const adminAccounts = [
+    {
+      email: "pantaipenangadmin@gmail.com",
+      name: "Main Pantai Hospital Penang Admin",
+      facility_id: 1,
+      hospital: "Pantai Hospital Penang (Main Hospital)",
+      department: "Hospital Administration",
+      room_number: "Admin Suite 1"
+    },
+    {
+      email: "pantaipavilionadmin@gmail.com",
+      name: "Georgetown Pavilion Admin",
+      facility_id: 2,
+      hospital: "Pantai Heart & Wellness Pavilion",
+      department: "Hospital Administration",
+      room_number: "Admin Suite 2"
+    },
+    {
+      email: "pantaiclinicadmin@gmail.com",
+      name: "Bayan Baru Clinic Admin",
+      facility_id: 3,
+      hospital: "Pantai Premier Clinic & Day Surgery",
+      department: "Hospital Administration",
+      room_number: "Admin Suite 3"
+    },
+    {
+      email: "pantaicentreadmin@gmail.com",
+      name: "Ayer Itam Centre Admin",
+      facility_id: 4,
+      hospital: "Pantai Specialist Centre",
+      department: "Hospital Administration",
+      room_number: "Admin Suite 4"
+    }
+  ];
+
+  for (const adm of adminAccounts) {
+    try {
+      const emailKey = adm.email.toLowerCase().trim();
+      const existing = userMap.get(emailKey);
+      if (existing) {
+        const meta = existing.user_metadata || {};
+        const needsUpdate = meta.role !== "Admin" || meta.full_name !== adm.name || meta.facility_id !== adm.facility_id;
+        if (needsUpdate) {
+          await db.supabaseAdmin.auth.admin.updateUserById(existing.id, {
+            password: "12345678",
+            user_metadata: {
+              ...meta,
+              full_name: adm.name,
+              role: "Admin",
+              approved: true,
+              facility_id: adm.facility_id,
+              hospital: adm.hospital,
+              department: adm.department,
+              room_number: adm.room_number
+            }
+          });
+        }
+      } else {
+        const { data, error } = await db.supabaseAdmin.auth.admin.createUser({
+          email: adm.email,
+          password: "12345678",
+          email_confirm: true,
+          user_metadata: {
+            full_name: adm.name,
+            role: "Admin",
+            approved: true,
+            facility_id: adm.facility_id,
+            hospital: adm.hospital,
+            department: adm.department,
+            room_number: adm.room_number
+          }
+        });
+        if (data?.user) {
+          userMap.set(emailKey, data.user);
+          console.log(`✅ Seeded branch admin account: ${adm.email} (Facility #${adm.facility_id})`);
+        } else if (error) {
+          console.error(`Error seeding admin ${adm.email}:`, error.message);
+        }
+      }
+
+      // Upsert into profiles table if present
+      try {
+        await db.supabaseAdmin.from('profiles').upsert({
+          email: adm.email,
+          role: 'admin',
+          facility_id: adm.facility_id,
+          department: adm.department,
+          full_name: adm.name,
+          room_number: adm.room_number
+        }, { onConflict: 'email' });
+      } catch (err: any) {
+        // Non-fatal if profiles table does not exist
+      }
+    } catch (err: any) {
+      console.error(`Failed to seed branch admin ${adm.email}:`, err.message);
+    }
   }
 }
 
@@ -2216,6 +2549,11 @@ async function startServer() {
   } catch (err) {
     console.error("Failed to train local ML classifier:", err);
   }
+
+  // 404 handler for unmatched API routes before Vite SPA fallback
+  app.all("/api/*", (_req, res) => {
+    res.status(404).json({ error: "API endpoint not found" });
+  });
 
   if (process.env.NODE_ENV !== "production") {
     console.log("🔧  Starting in development mode with Vite middleware...");

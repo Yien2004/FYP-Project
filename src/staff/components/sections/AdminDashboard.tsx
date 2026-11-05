@@ -1,99 +1,190 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Server, 
-  Database, 
-  ShieldCheck, 
-  TrendingUp, 
-  Terminal,
-  Activity,
-  UserCheck,
-  Clock
+  Stethoscope, 
+  Users, 
+  CalendarCheck2, 
+  Filter,
+  Calendar,
+  Building2,
+  ShieldCheck
 } from 'lucide-react';
-import { SystemLog } from '../../types';
+import { getStaffAccountByEmail, PANTAI_FACILITIES, RBAC_STAFF_ACCOUNTS, getFacilityIdByHospital } from '../../../data/staffAccounts';
 
-export default function AdminDashboard() {
-  const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
-  const [staffRequests, setStaffRequests] = useState<any[]>([]);
+interface AdminDashboardProps {
+  isSuperAdmin?: boolean;
+}
+
+export default function AdminDashboard({ isSuperAdmin = false }: AdminDashboardProps) {
   const [loading, setLoading] = useState(true);
 
-  // Dynamic Telemetry states
-  const [dbLatency, setDbLatency] = useState<number>(42);
-  const [errorLogsCount, setErrorLogsCount] = useState<number>(0);
-  const [totalLogsCount, setTotalLogsCount] = useState<number>(0);
-
-  // Demographics counts
+  // Demographics counts for KPI cards
   const [clinicianCount, setClinicianCount] = useState<number>(0);
   const [patientCount, setPatientCount] = useState<number>(0);
-  const [adminCount, setAdminCount] = useState<number>(0);
+
+  // Bound Admin Account & Facility Scoping
+  const loggedEmail = localStorage.getItem('lifelink_user_email') || '';
+  const adminAccount = React.useMemo(() => getStaffAccountByEmail(loggedEmail), [loggedEmail]);
+  const defaultFacId = adminAccount?.facility_id || 1;
+  const [selectedFacilityId, setSelectedFacilityId] = useState<number | 'ALL'>(isSuperAdmin ? 'ALL' : defaultFacId);
+  const facilityId = selectedFacilityId;
+
+  // Department Filter
+  const [selectedDepartment, setSelectedDepartment] = useState('ALL');
+  const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
+
+  // Malaysian Date Helpers (GMT+8)
+  const getMalaysianDateStr = (offsetDays: number = 0) => {
+    try {
+      const d = new Date();
+      if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }).format(d);
+    } catch (e) {
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      return d.toISOString().split('T')[0];
+    }
+  };
+
+  const todayDateStr = getMalaysianDateStr(0);
+  const yesterdayDateStr = getMalaysianDateStr(-1);
+
+  const isSlotOverdue = (dateStr?: string, timeSlot?: string) => {
+    if (!dateStr) return false;
+    if (dateStr < todayDateStr) return true;
+    if (dateStr > todayDateStr) return false;
+    if (!timeSlot) return false;
+    const now = new Date();
+    const myFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kuala_Lumpur',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const parts = myFormatter.formatToParts(now);
+    const p: Record<string, string> = {};
+    parts.forEach(x => { p[x.type] = x.value; });
+    const currentMins = parseInt(p.hour, 10) * 60 + parseInt(p.minute, 10);
+    const dashSplit = timeSlot.split(/[-–—]/);
+    const targetStr = (dashSplit.length > 1 ? dashSplit[1] : dashSplit[0]).trim();
+    const isPM = /pm/i.test(targetStr);
+    const isAM = /am/i.test(targetStr);
+    const match = targetStr.match(/(\d{1,2}):(\d{2})/);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      if (isPM && h < 12) h += 12;
+      if (isAM && h === 12) h = 0;
+      return currentMins >= (h * 60 + m);
+    }
+    return false;
+  };
+
+  // Date Filter State (Defaults to Today's Date in Malaysia)
+  const [selectedDate, setSelectedDate] = useState<string>(todayDateStr);
+  const [dayAppointments, setDayAppointments] = useState<any[]>([]);
 
   // SVG Chart data
   const [monthlyData, setMonthlyData] = useState<{ month: string; count: number }[]>([]);
-  const [selectedHospital, setSelectedHospital] = useState('ALL');
+  const [selectedHospital, setSelectedHospital] = useState(() => {
+    return adminAccount?.hospital || 'ALL';
+  });
   const [appointments, setAppointments] = useState<any[]>([]);
 
-  const loadStaffRequests = () => {
-    fetch("/api/admin/staff-requests")
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setStaffRequests(data);
+  // Real Operational Flow Rates
+  const [opsMetrics, setOpsMetrics] = useState<{
+    totalBookings: number;
+    cancelledCount: number;
+    checkedInCount: number;
+    checkInRate: string;
+    absentRate: string;
+    noShowRate: string;
+    waitingCount: number;
+    inConsultation: number;
+    completed: number;
+  }>({
+    totalBookings: 0,
+    cancelledCount: 0,
+    checkedInCount: 0,
+    checkInRate: '0.0%',
+    absentRate: '0.0%',
+    noShowRate: '0.0%',
+    waitingCount: 0,
+    inConsultation: 0,
+    completed: 0,
+  });
+
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    'x-admin-email': loggedEmail || 'pantaipenangadmin@gmail.com'
+  };
+
+  useEffect(() => {
+    if (adminAccount?.hospital) {
+      setSelectedHospital(adminAccount.hospital);
+    }
+  }, [adminAccount]);
+
+  const loadOpsMetrics = async (
+    dept: string = selectedDepartment,
+    date: string = selectedDate,
+    overrideFacilityId?: number | 'ALL'
+  ) => {
+    const activeFac = overrideFacilityId !== undefined ? overrideFacilityId : (isSuperAdmin ? selectedFacilityId : facilityId);
+    const facParam = `facilityId=${activeFac}`;
+    const deptParam = dept !== 'ALL' ? `&department=${encodeURIComponent(dept)}` : '';
+    const dateParam = date ? `&date=${encodeURIComponent(date)}` : '';
+    try {
+      const res = await fetch(`/api/admin/metrics?${facParam}${deptParam}${dateParam}`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        const m = data.metrics || data;
+        setOpsMetrics({
+          totalBookings: m.totalBookings || 0,
+          cancelledCount: m.cancelledCount || 0,
+          checkedInCount: m.checkedInCount || 0,
+          checkInRate: m.checkInRate || '0.0%',
+          absentRate: m.absentRate || m.noShowRate || '0.0%',
+          noShowRate: m.noShowRate || m.absentRate || '0.0%',
+          waitingCount: m.waitingCount || 0,
+          inConsultation: m.inConsultation || 0,
+          completed: m.completed || 0,
+        });
+        if (Array.isArray(data.appointments)) {
+          setDayAppointments(data.appointments);
         }
-      })
-      .catch(err => console.warn("Failed to fetch pending staff requests", err));
+      }
+    } catch (err) {
+      console.warn("Failed to load ops metrics", err);
+    }
   };
 
   const loadTelemetry = async () => {
     setLoading(true);
-    try {
-      const startTime = performance.now();
-      const logsRes = await fetch("/api/logs");
-      const endTime = performance.now();
-      
-      // Compute database latency
-      const latency = Math.round(endTime - startTime);
-      setDbLatency(latency > 0 ? latency : 35);
 
-      if (logsRes.ok) {
-        const logs: SystemLog[] = await logsRes.json();
-        setSystemLogs(logs);
-        setTotalLogsCount(logs.length);
-        
-        // Count errors / alerts
-        const errors = logs.filter(l => {
-          const msg = (l.event || '').toLowerCase();
-          return l.level === 'CRITICAL' || l.level === 'WARNING' || msg.includes('critical') || msg.includes('alert') || msg.includes('alarm');
-        }).length;
-        setErrorLogsCount(errors);
-      }
-    } catch (err) {
-      console.warn("Failed to load telemetry logs", err);
-    }
+    const activeFac = isSuperAdmin ? selectedFacilityId : defaultFacId;
+    let loadedUsers: any[] = [];
+    let loadedApts: any[] = [];
 
-    // Load registered users and count demographics
+    // 1. Registered users demographics from Supabase Auth
     try {
-      const usersRes = await fetch("/api/admin/users");
+      const usersRes = await fetch("/api/admin/users", { headers: authHeaders });
       if (usersRes.ok) {
         const users = await usersRes.json();
         if (Array.isArray(users)) {
-          const doctors = users.filter(u => u.role === 'Doctor' || u.role === 'Nurse').length;
-          const patients = users.filter(u => u.role === 'Patient').length;
-          const admins = users.filter(u => u.role === 'Admin').length;
-          
-          setClinicianCount(doctors);
-          setPatientCount(patients);
-          setAdminCount(admins);
+          loadedUsers = users;
         }
       }
     } catch (err) {
       console.warn("Failed to load user demographics", err);
     }
 
-    // Load appointments and aggregate by month for the chart
+    // 2. Load appointments for trend charting
     try {
       const aptsRes = await fetch("/api/appointments");
       if (aptsRes.ok) {
         const apts = await aptsRes.json();
         if (Array.isArray(apts)) {
+          loadedApts = apts;
           setAppointments(apts);
         }
       }
@@ -101,14 +192,72 @@ export default function AdminDashboard() {
       console.warn("Failed to aggregate appointment trends", err);
     }
 
-    loadStaffRequests();
+    // 3. Compute Clinician Count based on Active Facility
+    if (activeFac === 'ALL') {
+      const totalDocs = RBAC_STAFF_ACCOUNTS.filter(a => a.role === 'doctor' || a.role === 'Doctor').length;
+      setClinicianCount(totalDocs || 160);
+    } else {
+      const branchDocs = RBAC_STAFF_ACCOUNTS.filter(a => 
+        (a.role === 'doctor' || a.role === 'Doctor') && a.facility_id === activeFac
+      ).length;
+      setClinicianCount(branchDocs);
+    }
+
+    // 4. Compute Patient Count:
+    // If Super Admin viewing all: total global registered platform patients
+    // If Branch Admin (or specific facility): unique patients who have made an appointment at least once at this branch!
+    if (isSuperAdmin && activeFac === 'ALL') {
+      const patients = loadedUsers.filter(u => (u.role || '').toLowerCase() === 'patient').length;
+      setPatientCount(patients);
+    } else {
+      const branchAppointments = loadedApts.filter((a: any) => {
+        const aptFacId = a.facility_id ? Number(a.facility_id) : getFacilityIdByHospital(a.clinic || a.hospital);
+        return aptFacId === activeFac;
+      });
+      const uniqueBranchPatients = new Set<string>();
+      branchAppointments.forEach((a: any) => {
+        const key = (a.patientEmail || a.patientName || a.userId || '').toLowerCase().trim();
+        if (key) uniqueBranchPatients.add(key);
+      });
+      setPatientCount(uniqueBranchPatients.size);
+    }
+
+    // 5. Load active departments for dropdown filter
+    try {
+      const deptRes = await fetch(`/api/departments/active?facilityId=${facilityId}`);
+      if (deptRes.ok) {
+        const deptData = await deptRes.json();
+        if (deptData.success && Array.isArray(deptData.departments)) {
+          setAvailableDepartments(deptData.departments);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load active departments", err);
+    }
+
+    await loadOpsMetrics(selectedDepartment, selectedDate);
     setLoading(false);
   };
 
   useEffect(() => {
+    loadTelemetry();
+  }, [facilityId]);
+
+  // Handle department filter selection
+  const handleDepartmentChange = (dept: string) => {
+    setSelectedDepartment(dept);
+    loadOpsMetrics(dept, selectedDate);
+  };
+
+  // Handle date filter selection
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    loadOpsMetrics(selectedDepartment, date);
+  };
+
+  // Appointment monthly aggregation
+  useEffect(() => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    // Generate last 6 months chronologically
     const monthsList = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date();
@@ -123,86 +272,63 @@ export default function AdminDashboard() {
 
     appointments.forEach((a: any) => {
       if (!a.date) return;
-      
-      // Filter by selected hospital
       if (selectedHospital !== 'ALL') {
         const aptHosp = (a.clinic || a.hospital || '').toLowerCase().trim();
         const selHosp = selectedHospital.toLowerCase().trim();
-        if (aptHosp !== selHosp) {
-          return;
-        }
+        if (aptHosp !== selHosp) return;
       }
 
       const [y, m] = a.date.split('-');
       const aptYear = parseInt(y, 10);
       const aptMonth = parseInt(m, 10);
-      
       const match = monthsList.find(mObj => mObj.year === aptYear && mObj.monthNum === aptMonth);
-      if (match) {
-        match.count++;
-      }
+      if (match) match.count++;
     });
 
     setMonthlyData(monthsList.map(m => ({ month: m.month, count: m.count })));
   }, [appointments, selectedHospital]);
 
-  useEffect(() => {
-    loadTelemetry();
-  }, []);
+  const dateDescription = selectedDate === todayDateStr 
+    ? 'Today' 
+    : (selectedDate === yesterdayDateStr 
+        ? 'Yesterday' 
+        : (selectedDate === 'ALL' ? 'All Dates' : selectedDate));
 
-  const handleApprove = async (id: string) => {
-    if (!window.confirm("Approve this staff account?")) return;
-    try {
-      const res = await fetch(`/api/admin/staff-requests/${id}/approve`, {
-        method: "POST"
-      });
-      if (res.ok) {
-        alert("Staff account successfully approved and registered!");
-        loadTelemetry();
-      } else {
-        const data = await res.json();
-        alert(`Approval failed: ${data.error || "Server error"}`);
-      }
-    } catch (err: any) {
-      alert(`Connection error: ${err.message}`);
-    }
-  };
-
-  const handleReject = async (id: string) => {
-    if (!window.confirm("Reject and remove this staff registration request?")) return;
-    try {
-      const res = await fetch(`/api/admin/staff-requests/${id}/reject`, {
-        method: "POST"
-      });
-      if (res.ok) {
-        alert("Staff registration request rejected.");
-        loadTelemetry();
-      } else {
-        const data = await res.json();
-        alert(`Rejection failed: ${data.error || "Server error"}`);
-      }
-    } catch (err: any) {
-      alert(`Connection error: ${err.message}`);
-    }
-  };
+  const activeFac = isSuperAdmin ? selectedFacilityId : defaultFacId;
 
   const adminMetrics = [
-    { label: 'Active Edge Clusters', value: '14 / 14', status: 'Optimal', icon: Server, color: 'text-emerald-500 bg-emerald-50' },
-    { label: 'DB Query Latency', value: `${dbLatency}ms`, status: '99.8% Perf', icon: Database, color: 'text-blue-500 bg-blue-50' },
-    { label: 'Security Firewall', value: `Alerts: ${errorLogsCount}`, status: 'Secured', icon: ShieldCheck, color: 'text-amber-500 bg-amber-50' },
-    { label: 'API Dispatch Volume', value: `${totalLogsCount} total`, status: 'Standard', icon: TrendingUp, color: 'text-red-500 bg-red-50' },
+    { 
+      label: 'Active Clinicians', 
+      value: clinicianCount.toString(), 
+      icon: Stethoscope, 
+      color: 'text-amber-700 bg-amber-50',
+      caption: isSuperAdmin && activeFac === 'ALL' ? 'Across all 4 facilities' : 'Registered branch specialists'
+    },
+    { 
+      label: isSuperAdmin && activeFac === 'ALL' ? 'Registered Patients' : 'Branch Patients', 
+      value: patientCount.toString(), 
+      icon: Users, 
+      color: 'text-neutral-700 bg-neutral-100',
+      caption: isSuperAdmin && activeFac === 'ALL' ? 'Platform registered accounts' : 'With bookings at this branch'
+    },
+    { 
+      label: `${dateDescription} Consults`, 
+      value: opsMetrics.totalBookings.toString(), 
+      icon: CalendarCheck2, 
+      color: 'text-emerald-700 bg-emerald-50',
+      caption: 'Outpatient queue slots'
+    },
   ];
 
-  // Chart layout config
   const chartData = monthlyData.length > 0 ? monthlyData : [
-    { month: 'Jan', count: 0 },
-    { month: 'Feb', count: 0 },
-    { month: 'Mar', count: 0 },
-    { month: 'Apr', count: 0 },
     { month: 'May', count: 0 },
     { month: 'Jun', count: 0 },
+    { month: 'Jul', count: 0 },
+    { month: 'Aug', count: 0 },
+    { month: 'Sep', count: 0 },
+    { month: 'Oct', count: 0 }
   ];
-  const maxVal = Math.max(...chartData.map(d => d.count), 5); // default floor to 5 to avoid zero division
+  const maxVal = Math.max(...chartData.map(d => d.count), 5);
   const height = 150;
   const width = 500;
   const padding = 30;
@@ -215,14 +341,10 @@ export default function AdminDashboard() {
 
   const pathD = points.length > 0 ? `M ${points.join(' L ')}` : '';
 
-  // Max value calculations for percentages
-  const maxDemographics = Math.max(clinicianCount, patientCount, adminCount, 1);
-
   return (
-    <div className="space-y-6 text-neutral-800 font-sans">
-      
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6 text-neutral-800 font-sans pb-12">
+      {/* 1. Core Metric Strip */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {adminMetrics.map((met, idx) => {
           const Icon = met.icon;
           return (
@@ -233,303 +355,367 @@ export default function AdminDashboard() {
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">{met.label}</span>
                 <span className="text-xl font-extrabold text-neutral-900 tracking-tight block mt-1">{met.value}</span>
-                <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  {met.status}
-                </span>
+                {met.caption && (
+                  <span className="text-[10px] text-neutral-400 block mt-0.5 truncate">{met.caption}</span>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Admin Visualizers Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 2. Department & Date Filter + Clinical Operational Flow Strip */}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-xs space-y-4">
         
-        {/* SVG Appointment Trends Chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
-          <div className="border-b border-neutral-100 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-bold text-base text-neutral-900">Total Scheduling Velocity</h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Tracked volume of outpatient consultations over the last 6 months.</p>
+        {/* Header Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-3">
+          <div>
+            <h3 className="text-xs font-extrabold text-neutral-800 uppercase tracking-wider">
+              Clinical Operational Flow & Attendance
+            </h3>
+          </div>
+
+          {/* Filters Bar: Date & Department (Right Aligned) */}
+          <div className="flex flex-wrap items-center justify-end gap-3 ml-auto">
+            
+            {/* Date Quick Toggles & Picker */}
+            <div className="flex items-center gap-1.5 bg-neutral-50 border border-neutral-200 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => handleDateChange(todayDateStr)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  selectedDate === todayDateStr 
+                    ? 'bg-neutral-900 text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateChange(yesterdayDateStr)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  selectedDate === yesterdayDateStr 
+                    ? 'bg-neutral-900 text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                }`}
+              >
+                Yesterday
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateChange('ALL')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  selectedDate === 'ALL' 
+                    ? 'bg-neutral-900 text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                }`}
+              >
+                All
+              </button>
+
+              <div className="relative flex items-center ml-1">
+                <input
+                  type="date"
+                  value={selectedDate === 'ALL' ? '' : selectedDate}
+                  onChange={(e) => {
+                    if (e.target.value) handleDateChange(e.target.value);
+                  }}
+                  className="bg-white border border-neutral-200 rounded-lg px-2 py-0.5 text-xs text-neutral-800 font-semibold outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer h-7"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Facility Scope: Super Admin selector vs Branch Admin locked badge */}
+            {isSuperAdmin ? (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-amber-700 whitespace-nowrap flex items-center gap-1 font-mono">
+                  <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Facility:</span>
+                </label>
+                <select
+                  value={selectedFacilityId}
+                  onChange={(e) => {
+                    const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                    setSelectedFacilityId(val);
+                    loadOpsMetrics(selectedDepartment, selectedDate, val);
+                  }}
+                  className="bg-amber-50 border border-amber-300 rounded-xl px-2.5 py-1 text-xs text-neutral-900 font-bold outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 h-9 cursor-pointer"
+                >
+                  <option value="ALL">All 4 Facilities (Group Consolidated)</option>
+                  {PANTAI_FACILITIES.map(f => (
+                    <option key={f.id} value={f.id}>{f.shortTag} ({f.location})</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-neutral-50 border border-neutral-200 px-3 py-1.5 rounded-xl text-xs font-bold text-neutral-700">
+                <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                <span className="truncate max-w-[150px]">{adminAccount?.hospital || "Branch Admin"}</span>
+              </div>
+            )}
+
+            {/* Department Filter Dropdown */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-neutral-500 whitespace-nowrap flex items-center gap-1">
+                <Filter className="w-3 h-3 text-neutral-400" />
+                <span className="hidden sm:inline">Dept:</span>
+              </label>
+              <select
+                value={selectedDepartment}
+                onChange={(e) => handleDepartmentChange(e.target.value)}
+                className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1 text-xs text-neutral-800 font-semibold outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 h-9 cursor-pointer"
+              >
+                <option value="ALL">All Departments</option>
+                {availableDepartments.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Operational Metrics Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-center divide-y sm:divide-y-0 sm:divide-x divide-neutral-100 pt-1">
+          <div className="pt-2 sm:pt-0">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Check-In Rate</span>
+            <span className="text-base font-extrabold text-emerald-700 block mt-0.5">{opsMetrics.checkInRate}</span>
+          </div>
+          <div className="pt-2 sm:pt-0">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Waiting in Clinic</span>
+            <span className={`text-base font-extrabold block mt-0.5 ${opsMetrics.waitingCount > 0 ? 'text-amber-600' : 'text-neutral-500'}`}>
+              {opsMetrics.waitingCount}
+            </span>
+          </div>
+          <div className="pt-2 sm:pt-0">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">In Consultation</span>
+            <span className={`text-base font-extrabold block mt-0.5 ${opsMetrics.inConsultation > 0 ? 'text-blue-600' : 'text-neutral-500'}`}>
+              {opsMetrics.inConsultation}
+            </span>
+          </div>
+          <div className="pt-2 sm:pt-0">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Completed</span>
+            <span className="text-base font-extrabold text-teal-600 block mt-0.5">{opsMetrics.completed}</span>
+          </div>
+          <div className="pt-2 sm:pt-0">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Absent Rate</span>
+            <span className="text-base font-extrabold text-rose-600 block mt-0.5">{opsMetrics.absentRate}</span>
+          </div>
+          <div className="pt-2 sm:pt-0">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Cancelled</span>
+            <span className="text-base font-extrabold text-neutral-500 block mt-0.5">{opsMetrics.cancelledCount}</span>
+          </div>
+        </div>
+
+        {/* Detailed Encounter & Queue Breakdown */}
+        <div className="pt-3 border-t border-neutral-100">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-neutral-800">
+              Encounter Flow Roster ({dateDescription})
+            </span>
+          </div>
+
+          {dayAppointments.length > 0 ? (
+              <div className="overflow-x-auto rounded-xl border border-neutral-200/80">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-50/80 text-neutral-500 uppercase tracking-wider text-[10px] font-bold border-b border-neutral-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Queue #</th>
+                      <th className="py-2.5 px-3">Patient</th>
+                      <th className="py-2.5 px-3">Specialist & Dept</th>
+                      <th className="py-2.5 px-3">Scheduled Slot</th>
+                      <th className="py-2.5 px-3">Flow Status</th>
+                      <th className="py-2.5 px-3">Arrival / Check-In</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100 bg-white">
+                    {dayAppointments.map((apt) => {
+                      const norm = (apt.status || '').toUpperCase().replace(/[\s-]+/g, '_');
+                      const overdue = isSlotOverdue(apt.date, apt.timeSlot);
+                      const isCancelled = norm === 'CANCELLED' || norm === 'REJECTED' || norm.includes('CANCEL');
+                      const isCompleted = !isCancelled && (norm === 'COMPLETED' || norm === 'DONE' || (overdue && (apt.checkedIn || norm === 'CHECKED_IN')));
+                      const isInConsult = !isCancelled && !isCompleted && norm === 'IN_CONSULTATION';
+                      const isWaiting = !isCancelled && !isCompleted && !isInConsult && !overdue && (apt.checkedIn || norm === 'CHECKED_IN');
+                      const isAbsent = !isCancelled && !isCompleted && (norm === 'NO_SHOW' || norm === 'ABSENT' || norm === 'MISSING' || (overdue && !apt.checkedIn && norm !== 'CHECKED_IN'));
+
+                      return (
+                        <tr key={apt.id} className="hover:bg-neutral-50/50 transition">
+                          <td className="py-2 px-3 font-mono font-extrabold text-neutral-900">
+                            {apt.queueNumber}
+                          </td>
+                          <td className="py-2 px-3 font-bold text-neutral-800">
+                            {apt.patientName}
+                          </td>
+                          <td className="py-2 px-3 text-neutral-600">
+                            <div className="font-medium text-neutral-800">{apt.doctorName}</div>
+                            <div className="text-[10px] text-neutral-400">{apt.specialty}</div>
+                          </td>
+                          <td className="py-2 px-3 text-neutral-700 font-mono text-[11px]">
+                            {apt.timeSlot || 'Standard Slot'}
+                          </td>
+                          <td className="py-2 px-3">
+                            {isCancelled ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-300">
+                                Cancelled
+                              </span>
+                            ) : isInConsult ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                In Consultation
+                              </span>
+                            ) : isWaiting ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Waiting in Clinic
+                              </span>
+                            ) : isCompleted ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Completed
+                              </span>
+                            ) : isAbsent ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                Absent / Missed Slot
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">
+                                Scheduled (Pending Check-In)
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-[11px] text-neutral-500">
+                            {isCancelled ? (
+                              <span className="text-neutral-400 font-medium italic">Cancelled</span>
+                            ) : apt.checkInTime ? (
+                              <span className="font-medium text-neutral-700">{apt.checkInTime}</span>
+                            ) : isAbsent ? (
+                              <span className="text-rose-500/80 font-medium">Missed Slot</span>
+                            ) : (
+                              <span className="text-neutral-400 italic">Not Checked In Yet</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-6 px-4 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
+                <Calendar className="w-6 h-6 text-neutral-350 mx-auto mb-1.5" />
+                <p className="text-xs font-bold text-neutral-700">No Patient Appointments on {dateDescription}</p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Select a different date or choose "All" to inspect historical queues.
+                </p>
+              </div>
+            )}
+        </div>
+
+      </div>
+
+      {/* 3. Outpatient Consultation Trends SVG Chart */}
+      <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
+        <div className="border-b border-neutral-100 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-base text-neutral-900">Outpatient Consultation Trends</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            {adminAccount ? (
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-3 py-1.5 text-xs text-amber-900 font-semibold h-9 flex items-center shrink-0">
+                <span>{adminAccount.hospital}</span>
+              </div>
+            ) : (
               <select
                 value={selectedHospital}
                 onChange={(e) => setSelectedHospital(e.target.value)}
                 className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-1 focus:ring-amber-400 h-9 cursor-pointer"
               >
-                <option value="ALL">All Facilities</option>
-                <option value="Hospital Pulau Pinang">Hospital Pulau Pinang</option>
-                <option value="Hospital Seberang Jaya">Hospital Seberang Jaya</option>
-                <option value="Klinik Kesihatan Jalan Perak">Klinik Kesihatan Jalan Perak</option>
-                <option value="Klinik Kesihatan Bayan Baru">Klinik Kesihatan Bayan Baru</option>
-                <option value="Hospital Bukit Mertajam">Hospital Bukit Mertajam</option>
-                <option value="Pantai Hospital Penang">Pantai Hospital Penang</option>
-                <option value="Hospital Lam Wah Ee">Hospital Lam Wah Ee</option>
-                <option value="Gleneagles Hospital Penang">Gleneagles Hospital Penang</option>
-                <option value="Island Hospital">Island Hospital</option>
-                <option value="Penang Adventist Hospital">Penang Adventist Hospital</option>
-                <option value="Loh Guan Lye Specialists Centre">Loh Guan Lye Specialists Centre</option>
-                <option value="KPJ Penang Specialist Hospital">KPJ Penang Specialist Hospital</option>
-                <option value="O2 Klinik">O2 Klinik</option>
-                <option value="Klinik Singapore">Klinik Singapore</option>
-                <option value="Poliklinik Perdana">Poliklinik Perdana</option>
+                <option value="ALL">All PantaiCare Facilities</option>
+                <option value="Pantai Hospital Penang (Main Hospital)">Pantai Hospital Penang (Main Hospital)</option>
+                <option value="Pantai Heart & Wellness Pavilion">Pantai Heart & Wellness Pavilion</option>
+                <option value="Pantai Premier Clinic & Day Surgery">Pantai Premier Clinic & Day Surgery</option>
+                <option value="Pantai Specialist Centre">Pantai Specialist Centre</option>
               </select>
-              <button 
-                onClick={loadTelemetry}
-                className="text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg border border-amber-200/50 cursor-pointer h-9 shrink-0"
-              >
-                Sync Chart
-              </button>
-            </div>
-          </div>
-
-          {/* SVG Canvas for Charting */}
-          <div className="relative flex justify-center py-2 h-44 overflow-hidden bg-neutral-50/20 rounded-xl border border-neutral-150">
-            {loading ? (
-              <div className="flex items-center justify-center text-xs text-neutral-450 font-mono">
-                Compiling database schedules...
-              </div>
-            ) : (
-              <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full text-neutral-350">
-                {/* Grid Lines */}
-                <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="#f0f0f0" strokeWidth="1" />
-                <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#f0f0f0" strokeWidth="1" />
-                <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e2e8f0" strokeWidth="1.5" />
-
-                {pathD && (
-                  <>
-                    {/* Area path with light color */}
-                    <path
-                      d={`${pathD} L ${padding + (chartData.length - 1) * (width - padding * 2) / Math.max(chartData.length - 1, 1)},${height - padding} L ${padding},${height - padding} Z`}
-                      fill="url(#trendGrad)"
-                      opacity="0.15"
-                    />
-                    {/* Line path */}
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="#d97706"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </>
-                )}
-
-                {/* Gradients definition */}
-                <defs>
-                  <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#d97706" />
-                    <stop offset="100%" stopColor="#ffffff" />
-                  </linearGradient>
-                </defs>
-
-                {/* Points circles and labels */}
-                {chartData.map((d, index) => {
-                  const x = padding + (index * (width - padding * 2)) / Math.max(chartData.length - 1, 1);
-                  const y = height - padding - (d.count / maxVal) * (height - padding * 2);
-                  return (
-                    <g key={index}>
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r="4"
-                        fill="#ffffff"
-                        stroke="#d97706"
-                        strokeWidth="2.5"
-                      />
-                      <text
-                        x={x}
-                        y={y - 12}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fontWeight="bold"
-                        fill="#111827"
-                        className="font-mono"
-                      >
-                        {d.count}
-                      </text>
-                      <text
-                        x={x}
-                        y={height - 10}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fontWeight="medium"
-                        fill="#9ca3af"
-                      >
-                        {d.month}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
             )}
           </div>
         </div>
 
-        {/* User Demographics / Accounts Breakdown */}
-        <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
-          <div className="border-b border-neutral-100 pb-4 mb-5">
-            <h3 className="font-bold text-base text-neutral-900">User Demographics</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Total registered accounts on PenangHealth Supabase database.</p>
-          </div>
-
-          <div className="space-y-4 pt-1">
-            {/* Doctors */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-neutral-600">Licensed Practitioners (MD/NP)</span>
-                <span className="text-neutral-900 font-bold font-mono">{clinicianCount} Clinicians</span>
-              </div>
-              <div className="h-2.5 w-full bg-neutral-100 rounded-lg overflow-hidden">
-                <div 
-                  className="h-full bg-amber-500 rounded-lg transition-all duration-500" 
-                  style={{ width: `${(clinicianCount / maxDemographics) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Patients */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-neutral-600">Registered Outpatients</span>
-                <span className="text-neutral-900 font-bold font-mono">{patientCount} Patients</span>
-              </div>
-              <div className="h-2.5 w-full bg-neutral-100 rounded-lg overflow-hidden">
-                <div 
-                  className="h-full bg-teal-600 rounded-lg transition-all duration-500" 
-                  style={{ width: `${(patientCount / maxDemographics) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Operators & Admins */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-neutral-600">Database Operators & Admins</span>
-                <span className="text-neutral-900 font-bold font-mono">{adminCount} Admins</span>
-              </div>
-              <div className="h-2.5 w-full bg-neutral-100 rounded-lg overflow-hidden">
-                <div 
-                  className="h-full bg-neutral-800 rounded-lg transition-all duration-500" 
-                  style={{ width: `${(adminCount / maxDemographics) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Account Status KPI */}
-            <div className="mt-6 bg-teal-50/50 border border-teal-100 rounded-xl p-3 flex items-center gap-3">
-              <UserCheck className="w-4 h-4 text-teal-600 shrink-0" />
-              <div className="text-[11px] text-teal-850">
-                <strong className="font-semibold">HL7 Account Verification Active:</strong> 100% of practitioners verified against Penang Health database registry.
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Pending Staff Registration Approvals */}
-      <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-xs">
-        <div className="border-b border-neutral-100 pb-4 mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-base text-neutral-900">Pending Staff Registrations</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Clinician and staff registration requests waiting for administrative approval.</p>
-          </div>
-          <span className="text-xs bg-teal-50 border border-teal-200/60 text-teal-700 font-bold px-2.5 py-1 rounded-xl">
-            {staffRequests.length} Pending
-          </span>
-        </div>
-
-        {staffRequests.length === 0 ? (
-          <div className="py-6 text-center text-xs text-neutral-450 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
-            No pending registration requests to display.
-          </div>
-        ) : (
-          <div className="divide-y divide-neutral-100">
-            {staffRequests.map((request) => (
-              <div key={request.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-0 last:pb-0">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-xs text-neutral-900">{request.fullName}</span>
-                    <span className="text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700">
-                      {request.role}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-neutral-500 font-mono">{request.email}</p>
-                  <p className="text-[9px] text-neutral-400">Requested: {new Date(request.requestedAt).toLocaleString()}</p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleApprove(request.id)}
-                    className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleReject(request.id)}
-                    className="px-3.5 py-1.5 border border-neutral-200 hover:bg-neutral-100 text-neutral-655 rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Recent System Activities Terminal (Clean White Card Theme) */}
-      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs text-neutral-700">
-        <div className="border-b border-neutral-100 pb-4 mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-sky-50 rounded-xl border border-sky-100 text-sky-600">
-              <Terminal className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-neutral-900 font-sans">System Audit Logger Engine</h3>
-              <p className="text-[10px] text-neutral-400 font-sans">Edge router security telemetry feeds.</p>
-            </div>
-          </div>
-          <span className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 font-mono font-bold flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            ONLINE
-          </span>
-        </div>
-
-        <div className="font-mono text-xs divide-y divide-neutral-100 leading-relaxed max-h-60 overflow-y-auto space-y-2">
-          {systemLogs.length === 0 ? (
-            <div className="py-4 text-center text-neutral-400 font-mono">
-              No recent audit feeds logged.
+        {/* SVG Canvas for Charting */}
+        <div className="relative flex justify-center py-2 h-44 overflow-hidden bg-neutral-50/20 rounded-xl border border-neutral-150">
+          {loading ? (
+            <div className="flex items-center justify-center text-xs text-neutral-450">
+              Loading consultation trends...
             </div>
           ) : (
-            systemLogs.map((log, idx) => {
-              const isWarn = log.level === 'WARNING' || log.level === 'warning';
-              const isCrit = log.level === 'CRITICAL' || log.level === 'error';
-              const badgeCol = isCrit 
-                ? 'bg-red-50 text-red-700 border-red-200' 
-                : isWarn 
-                  ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                  : 'bg-sky-50 text-sky-700 border-sky-100';
-              
-              const service = log.service || 'SystemAPI';
-              const execTime = log.execTime || '20ms';
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full text-neutral-350">
+              {/* Grid Lines */}
+              <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="#f0f0f0" strokeWidth="1" />
+              <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#f0f0f0" strokeWidth="1" />
+              <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e2e8f0" strokeWidth="1.5" />
 
-              return (
-                <div key={log.id || idx} className="pt-2 flex items-start gap-4">
-                  <span className="text-[10px] text-neutral-400 shrink-0 select-none">[{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'N/A'}]</span>
-                  <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border ${badgeCol} shrink-0`}>
-                    {log.level || 'INFO'}
-                  </span>
-                  <span className="text-[11px] text-neutral-900 font-semibold shrink-0">[{service}]</span>
-                  <p className="text-neutral-700 text-[11px] flex-1 leading-snug">{log.message}</p>
-                  <span className="text-[10px] text-neutral-400 font-mono shrink-0 select-none">rt={execTime}</span>
-                </div>
-              );
-            })
+              {pathD && (
+                <>
+                  <path
+                    d={`${pathD} L ${padding + (chartData.length - 1) * (width - padding * 2) / Math.max(chartData.length - 1, 1)},${height - padding} L ${padding},${height - padding} Z`}
+                    fill="url(#trendGrad)"
+                    opacity="0.15"
+                  />
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#d97706"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </>
+              )}
+
+              <defs>
+                <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#d97706" />
+                  <stop offset="100%" stopColor="#ffffff" />
+                </linearGradient>
+              </defs>
+
+              {/* Data points */}
+              {chartData.map((d, index) => {
+                const x = padding + (index * (width - padding * 2)) / Math.max(chartData.length - 1, 1);
+                const y = height - padding - (d.count / maxVal) * (height - padding * 2);
+                return (
+                  <g key={index}>
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r="4"
+                      fill="#ffffff"
+                      stroke="#d97706"
+                      strokeWidth="2.5"
+                    />
+                    <text
+                      x={x}
+                      y={y - 12}
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontWeight="bold"
+                      fill="#111827"
+                      className="font-mono"
+                    >
+                      {d.count}
+                    </text>
+                    <text
+                      x={x}
+                      y={height - 10}
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontWeight="medium"
+                      fill="#9ca3af"
+                    >
+                      {d.month}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
           )}
         </div>
       </div>

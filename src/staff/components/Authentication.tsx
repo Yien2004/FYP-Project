@@ -36,7 +36,7 @@ export default function Authentication({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [requestSuccess, setRequestSuccess] = useState("");
-  const [selectedHospital, setSelectedHospital] = useState("Hospital Pulau Pinang");
+  const [selectedHospital, setSelectedHospital] = useState("Pantai Hospital Penang (Main Hospital)");
 
   const handlePasswordChange = (val: string) => {
     setNewPassword(val);
@@ -163,6 +163,20 @@ export default function Authentication({
         setErrorMessage("Access denied. Patient accounts must use the Patient Portal.");
         return;
       }
+
+      try {
+        localStorage.setItem("lifelink_user_email", email);
+        localStorage.setItem("lifelink_user_role", role);
+        localStorage.setItem("lifelink_user_name", data.user.name || email.split("@")[0]);
+        localStorage.setItem("lifelink_logged", "true");
+        if (data.user.hospital) localStorage.setItem("lifelink_user_clinic", data.user.hospital);
+        if (data.user.facility_id) localStorage.setItem("lifelink_facility_id", String(data.user.facility_id));
+        if (data.user.department) localStorage.setItem("lifelink_user_department", data.user.department);
+        if (data.user.room_number) localStorage.setItem("lifelink_user_room", data.user.room_number);
+      } catch (e) {
+        /* ignore */
+      }
+
       onLoginSuccess(email, role, data.user.name, data.user.hospital);
     } catch {
       setErrorMessage("Unable to connect to the server. Please try again.");
@@ -317,6 +331,60 @@ export default function Authentication({
               )}
             </button>
 
+            {isAdminPortal && (
+              <div className="pt-3 border-t border-slate-800/80">
+                <span className="block text-[10px] font-mono tracking-wider uppercase text-slate-400 mb-2.5 text-center">
+                  Quick Fill 4 Branch Admin Accounts (PIN: 12345678)
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("pantaipenangadmin@gmail.com");
+                      setPassword("12345678");
+                    }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-teal-500/50 rounded-xl text-left transition group cursor-pointer"
+                  >
+                    <div className="font-bold text-white text-[11px] group-hover:text-teal-400">1. 主院 (Bayan Lepas)</div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">pantaipenangadmin@...</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("pantaipavilionadmin@gmail.com");
+                      setPassword("12345678");
+                    }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-teal-500/50 rounded-xl text-left transition group cursor-pointer"
+                  >
+                    <div className="font-bold text-white text-[11px] group-hover:text-teal-400">2. 乔治市心脏中心</div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">pantaipavilionadmin@...</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("pantaiclinicadmin@gmail.com");
+                      setPassword("12345678");
+                    }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-teal-500/50 rounded-xl text-left transition group cursor-pointer"
+                  >
+                    <div className="font-bold text-white text-[11px] group-hover:text-teal-400">3. 峇央峇鲁门诊</div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">pantaiclinicadmin@...</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("pantaicentreadmin@gmail.com");
+                      setPassword("12345678");
+                    }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-teal-500/50 rounded-xl text-left transition group cursor-pointer"
+                  >
+                    <div className="font-bold text-white text-[11px] group-hover:text-teal-400">4. 亚依淡专科中心</div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">pantaicentreadmin@...</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {enableRegistration && (
               <button
                 type="button"
@@ -385,21 +453,10 @@ export default function Authentication({
                   onChange={(e) => setSelectedHospital(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 transition animate-none"
                 >
-                  <option value="Hospital Pulau Pinang">Hospital Pulau Pinang</option>
-                  <option value="Hospital Seberang Jaya">Hospital Seberang Jaya</option>
-                  <option value="Klinik Kesihatan Jalan Perak">Klinik Kesihatan Jalan Perak</option>
-                  <option value="Klinik Kesihatan Bayan Baru">Klinik Kesihatan Bayan Baru</option>
-                  <option value="Hospital Bukit Mertajam">Hospital Bukit Mertajam</option>
-                  <option value="Pantai Hospital Penang">Pantai Hospital Penang</option>
-                  <option value="Hospital Lam Wah Ee">Hospital Lam Wah Ee</option>
-                  <option value="Gleneagles Hospital Penang">Gleneagles Hospital Penang</option>
-                  <option value="Island Hospital">Island Hospital</option>
-                  <option value="Penang Adventist Hospital">Penang Adventist Hospital</option>
-                  <option value="Loh Guan Lye Specialists Centre">Loh Guan Lye Specialists Centre</option>
-                  <option value="KPJ Penang Specialist Hospital">KPJ Penang Specialist Hospital</option>
-                  <option value="O2 Klinik">O2 Klinik</option>
-                  <option value="Klinik Singapore">Klinik Singapore</option>
-                  <option value="Poliklinik Perdana">Poliklinik Perdana</option>
+                  <option value="Pantai Hospital Penang (Main Hospital)">Pantai Hospital Penang (Main Hospital)</option>
+                  <option value="Pantai Heart & Wellness Pavilion">Pantai Heart & Wellness Pavilion</option>
+                  <option value="Pantai Premier Clinic & Day Surgery">Pantai Premier Clinic & Day Surgery</option>
+                  <option value="Pantai Specialist Centre">Pantai Specialist Centre</option>
                 </select>
               </div>
             )}

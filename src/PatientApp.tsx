@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Dashboard from "./screens/Dashboard";
 import AIConsultation from "./screens/AIConsultation";
-import Communication from "./screens/Communication";
 import ScheduleAppointment from "./screens/ScheduleAppointment";
 import AppointmentsHistory from "./screens/AppointmentsHistory";
 import ClinicSearch from "./screens/ClinicSearch";
@@ -17,7 +16,6 @@ import {
   VitalSign,
   Appointment,
   AppNotification,
-  Message,
   Doctor
 } from "./types";
 import {
@@ -44,26 +42,85 @@ interface PatientAppProps {
   onLogout?: () => void;
 }
 
+function getNotifSortTime(n: AppNotification): number {
+  if (n.timestamp) {
+    const t = new Date(n.timestamp).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  const str = (n.time || '').trim().toLowerCase();
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  if (str.includes('just now')) {
+    return Date.now();
+  }
+
+  let dayOffsetMs = 0;
+  if (str.includes('yesterday')) {
+    dayOffsetMs = -24 * 3600 * 1000;
+  } else if (str.includes('days ago')) {
+    const dMatch = str.match(/(\d+)\s*days?\s*ago/);
+    if (dMatch) {
+      dayOffsetMs = -parseInt(dMatch[1], 10) * 24 * 3600 * 1000;
+    }
+  }
+
+  const timeMatch = str.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1], 10);
+    const m = parseInt(timeMatch[2], 10);
+    const ampm = timeMatch[3].toLowerCase();
+    if (ampm === 'pm' && h < 12) h += 12;
+    if (ampm === 'am' && h === 12) h = 0;
+    return todayStart + dayOffsetMs + (h * 3600 + m * 60) * 1000;
+  }
+
+  return todayStart + dayOffsetMs;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PatientApp({ onLogout }: PatientAppProps) {
   const [currentScreen, setCurrentScreen] = useState<string>("dashboard");
 
-  // Local states seeded with mock data; replaced from Supabase on login
-  const [patientProfile, setPatientProfile]   = useState<PatientProfile>(initialPatientProfile);
+  // Local states: initialized cleanly for real accounts, falling back to mock data only for demo account
+  const [patientProfile, setPatientProfile] = useState<PatientProfile>(() => {
+    const cachedEmail = localStorage.getItem("carepoint_user_email") || localStorage.getItem("lifelink_user_email");
+    if (cachedEmail && cachedEmail !== "ahmad.danish@gmail.com") {
+      const cachedName = localStorage.getItem("carepoint_user_name") || localStorage.getItem("lifelink_user_name") || cachedEmail.split("@")[0];
+      return {
+        fullName: cachedName,
+        myKadOrPassport: "",
+        dateOfBirth: "",
+        gender: "",
+        phone: "",
+        email: cachedEmail,
+        nationality: "",
+        bloodType: "",
+        allergies: [],
+        chronicConditions: [],
+        insuranceProvider: "",
+        insurancePolicyNumber: "",
+        primaryPhysician: "",
+        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(cachedName)}&background=0d9488&color=fff`,
+        emergencyContactName: "",
+        emergencyContactPhone: "",
+        defaultRegion: "",
+        language: "English"
+      };
+    }
+    return initialPatientProfile;
+  });
   const [appointments, setAppointments]       = useState<Appointment[]>([]);
   const [vitalsList, setVitalsList]           = useState<VitalSign[]>([]);
-  const [notifications, setNotifications]     = useState<AppNotification[]>(initialNotifications);
+  const [notifications, setNotifications]     = useState<AppNotification[]>(() => {
+    const cachedEmail = localStorage.getItem("carepoint_user_email") || localStorage.getItem("lifelink_user_email");
+    if (cachedEmail && cachedEmail !== "ahmad.danish@gmail.com") {
+      return [];
+    }
+    return initialNotifications;
+  });
   const [doctorsList, setDoctorsList]         = useState<Doctor[]>([]);
   const [prefilledApt, setPrefilledApt]       = useState<Appointment | null>(null);
-
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(1);
-
-  useEffect(() => {
-    if (currentScreen === "communication") {
-      setUnreadMessagesCount(0);
-    }
-  }, [currentScreen]);
 
   // ── Fetch all patient data from Supabase via the Express API ─────────────
 
@@ -77,14 +134,21 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       
       let profileNotifs: AppNotification[] = [];
       if (profile.notifications && Array.isArray(profile.notifications)) {
-        profileNotifs = profile.notifications.map((n: any) => ({
-          id: n.id,
-          title: n.title,
-          body: n.body || n.message || "",
-          time: n.time || (n.timestamp ? new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"),
-          category: n.category || "general",
-          read: n.read
-        }));
+        profileNotifs = profile.notifications
+          .filter((n: any) => {
+            if (email !== "ahmad.danish@gmail.com" && ["notif-ai-reminder", "notif-1", "notif-2", "notif-3", "notif-4"].includes(n.id)) {
+              return false;
+            }
+            return true;
+          })
+          .map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            body: n.body || n.message || "",
+            time: n.time || (n.timestamp ? new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"),
+            category: n.category || "general",
+            read: n.read
+          }));
       }
 
       const patientId = profile.id;
@@ -112,20 +176,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         setDoctorsList(docs || []);
       }
 
-      // 4. Messages
-      const mRes = await apiFetch(`/api/messages?threadId=chat-${patientId}`);
-      if (mRes.ok) {
-        const msgs: any[] = await mRes.json();
-        if (Array.isArray(msgs) && msgs.length > 0) {
-          setMessages(msgs.map((msg: any) => ({
-            id:         msg.id,
-            sender:     msg.sender,
-            senderName: msg.senderName || (msg.sender === "doctor" ? "Dr. Sarah Jenkins" : "Patient"),
-            content:    msg.content || msg.text || "",
-            timestamp:  msg.timestamp
-          })));
-        }
-      }
+      // 5. Clinicians (Doctors)
 
       // 6. Fetch Broadcast Alerts from system logs
       let broadcastNotifs: AppNotification[] = [];
@@ -153,6 +204,15 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
             logsList.forEach((log: any, idx: number) => {
               const msg = log.message || "";
               if (!msg.startsWith("[Broadcast]:")) return;
+
+              // Expire temporary clinic broadcasts after 24 hours
+              if (log.timestamp) {
+                const logTime = new Date(log.timestamp).getTime();
+                if (!isNaN(logTime) && Date.now() - logTime > 24 * 60 * 60 * 1000) {
+                  return;
+                }
+              }
+
               const cleanMsg = msg.replace("[Broadcast]:", "").trim();
 
               // Parse audience group target
@@ -200,11 +260,12 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         }
       });
 
-      // Ensure example AI appointment reminder is always available in notification box
-      const hasAiReminder = mergedNotifs.some(n => n.id === "notif-ai-reminder" || n.category === "reminder");
-      if (!hasAiReminder && initialNotifications.length > 0) {
-        mergedNotifs.unshift(initialNotifications[0]);
+      if (mergedNotifs.length === 0 && email === "ahmad.danish@gmail.com") {
+        mergedNotifs.push(...initialNotifications);
       }
+
+      // Sort notifications descending by recency (newest alerts on top)
+      mergedNotifs.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
 
       setNotifications(mergedNotifs);
 
@@ -278,6 +339,98 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
     }
   };
 
+  // ── Smart AI Appointment Notification Helpers ───────────────────────────
+  const getAppointmentDateTime = (dateStr: string, timeSlotStr: string): Date | null => {
+    if (!dateStr) return null;
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return null;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+
+    let hour = 9;
+    let minute = 0;
+
+    if (timeSlotStr) {
+      const match24 = timeSlotStr.match(/^(\d{1,2}):(\d{2})/);
+      if (match24) {
+        hour = parseInt(match24[1], 10);
+        minute = parseInt(match24[2], 10);
+      } else {
+        const match12 = timeSlotStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+        if (match12) {
+          let h = parseInt(match12[1], 10);
+          minute = parseInt(match12[2], 10);
+          const meridiem = (match12[3] || "").toUpperCase();
+          if (meridiem === "PM" && h < 12) h += 12;
+          if (meridiem === "AM" && h === 12) h = 0;
+          hour = h;
+        }
+      }
+    }
+
+    return new Date(year, month, day, hour, minute);
+  };
+
+  // Periodic Reminder Watcher: Checks 1 day in advance & 2 hours in advance
+  useEffect(() => {
+    const checkAiReminders = () => {
+      const now = new Date();
+      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const additions: AppNotification[] = [];
+
+      appointments.forEach((apt) => {
+        if (apt.status === "Cancelled" || apt.status === "Done" || apt.status === "Completed") return;
+        const aptTime = getAppointmentDateTime(apt.date, apt.timeSlot);
+        if (!aptTime) return;
+
+        const aptDateOnly = new Date(aptTime.getFullYear(), aptTime.getMonth(), aptTime.getDate());
+        const dayDiff = Math.round((aptDateOnly.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+        const diffMins = Math.round((aptTime.getTime() - now.getTime()) / (1000 * 60));
+
+        // 1. One day in advance reminder (tomorrow)
+        const oneDayNotifId = `notif-ai-1day-${apt.id}`;
+        if (dayDiff === 1 && !notifications.some(n => n.id === oneDayNotifId)) {
+          additions.push({
+            id: oneDayNotifId,
+            title: `Appointment Reminder: Tomorrow at ${apt.timeSlot}`,
+            body: `Health Assistant Reminder: You have an upcoming consultation with ${apt.doctorName || 'Specialist'} at ${apt.clinic} tomorrow (${apt.date}) at ${apt.timeSlot}. Please remember to arrive 5–10 minutes early for reception check-in.`,
+            time: "Just now",
+            timestamp: new Date().toISOString(),
+            read: false,
+            category: "reminder"
+          });
+        }
+
+        // 2. 2 hours in advance reminder (today, diffMins <= 120 && diffMins > 0)
+        const twoHourNotifId = `notif-ai-2h-${apt.id}`;
+        if (dayDiff === 0 && diffMins <= 120 && diffMins > 0 && !notifications.some(n => n.id === twoHourNotifId)) {
+          additions.push({
+            id: twoHourNotifId,
+            title: `Appointment Reminder: In 2 Hours (${apt.timeSlot})`,
+            body: `Health Assistant Reminder: Your consultation with ${apt.doctorName || 'Specialist'} at ${apt.clinic} begins in 2 hours (${apt.timeSlot}). Queue: ${apt.queueNumber || '#Q-100'}. Please arrive 5–10 minutes early for counter presence check-in.`,
+            time: "Just now",
+            timestamp: new Date().toISOString(),
+            read: false,
+            category: "reminder"
+          });
+        }
+      });
+
+      if (additions.length > 0) {
+        setNotifications(prev => {
+          const combined = [...additions, ...prev];
+          combined.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
+          return combined;
+        });
+      }
+    };
+
+    checkAiReminders();
+    const interval = setInterval(checkAiReminders, 30000);
+    return () => clearInterval(interval);
+  }, [appointments, notifications]);
+
   // ── Appointments ──────────────────────────────────────────────────────────
 
   const handleAddAppointment = async (newApt: Appointment) => {
@@ -296,10 +449,11 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         const saved = await res.json();
         setAppointments(prev => [saved, ...prev]);
 
-        // Append local notification immediately
-        const arrivalNotice = `Please arrive at the clinic counter 5–10 minutes before your scheduled appointment time and present your Queue Number (${saved.queueNumber || 'assigned at counter'}) to the counter staff for on-site presence check-in. Make sure you have arrived in person to confirm your consultation slot.`;
-        const newNotif = {
-          id: "notif-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+        // Evaluate user's timing rules:
+        // 1. Success confirmation
+        const arrivalNotice = `Please arrive at the clinic counter 5–10 minutes before your scheduled appointment time and present your Queue Number (${saved.queueNumber || 'assigned at counter'}) to the counter staff for on-site presence check-in.`;
+        const successNotif: AppNotification = {
+          id: "notif-success-" + saved.id + "-" + Date.now(),
           title: `Booking Confirmed (${saved.queueNumber || '#Q-100'})`,
           body: `Booking confirmed for ${saved.timeSlot} at ${saved.clinic} with ${saved.doctorName || 'Specialist'}. ${arrivalNotice}`,
           message: `Booking confirmed for ${saved.timeSlot} at ${saved.clinic} with ${saved.doctorName || 'Specialist'}. ${arrivalNotice}`,
@@ -308,17 +462,56 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           read: false,
           category: "reminder" as any
         };
-        const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
+
+        const newGeneratedNotifs: AppNotification[] = [successNotif];
+
+        const now = new Date();
+        const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const aptTime = getAppointmentDateTime(saved.date, saved.timeSlot);
+
+        if (aptTime) {
+          const aptDateOnly = new Date(aptTime.getFullYear(), aptTime.getMonth(), aptTime.getDate());
+          const dayDiff = Math.round((aptDateOnly.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+          const diffMins = Math.round((aptTime.getTime() - now.getTime()) / (1000 * 60));
+
+          // Rule 1: One day in advance reminder (if appointment is tomorrow)
+          if (dayDiff === 1) {
+            newGeneratedNotifs.unshift({
+              id: `notif-ai-1day-${saved.id}`,
+              title: `Appointment Reminder: Tomorrow at ${saved.timeSlot}`,
+              body: `Health Assistant Reminder: You have an upcoming consultation with ${saved.doctorName || 'Specialist'} at ${saved.clinic} tomorrow (${saved.date}) at ${saved.timeSlot}. Please remember to arrive 5–10 minutes early for reception check-in.`,
+              time: "Just now",
+              timestamp: new Date().toISOString(),
+              read: false,
+              category: "reminder"
+            });
+          }
+
+          // Rule 2 & 3: If appointment is today:
+          // If booked > 2 hours ahead (diffMins > 120), the 2-hour watcher will trigger when within 2 hours.
+          // If booked <= 2 hours ahead, do NOT send duplicate reminder, only successNotif!
+        }
+
+        const updatedNotifs = [...newGeneratedNotifs, ...(patientProfile.notifications || [])];
+        updatedNotifs.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
         setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
-        setNotifications(prev => [newNotif, ...prev]);
+        setNotifications(prev => {
+          const combined = [...newGeneratedNotifs, ...prev];
+          combined.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
+          return combined;
+        });
 
         alert(`SUCCESS: Booking confirmed at ${saved.clinic} on ${saved.date} at ${saved.timeSlot}!\nQueue Number: ${saved.queueNumber || '#Q-100'}\n\nPlease arrive 5–10 minutes early to check-in at the counter.`);
+        return true;
       } else {
-        setAppointments(prev => [newAptWithPatient, ...prev]);
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || "Conflict: This consultation time slot has already been booked by another patient.");
+        return false;
       }
     } catch (err) {
       console.error("Failed to save appointment on server", err);
-      setAppointments(prev => [newAptWithPatient, ...prev]);
+      alert("Unable to reach server to confirm time slot. Please try again.");
+      return false;
     }
     setPrefilledApt(null);
   };
@@ -348,8 +541,13 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
             category: "general" as any
           };
           const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
+          updatedNotifs.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
           setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
-          setNotifications(prev => [newNotif, ...prev]);
+          setNotifications(prev => {
+            const combined = [newNotif, ...prev];
+            combined.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
+            return combined;
+          });
 
           alert(`SUCCESS: Your appointment at ${target.clinic} has been cancelled. A notification log has been saved to your records.`);
         }
@@ -395,8 +593,13 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
             category: "general" as any
           };
           const updatedNotifs = [newNotif, ...(patientProfile.notifications || [])];
+          updatedNotifs.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
           setPatientProfile(prev => ({ ...prev, notifications: updatedNotifs }));
-          setNotifications(prev => [newNotif, ...prev]);
+          setNotifications(prev => {
+            const combined = [newNotif, ...prev];
+            combined.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
+            return combined;
+          });
 
           alert(`SUCCESS: Your appointment at ${target.clinic} has been rescheduled to ${date} at ${timeSlot}.`);
         }
@@ -461,78 +664,6 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
     } catch (err) {
       console.error("Failed to sync vitals to backend", err);
       setVitalsList(prev => [vitalWithPatient, ...prev]);
-    }
-  };
-
-  // ── Messages ──────────────────────────────────────────────────────────────
-
-  const handleSendMessage = async (msg: Message) => {
-    // Optimistically add the message to state immediately for instant rendering
-    setMessages(prev => {
-      if (prev.some(m => m.id === msg.id)) return prev;
-      return [...prev, msg];
-    });
-
-    const threadId = `chat-${patientProfile.id || "p1"}`;
-    const payload = {
-      threadId,
-      sender:     "user" as const,
-      senderName: patientProfile.fullName,
-      content:    msg.content,
-      timestamp:  msg.timestamp
-    };
-    try {
-      const res = await apiFetch("/api/messages", {
-        method: "POST",
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const saved = await res.json();
-        // Replace the temporary message with the synchronized version from the server
-        setMessages(prev => prev.map(m => m.id === msg.id ? {
-          id:         saved.id,
-          sender:     "user",
-          senderName: patientProfile.fullName,
-          content:    saved.content || saved.text || msg.content,
-          timestamp:  saved.timestamp
-        } : m));
-      }
-    } catch (err) {
-      console.warn("Failed to synchronize message to database, keeping local copy:", err);
-    }
-  };
-
-  const handleInjectDoctorMessage = async (content: string) => {
-    const nextUpcoming = appointments.find(a => a.status === "Upcoming");
-    const clinicName = nextUpcoming?.clinic || "General Triage";
-    const channelId = `staff-${clinicName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
-    
-    const threadId = `chat-${patientProfile.id || "p1"}`;
-    const prefixedContent = `[${channelId}]: ${content}`;
-    const payload = {
-      threadId,
-      sender:     "doctor" as const,
-      senderName: `Nurse ${clinicName.includes("Klinik") ? "Aishah" : "Mei Ling"}`,
-      content:    prefixedContent,
-      timestamp:  new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    };
-    try {
-      const res = await apiFetch("/api/messages", {
-        method: "POST",
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const saved = await res.json();
-        setMessages(prev => [...prev, {
-          id:         saved.id,
-          sender:     "doctor",
-          senderName: payload.senderName,
-          content:    saved.content || saved.text,
-          timestamp:  saved.timestamp
-        }]);
-      }
-    } catch (err) {
-      console.error("Failed to inject doctor message", err);
     }
   };
 
@@ -603,7 +734,32 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
 
   const handleResubmitBooking = (apt: Appointment) => {
     setPrefilledApt(apt);
+    localStorage.setItem("pantai_booking_initial_step", "4");
+    if (apt.clinic) {
+      localStorage.setItem("pantai_booking_preselected_clinic", apt.clinic);
+    }
     setCurrentScreen("schedule-appointment");
+  };
+
+  const handleSetScreen = (screen: string) => {
+    if (screen === "schedule-appointment") {
+      const hasPreselectedStep = localStorage.getItem("pantai_booking_initial_step");
+      if (!hasPreselectedStep) {
+        setPrefilledApt(null);
+        localStorage.removeItem("pantai_booking_preselected_clinic");
+        localStorage.removeItem("pantai_booking_preselected_doctor");
+        localStorage.removeItem("pantai_booking_preselected_specialty");
+        localStorage.removeItem("carey_triage_specialty");
+      }
+    } else {
+      setPrefilledApt(null);
+      localStorage.removeItem("pantai_booking_initial_step");
+      localStorage.removeItem("pantai_booking_preselected_clinic");
+      localStorage.removeItem("pantai_booking_preselected_doctor");
+      localStorage.removeItem("pantai_booking_preselected_specialty");
+      localStorage.removeItem("carey_triage_specialty");
+    }
+    setCurrentScreen(screen);
   };
 
   // ─── Authenticated layout ─────────────────────────────────────────────────
@@ -613,11 +769,10 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       {/* Left sidebar navigation */}
       <Sidebar
         currentScreen={currentScreen}
-        onSetScreen={setCurrentScreen}
+        onSetScreen={handleSetScreen}
         notifications={notifications}
         onLogout={handleLogout}
         patientProfile={patientProfile}
-        unreadMessagesCount={unreadMessagesCount}
       />
 
       {/* Main content area */}
@@ -626,7 +781,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           currentScreen={currentScreen}
           onNavigateHome={() => handleLogout()}
           notifications={notifications}
-          onSetScreen={setCurrentScreen}
+          onSetScreen={handleSetScreen}
           patientName={patientProfile.fullName}
         />
 
@@ -638,9 +793,10 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
                 patientProfile={patientProfile}
                 appointments={appointments}
                 vitals={vitalsList}
-                onSetScreen={setCurrentScreen}
+                onSetScreen={handleSetScreen}
                 onPostponedStatus={handlePostponedStatus}
                 onCancelAppointment={handleCancelAppointment}
+                onResubmitBooking={handleResubmitBooking}
               />
             )}
 
@@ -648,18 +804,8 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
               <AIConsultation
                 patientProfile={patientProfile}
                 vitals={vitalsList}
-                onSetScreen={setCurrentScreen}
-                onInjectDoctorMessage={handleInjectDoctorMessage}
-              />
-            )}
-
-            {currentScreen === "communication" && (
-              <Communication
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                onSetScreen={setCurrentScreen}
                 appointments={appointments}
-                patientProfile={patientProfile}
+                onSetScreen={handleSetScreen}
               />
             )}
 
@@ -667,10 +813,12 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
               <ScheduleAppointment
                 onAddAppointment={handleAddAppointment}
                 prefilledApt={prefilledApt}
-                onSetScreen={setCurrentScreen}
+                onSetScreen={handleSetScreen}
                 appointments={appointments}
                 onCancelAppointment={handleCancelAppointment}
                 onRescheduleAppointment={handleRescheduleAppointment}
+                patientProfile={patientProfile}
+                onUpdateProfile={handleUpdateProfile}
               />
             )}
 
@@ -678,20 +826,22 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
               <AppointmentsHistory
                 appointments={appointments}
                 onResubmitBooking={handleResubmitBooking}
-                onSetScreen={setCurrentScreen}
+                onSetScreen={handleSetScreen}
                 doctors={doctorsList}
+                onCancelAppointment={handleCancelAppointment}
+                onRescheduleAppointment={handleRescheduleAppointment}
               />
             )}
 
             {currentScreen === "clinic-search" && (
-              <ClinicSearch onSetScreen={setCurrentScreen} />
+              <ClinicSearch onSetScreen={handleSetScreen} />
             )}
 
             {currentScreen === "patient-registration" && (
               <PatientRegistration
                 currentProfile={patientProfile}
                 onUpdateProfile={handleUpdateProfile}
-                onSetScreen={setCurrentScreen}
+                onSetScreen={handleSetScreen}
               />
             )}
 
@@ -709,7 +859,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
                 patientProfile={patientProfile}
                 vitals={vitalsList}
                 appointments={appointments}
-                onSetScreen={setCurrentScreen}
+                onSetScreen={handleSetScreen}
                 onLogout={handleLogout}
                 onUpdateProfile={handleUpdateProfile}
               />

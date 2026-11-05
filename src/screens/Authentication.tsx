@@ -56,8 +56,8 @@ export default function Authentication({
   const handlePasswordStrength = (val: string) => {
     setNewPassword(val);
     let score = 0;
-    if (val.length >= 6)            score++;
-    if (val.length >= 10)           score++;
+    if (val.length >= 8)            score++;
+    if (val.length >= 12)           score++;
     if (/[A-Z]/.test(val))          score++;
     if (/[0-9]/.test(val))          score++;
     if (/[^A-Za-z0-9]/.test(val))   score++;
@@ -137,12 +137,16 @@ export default function Authentication({
       setErrorMessage("Password is required for registration.");
       return;
     }
+    if (newPassword.length < 8) {
+      setErrorMessage("Password must be at least 8 characters long.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setErrorMessage("Passwords do not match.");
       return;
     }
     if (strengthMeter.score < 2) {
-      setErrorMessage("Please choose a stronger password (min 6 characters).");
+      setErrorMessage("Please choose a stronger password (min 8 characters).");
       return;
     }
 
@@ -195,8 +199,12 @@ export default function Authentication({
 
   const handleUpdatePassword = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newPassword || newPassword.length < 8) {
+      setErrorMessage("Password must be at least 8 characters long.");
+      return;
+    }
     if (newPassword !== confirmPassword) { setErrorMessage("Passwords do not match!"); return; }
-    if (strengthMeter.score < 2) { setErrorMessage("Please choose a stronger password."); return; }
+    if (strengthMeter.score < 2) { setErrorMessage("Please choose a stronger password (min 8 characters)."); return; }
     setErrorMessage("");
     setIsSubmitted(true);
     setTimeout(() => {

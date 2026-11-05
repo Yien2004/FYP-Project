@@ -7,45 +7,49 @@
 -- CLINICIANS (Doctors)
 -- ============================================================
 insert into clinicians (id, name, specialty, rating, reviews_count, image, availability, hospital) values
-  ('doc-1', 'Dr. Sarah Mitchell',  'Family Medicine & Chief Medical Officer', 4.9, 312,
+  ('doc-1', 'Dr. Ainol Shareha Binti Sahar', 'Cardiology & Internal Medicine', 4.9, 203,
    'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
-   'Mon - Fri, 9:00 AM - 4:00 PM', 'CarePoint Specialist KL'),
-  ('doc-2', 'Dr. Adrian Rahman',   'Cardiologist',   4.8, 184,
+   'Mon–Fri: 9:00 AM – 5:00 PM', 'Pantai Hospital Penang (Main Hospital)'),
+  ('doc-2', 'Dr. Simon Lo', 'Cardiology & Interventional Catheterization', 4.9, 289,
    'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
-   'Tue, Thu, 10:00 AM - 3:00 PM', 'CarePoint Medical City Ampang'),
-  ('doc-3', 'Dr. Ling Wey Shuan',  'Pediatrician',   4.9, 228,
-   'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=300',
-   'Mon, Wed, Fri, 8:30 AM - 1:00 PM', 'CarePoint Clinic Damansara'),
-  ('doc-4', 'Dr. Amira Yusuf',     'Dermatologist',  4.7, 142,
+   'Mon–Fri: 8:30 AM – 5:30 PM', 'Pantai Heart & Wellness Pavilion'),
+  ('doc-3', 'Dr. Sarah Lim', 'Dermatology & Day Surgery', 4.8, 217,
    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
-   'Wed, Sat, 2:00 PM - 6:00 PM', 'CarePoint Clinic Subang Jaya')
-on conflict (id) do nothing;
+   'Mon–Sat: 8:00 AM – 9:00 PM', 'Pantai Premier Clinic & Day Surgery'),
+  ('doc-4', 'Dr. Siti Aminah', 'Orthopedic Surgery & Sports Medicine', 4.9, 284,
+   'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=300',
+   'Mon–Sat: 8:00 AM – 8:00 PM', 'Pantai Specialist Centre')
+on conflict (id) do update set
+  name = excluded.name,
+  specialty = excluded.specialty,
+  hospital = excluded.hospital;
 
 -- ============================================================
--- FACILITIES (Clinics)
+-- FACILITIES (Clinics — Penang Single-Hospital Directive)
 -- ============================================================
 insert into facilities (id, name, address, phone, hours, distance, lat, lng, featured, zip_code) values
-  ('clinic-1', 'CarePoint Clinic Damansara',
-   'Level 1, Block C, Damansara Heights, 50490 Kuala Lumpur, Malaysia',
-   '+60 3-2094 8800', '8:00 AM - 10:00 PM Daily', '1.2 km away',
-   3.149200, 101.654100, true, '50490'),
-  ('clinic-2', 'CarePoint Clinic Subang Jaya',
-   'A-03-G, Sunway Geo Avenue, Jalan Lagoon Selatan, 47500 Subang Jaya, Selangor, Malaysia',
-   '+60 3-5612 1122', '24 Hours Express Emergency Care', '12.4 km away',
-   3.064500, 101.609400, true, '47500'),
-  ('clinic-3', 'CarePoint Specialist Centre Ampang',
-   '24 Jalan Ampang Utama, Centrio Ampang, 68000 Ampang, Selangor, Malaysia',
-   '+60 3-4251 9000', '8:30 AM - 8:00 PM (Closed Sundays)', '6.8 km away',
-   3.159800, 101.751100, false, '68000'),
-  ('clinic-4', 'CarePoint Clinic KL Sentral',
-   'Lot 5, Departure Hall Level, Stesen Sentral KL, 50470 Kuala Lumpur, Malaysia',
-   '+60 3-2274 3344', '7:00 AM - 11:00 PM Daily', '4.1 km away',
-   3.134200, 101.686500, false, '50470'),
-  ('clinic-5', 'CarePoint Clinic Cheras',
-   'No. 88, Jalan Cheras Mewah, Taman Cheras, 56100 Kuala Lumpur, Malaysia',
-   '+60 3-9133 4455', '8:00 AM - 10:00 PM Daily', '9.3 km away',
-   3.098800, 101.740200, false, '56100')
-on conflict (id) do nothing;
+  ('ph-penang', 'Pantai Hospital Penang (Main Hospital)',
+   '82, Jalan Tengah, Bandar Bayan Baru, 11950 Bayan Lepas, Pulau Pinang',
+   '04-643 3888', 'Open 24 hours, 7 days a week (Tertiary Inpatient & 24/7 A&E)', '1.2 km away',
+   5.321389, 100.284722, true, '11950'),
+  ('pantai-pavilion', 'Pantai Heart & Wellness Pavilion',
+   '128, Jalan Burma, 10050 Georgetown, Pulau Pinang',
+   '04-226 7888', 'Mon–Fri: 8:30 AM – 5:30 PM | Sat: 8:30 AM – 1:00 PM', '9.5 km away',
+   5.420800, 100.320100, true, '10050'),
+  ('pantai-premier', 'Pantai Premier Clinic & Day Surgery',
+   '1-1-15, Tingkat Mahsuri, 11950 Bayan Baru, Pulau Pinang',
+   '04-641 2288', 'Mon–Sat: 8:00 AM – 9:00 PM | Sun: 9:00 AM – 1:00 PM', '1.6 km away',
+   5.326200, 100.290500, true, '11950'),
+  ('pantai-specialist', 'Pantai Specialist Centre',
+   '588, Jalan Air Itam, 11500 Ayer Itam, Pulau Pinang',
+   '04-828 5588', 'Mon–Sat: 8:00 AM – 8:00 PM | Sun: Closed', '8.2 km away',
+   5.405100, 100.282900, true, '11500')
+on conflict (id) do update set
+  name = excluded.name,
+  address = excluded.address,
+  hours = excluded.hours,
+  lat = excluded.lat,
+  lng = excluded.lng;
 
 -- ============================================================
 -- REVIEWS

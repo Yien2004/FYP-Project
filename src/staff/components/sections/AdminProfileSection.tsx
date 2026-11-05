@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   User,
   Mail,
-  ShieldCheck,
   Lock,
-  Save,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   Calendar,
-  Key
+  Key,
+  Loader2
 } from 'lucide-react';
 
 interface AdminProfileSectionProps {
@@ -36,12 +34,9 @@ export default function AdminProfileSection({
   const [adminDetails, setAdminDetails] = useState<AdminDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(true);
 
-  // Profile forms states
+  // Profile states
   const [profileName, setProfileName] = useState(userName);
   const [profileEmail, setProfileEmail] = useState(userEmail);
-  const [profileSuccess, setProfileSuccess] = useState('');
-  const [profileError, setProfileError] = useState('');
-  const [profileSubmitting, setProfileSubmitting] = useState(false);
 
   // Password change states
   const [newPassword, setNewPassword] = useState('');
@@ -60,7 +55,10 @@ export default function AdminProfileSection({
           const matched = data.find((u: any) => u.email.toLowerCase() === userEmail.toLowerCase());
           if (matched) {
             setAdminDetails(matched);
-            setProfileName(matched.fullName);
+            const resolvedName = matched.email.toLowerCase() === 'pantaipenangadmin@gmail.com' || matched.fullName === 'Main Hospital Admin'
+              ? 'Main Pantai Hospital Penang Admin'
+              : matched.fullName;
+            setProfileName(resolvedName);
             setProfileEmail(matched.email);
           }
         }
@@ -72,53 +70,6 @@ export default function AdminProfileSection({
   useEffect(() => {
     fetchAdminDetails();
   }, [userEmail]);
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminDetails) {
-      setProfileError('Admin account information not resolved.');
-      return;
-    }
-    if (!profileName.trim() || !profileEmail.trim()) {
-      setProfileError('Name and Email are required.');
-      return;
-    }
-
-    setProfileSuccess('');
-    setProfileError('');
-    setProfileSubmitting(true);
-
-    try {
-      const res = await fetch(`/api/admin/users/${adminDetails.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: profileName,
-          email: profileEmail,
-          role: adminDetails.role,
-          approved: adminDetails.approved,
-          status: adminDetails.status
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to update profile.');
-      }
-
-      onUpdateProfile(profileName, profileEmail);
-      setProfileSuccess('Administrative credentials updated successfully!');
-      
-      // Update local details object state
-      setAdminDetails(prev => prev ? { ...prev, fullName: profileName, email: profileEmail } : null);
-      
-      setTimeout(() => setProfileSuccess(''), 4000);
-    } catch (err: any) {
-      setProfileError(err.message || 'Something went wrong updating profile.');
-    } finally {
-      setProfileSubmitting(false);
-    }
-  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +132,7 @@ export default function AdminProfileSection({
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg mb-4 select-none">
             {userName ? userName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'AD'}
           </div>
-          <h4 className="font-bold text-base text-neutral-900">{userName || 'System Administrator'}</h4>
+          <h4 className="font-bold text-base text-neutral-900">{profileName || userName || 'Main Pantai Hospital Penang Admin'}</h4>
           <span className="text-[10px] font-bold uppercase tracking-widest text-sky-700 mt-1 bg-sky-50 border border-sky-100 px-2.5 py-0.5 rounded-full">
             {adminDetails?.role || 'Administrator'}
           </span>
@@ -198,13 +149,6 @@ export default function AdminProfileSection({
                 Registered: {adminDetails ? new Date(adminDetails.createdAt).toLocaleDateString() : 'N/A'}
               </span>
             </div>
-
-            <div className="flex items-center gap-2.5 text-xs text-neutral-600">
-              <ShieldCheck className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-              <span className="truncate font-mono text-[9px] text-neutral-500 bg-neutral-50 border border-neutral-200/60 px-2 py-0.5 rounded">
-                UUID: {adminDetails?.id || 'fetching...'}
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -216,7 +160,7 @@ export default function AdminProfileSection({
         <div className={cardBase}>
           <div className="flex items-center gap-2 mb-4 border-b border-neutral-100 pb-3">
             <User className="w-4.5 h-4.5 text-sky-600" />
-            <h3 className="font-bold text-sm text-neutral-900">Edit Administrator Profile</h3>
+            <h3 className="font-bold text-sm text-neutral-900">Administrator Profile Details</h3>
           </div>
 
           {loadingDetails ? (
@@ -224,16 +168,15 @@ export default function AdminProfileSection({
               Resolving database identity details...
             </div>
           ) : (
-            <form onSubmit={handleSaveProfile} className="space-y-4">
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className={labelClass}>Administrator Full Name</label>
                   <input
                     type="text"
-                    value={profileName}
-                    onChange={(e) => setProfileName(e.target.value)}
-                    className={inputClass}
-                    required
+                    value={profileName || 'Main Pantai Hospital Penang Admin'}
+                    disabled
+                    className="w-full bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-600 outline-none h-9 cursor-not-allowed select-none font-medium"
                   />
                 </div>
 
@@ -241,43 +184,13 @@ export default function AdminProfileSection({
                   <label className={labelClass}>Login Email Address</label>
                   <input
                     type="email"
-                    value={profileEmail}
-                    onChange={(e) => setProfileEmail(e.target.value)}
-                    className={inputClass}
-                    required
+                    value={profileEmail || userEmail}
+                    disabled
+                    className="w-full bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-600 outline-none h-9 cursor-not-allowed select-none font-medium"
                   />
                 </div>
               </div>
-
-              {profileError && (
-                <div className="text-[11px] text-red-700 bg-red-50 border border-red-100 p-2.5 rounded-lg flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {profileError}
-                </div>
-              )}
-
-              {profileSuccess && (
-                <div className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  {profileSuccess}
-                </div>
-              )}
-
-              <div className="flex justify-end pt-2 border-t border-neutral-100">
-                <button
-                  type="submit"
-                  disabled={profileSubmitting}
-                  className="bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-xs font-bold py-2 px-5 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer h-9"
-                >
-                  {profileSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  {profileSubmitting ? 'Saving Changes...' : 'Save Profile Details'}
-                </button>
-              </div>
-            </form>
+            </div>
           )}
         </div>
 

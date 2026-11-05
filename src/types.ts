@@ -70,15 +70,18 @@ export interface Appointment {
   doctorImage: string;
   date: string;
   timeSlot: string;
-  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected' | 'Done' | 'Missing';
+  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected' | 'Done' | 'Missing' | 'Checked In' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | string;
   type: 'In-Clinic' | 'Video Consultation';
   clinic?: string;
   symptoms: string;
   clinicalNotes?: string;
   prescription?: string;
+  diagnosis?: string;
   checkedIn?: boolean;
   checkInTime?: string;
   queueNumber?: string;
+  roomNumber?: string;
+  estimatedCallTime?: string;
   shareHistory?: boolean;
   syncCrossFacilityRecords?: boolean;
   requestRide?: boolean;
@@ -114,6 +117,21 @@ export interface AppNotification {
   time: string;
   category: 'alert' | 'medication' | 'lab' | 'general' | 'reminder';
   read: boolean;
+  timestamp?: string;
+  message?: string;
+}
+
+export interface StructuredTriage {
+  intent: "general_inquiry" | "symptom_triage" | "emergency" | "appointment_inquiry" | "appointment_reschedule" | "doctor_schedule" | "general";
+  has_symptom: boolean;
+  symptoms_detected: string[];
+  recommended_specialty: string | null;
+  target_department: string | null;
+  requires_emergency: boolean;
+  triage_summary: string;
+  bot_message: string;
+  doctors?: any[];
+  action_payload?: any;
 }
 
 export interface ChatMessage {
@@ -122,7 +140,23 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   triageData?: {
-    department: string;
+    department?: string;
     doctors: any[];
+    isBooking?: boolean;
+    facility?: string;
+  };
+  structuredTriage?: StructuredTriage;
+  triageResult?: {
+    success?: boolean;
+    intent?: string;
+    isEmergency: boolean;
+    severityScore: number;
+    recommendedSpecialty: string;
+    facilityId?: number;
+    facilityName?: string;
+    reply?: string;
+    language?: 'en' | 'zh';
+    activeAppointment?: any;
+    isNonMedical?: boolean;
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -8,8 +8,9 @@ import {
   AlertCircle, 
   CalendarRange,
   UserX,
-  Building,
-  ShieldCheck,
+  Upload,
+  FileText,
+  X,
   CheckCircle2
 } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   });
 
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
-  const [leaveReasons, setLeaveReasons] = useState<Record<string, 'doctor_mc' | 'clinic_holiday'>>(() => {
+  const [leaveReasons, setLeaveReasons] = useState<Record<string, 'doctor_mc'>>(() => {
     try {
       const saved = localStorage.getItem("lifelink_leave_reasons");
       return saved ? JSON.parse(saved) : {};
@@ -52,7 +53,9 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   const [customBreaks, setCustomBreaks] = useState<{ [date: string]: { start: string; end: string } }>({});
 
   const [newLeaveDate, setNewLeaveDate] = useState("");
-  const [leaveType, setLeaveType] = useState<'doctor_mc' | 'clinic_holiday'>('doctor_mc');
+  const [mcFile, setMcFile] = useState<{ name: string; size: string; dataUrl?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -79,7 +82,7 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
       });
   }, [doctorName]);
 
-  const persistBlockedDates = (dates: string[], updatedReasons?: Record<string, 'doctor_mc' | 'clinic_holiday'>) => {
+  const persistBlockedDates = (dates: string[], updatedReasons?: Record<string, 'doctor_mc'>) => {
     if (updatedReasons) {
       setLeaveReasons(updatedReasons);
       try {
@@ -114,42 +117,45 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
       });
   };
 
-  const handleToggleTodayAttendance = () => {
-    if (isDoctorOffToday) {
-      // Remove today from blocked dates
-      const updated = blockedDates.filter(d => d !== todayStr);
-      setBlockedDates(updated);
-      const nextReasons = { ...leaveReasons };
-      delete nextReasons[todayStr];
-      persistBlockedDates(updated, nextReasons);
-    } else {
-      // Add today as doctor leave/MC
-      const updated = [...blockedDates, todayStr].sort();
-      setBlockedDates(updated);
-      const nextReasons = { ...leaveReasons, [todayStr]: 'doctor_mc' as const };
-      persistBlockedDates(updated, nextReasons);
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const sizeKb = Math.round(file.size / 1024);
+    const sizeStr = sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setMcFile({
+        name: file.name,
+        size: sizeStr,
+        dataUrl: reader.result as string
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveFile = () => {
+    setMcFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
   const handleAddLeave = () => {
     if (!newLeaveDate) return;
     if (blockedDates.includes(newLeaveDate)) {
-      setErrorMsg("This date is already marked as a leave or holiday.");
+      setErrorMsg("This date is already marked as a doctor leave or MC.");
       setTimeout(() => setErrorMsg(""), 3000);
       return;
     }
     const updated = [...blockedDates, newLeaveDate].sort();
     setBlockedDates(updated);
-    const nextReasons = { ...leaveReasons, [newLeaveDate]: leaveType };
+    const nextReasons = { ...leaveReasons, [newLeaveDate]: 'doctor_mc' as const };
     setNewLeaveDate("");
-    persistBlockedDates(updated, nextReasons);
-  };
-
-  const handleRemoveLeave = (date: string) => {
-    const updated = blockedDates.filter(d => d !== date);
-    setBlockedDates(updated);
-    const nextReasons = { ...leaveReasons };
-    delete nextReasons[date];
+    setMcFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     persistBlockedDates(updated, nextReasons);
   };
 
@@ -163,21 +169,18 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 font-sans text-neutral-800">
+    <div className="max-w-2xl mx-auto space-y-6 font-sans text-neutral-800">
       
       {/* Top Clean Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Doctor Attendance &amp; Holiday Manager</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Manage doctor medical leave (MC), daily absence, and clinic/hospital holiday closures.</p>
-        </div>
+      <div className="pb-3 border-b border-slate-200">
+        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Doctor Attendance &amp; Leave Manager</h2>
       </div>
 
       {/* Floating Status Banners */}
       {saveSuccess && (
         <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl shadow-xs animate-fadeIn">
           <Check className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>Attendance records and holiday schedule successfully synchronized with patient booking ledger.</span>
+          <span>Attendance records and doctor leave schedule successfully synchronized with patient booking ledger.</span>
         </div>
       )}
       {errorMsg && (
@@ -188,7 +191,7 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
       )}
 
       {/* Doctor Today Attendance Banner */}
-      <div className={`border rounded-2xl p-6 transition shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-5 ${
+      <div className={`border rounded-2xl p-6 transition shadow-xs flex items-center justify-between gap-5 ${
         isDoctorOffToday 
           ? 'bg-rose-50/60 border-rose-200 text-rose-900' 
           : 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
@@ -204,194 +207,110 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-white">
                 Today: {todayStr}
               </span>
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                isDoctorOffToday ? 'bg-rose-200 text-rose-900' : 'bg-emerald-200 text-emerald-900'
-              }`}>
-                {isDoctorOffToday ? 'Off Duty / Medical Leave (MC)' : 'On Duty & Available'}
-              </span>
+              {isDoctorOffToday && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-200 text-rose-900">
+                  Off Duty / Medical Leave (MC)
+                </span>
+              )}
             </div>
             <h3 className="font-extrabold text-base text-slate-900 mt-1">
-              {doctorName || 'Attending Physician'}
+              Clinical Physician Duty Schedule
             </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              {isDoctorOffToday 
-                ? 'Doctor is marked as not coming today. Patient appointment slots for today are blocked automatically.' 
-                : 'Doctor is on duty. Consultation appointment bookings are open for patients today.'}
-            </p>
+            {isDoctorOffToday && (
+              <p className="text-xs text-slate-600 mt-0.5">
+                Doctor is marked as not coming today. Patient appointment slots for today are blocked automatically.
+              </p>
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Schedule Leave / MC Form */}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+        <div className="border-b border-neutral-100 pb-3">
+          <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
+            <CalendarRange className="w-4 h-4 text-sky-600" />
+            Schedule Doctor Medical Leave (MC)
+          </h3>
+        </div>
+
+        {/* Leave Type Indicator: Doctor MC / Leave Only */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Block Category</label>
+          <div className="p-2.5 rounded-xl text-xs font-bold border bg-rose-50 border-rose-300 text-rose-800 flex items-center gap-2">
+            <UserX className="w-4 h-4 text-rose-600" />
+            <span>Doctor MC / Leave</span>
+          </div>
+        </div>
+
+        {/* Date Input */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Select Calendar Date</label>
+          <input
+            type="date"
+            min={todayStr}
+            value={newLeaveDate}
+            onChange={(e) => setNewLeaveDate(e.target.value)}
+            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:border-sky-500 h-10 font-mono transition"
+          />
+        </div>
+
+        {/* Upload MC or File Column (Optional) */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+            Upload MC / Medical Certificate (Optional)
+          </label>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+            className="hidden" 
+          />
+
+          {!mcFile ? (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full border-2 border-dashed border-slate-200 hover:border-teal-400 bg-slate-50 hover:bg-teal-50/30 rounded-xl p-4 transition flex flex-col items-center justify-center gap-1.5 text-slate-500 cursor-pointer"
+            >
+              <Upload className="w-5 h-5 text-slate-400" />
+              <span className="text-xs font-semibold text-slate-700">Click to upload MC or doctor certificate</span>
+              <span className="text-[10px] text-slate-400">Optional supporting document</span>
+            </button>
+          ) : (
+            <div className="flex items-center justify-between bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-800 truncate text-xs">{mcFile.name}</p>
+                  <p className="text-[10px] text-teal-700 font-mono">{mcFile.size} • MC Document Attached</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="p-1 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
+                title="Remove attached file"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         <button
           type="button"
-          onClick={handleToggleTodayAttendance}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer ${
-            isDoctorOffToday
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-              : 'bg-rose-600 hover:bg-rose-700 text-white'
-          }`}
+          onClick={handleAddLeave}
+          disabled={!newLeaveDate}
+          className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
         >
-          {isDoctorOffToday ? (
-            <>
-              <Check className="w-4 h-4" />
-              <span>Mark Doctor Present Today</span>
-            </>
-          ) : (
-            <>
-              <UserX className="w-4 h-4" />
-              <span>Mark Doctor MC / Off Today</span>
-            </>
-          )}
+          <Plus className="w-4 h-4" />
+          <span>Block Selected Date</span>
         </button>
-      </div>
-
-      {/* Main Two-Card Layout: Add Block & Active Block List */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left Column (5 cols): Add Leave / Holiday Block */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="border-b border-neutral-100 pb-3">
-              <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                <CalendarRange className="w-4 h-4 text-sky-600" />
-                Schedule Leave or Holiday
-              </h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Block dates to prevent patient appointments for doctor leave or hospital closures.</p>
-            </div>
-
-            {/* Leave Type Selector */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Block Category</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setLeaveType('doctor_mc')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                    leaveType === 'doctor_mc'
-                      ? 'bg-rose-50 border-rose-300 text-rose-800'
-                      : 'bg-neutral-50 border-neutral-200 text-neutral-600 hover:bg-neutral-100'
-                  }`}
-                >
-                  <UserX className="w-3.5 h-3.5" />
-                  Doctor MC / Leave
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLeaveType('clinic_holiday')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                    leaveType === 'clinic_holiday'
-                      ? 'bg-sky-50 border-sky-300 text-sky-800'
-                      : 'bg-neutral-50 border-neutral-200 text-neutral-600 hover:bg-neutral-100'
-                  }`}
-                >
-                  <Building className="w-3.5 h-3.5" />
-                  Clinic Holiday
-                </button>
-              </div>
-            </div>
-
-            {/* Date Input */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Select Calendar Date</label>
-              <input
-                type="date"
-                min={todayStr}
-                value={newLeaveDate}
-                onChange={(e) => setNewLeaveDate(e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:border-sky-500 h-10 font-mono transition"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAddLeave}
-              disabled={!newLeaveDate}
-              className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Block Selected Date</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column (7 cols): Blocked Dates Table */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="border-b border-neutral-100 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  Active Leave &amp; Holiday Blocks
-                </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">Dates where patient appointment bookings are suspended.</p>
-              </div>
-              <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
-                {blockedDates.length} blocked
-              </span>
-            </div>
-
-            {blockedDates.length === 0 ? (
-              <div className="text-center py-12 px-4 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl text-xs text-neutral-400">
-                <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="font-semibold text-slate-600">No leave or holiday dates currently blocked.</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">All regular clinic consultation slots remain available for patient booking.</p>
-              </div>
-            ) : (
-              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-                {blockedDates.map((date) => {
-                  const type = leaveReasons[date] || (date === todayStr ? 'doctor_mc' : 'clinic_holiday');
-                  const isToday = date === todayStr;
-
-                  return (
-                    <div 
-                      key={date} 
-                      className={`p-3.5 border rounded-xl flex items-center justify-between gap-3 text-xs transition ${
-                        isToday 
-                          ? 'bg-rose-50/50 border-rose-200' 
-                          : 'bg-neutral-50 border-neutral-200/80 hover:bg-neutral-100/60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          type === 'doctor_mc' ? 'bg-rose-100 text-rose-700' : 'bg-sky-100 text-sky-700'
-                        }`}>
-                          {type === 'doctor_mc' ? <UserX className="w-4 h-4" /> : <Building className="w-4 h-4" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold font-mono text-neutral-900">{date}</span>
-                            {isToday && (
-                              <span className="text-[9px] font-extrabold uppercase bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded">
-                                Today
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-neutral-500 font-medium">
-                            {type === 'doctor_mc' ? 'Doctor Leave / MC (Absent)' : 'Clinic / Hospital Public Holiday'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 uppercase">
-                          Booking Blocked
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLeave(date)}
-                          className="p-1.5 hover:bg-rose-100 text-neutral-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
-                          title="Remove Block and Reopen Slots"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
       </div>
 
     </div>

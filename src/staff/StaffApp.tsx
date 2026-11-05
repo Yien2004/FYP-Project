@@ -6,7 +6,6 @@ import ReportsSection from './components/sections/ReportsSection';
 import PatientsSection from './components/sections/PatientsSection';
 import AppointmentsSection from './components/sections/AppointmentsSection';
 import StaffSettings from './components/sections/StaffSettings';
-import CommunicationSection from './components/sections/CommunicationSection';
 import NotificationsSection from './components/sections/NotificationsSection';
 import StaffNotificationsInbox from './components/sections/StaffNotificationsInbox';
 import ScheduleManager from './components/sections/ScheduleManager';
@@ -14,6 +13,7 @@ import Authentication from './components/Authentication';
 import { StaffTab } from './types';
 import { Volume2, X } from 'lucide-react';
 import DataAnalyticsSection from './components/sections/DataAnalyticsSection';
+import { getStaffAccountByEmail } from '../data/staffAccounts';
 
 interface StaffAppProps {
   onBackToPatientPortal?: () => void;
@@ -27,22 +27,11 @@ function getClinicFromEmail(email: string): string {
   if (cached) return cached;
 
   const emailLower = (email || '').toLowerCase().trim();
-  if (emailLower.includes('hospitalpulaupinang')) return 'Hospital Pulau Pinang';
-  if (emailLower.includes('hospitalseberangjaya')) return 'Hospital Seberang Jaya';
-  if (emailLower.includes('kkjalanperak')) return 'Klinik Kesihatan Jalan Perak';
-  if (emailLower.includes('kkbayanbaru')) return 'Klinik Kesihatan Bayan Baru';
-  if (emailLower.includes('hospitalbukitmertajam')) return 'Hospital Bukit Mertajam';
-  if (emailLower.includes('pantaihospital')) return 'Pantai Hospital Penang';
-  if (emailLower.includes('lamwahee')) return 'Hospital Lam Wah Ee';
-  if (emailLower.includes('gleneagleshospital')) return 'Gleneagles Hospital Penang';
-  if (emailLower.includes('islandhospital')) return 'Island Hospital';
-  if (emailLower.includes('o2klinik')) return 'O2 Klinik';
-  if (emailLower.includes('kliniksingapore')) return 'Klinik Singapore';
-  if (emailLower.includes('poliklinikperdana')) return 'Poliklinik Perdana';
-  if (emailLower.includes('penangadventisthospital')) return 'Penang Adventist Hospital';
-  if (emailLower.includes('lohguanlye')) return 'Loh Guan Lye Specialists Centre';
-  if (emailLower.includes('kpjpenang')) return 'KPJ Penang Specialist Hospital';
-  return '';
+  if (emailLower.includes('pantaiheart') || emailLower.includes('heartwellness')) return 'Pantai Heart & Wellness Pavilion';
+  if (emailLower.includes('pantaipremier') || emailLower.includes('premierclinic')) return 'Pantai Premier Clinic & Day Surgery';
+  if (emailLower.includes('pantaispecialist') || emailLower.includes('specialistcentre')) return 'Pantai Specialist Centre';
+  if (emailLower.includes('pantaihospital') || emailLower.includes('pantai')) return 'Pantai Hospital Penang (Main Hospital)';
+  return 'Pantai Hospital Penang (Main Hospital)';
 }
 
 const appTranslations: Record<string, Record<string, string>> = {
@@ -97,15 +86,29 @@ export default function StaffApp({
   const [userEmail, setUserEmail] = useState(() => {
     return initialEmail || localStorage.getItem("lifelink_user_email") || '';
   });
+  const staffAccount = React.useMemo(() => getStaffAccountByEmail(userEmail), [userEmail]);
   const [userRole, setUserRole] = useState(() => {
-    return initialRole || localStorage.getItem("lifelink_user_role") || '';
+    return staffAccount?.role || initialRole || localStorage.getItem("lifelink_user_role") || '';
   });
   const [userName, setUserName] = useState(() => {
-    return initialName || localStorage.getItem("lifelink_user_name") || 'Staff Member';
+    return staffAccount?.name || initialName || localStorage.getItem("lifelink_user_name") || 'Staff Member';
   });
 
   const [staffTab, setStaffTab] = useState<StaffTab>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isDoctorUser = React.useMemo(() => {
+    return Boolean(
+      staffAccount?.role?.toLowerCase() === "doctor" || 
+      userRole?.toLowerCase() === "doctor" ||
+      userEmail.toLowerCase().startsWith("dr_") ||
+      userEmail.toLowerCase() === "doctor@hospital.com"
+    );
+  }, [staffAccount, userRole, userEmail]);
+
+  const [dashboardDepartment, setDashboardDepartment] = useState<string>(() => {
+    return (staffAccount?.department && staffAccount.department !== 'All') ? staffAccount.department : 'All';
+  });
 
   // Badge state
   const [unreadCount, setUnreadCount] = useState(0);
@@ -134,28 +137,7 @@ export default function StaffApp({
   const fetchBadgeCounts = React.useCallback(() => {
     const loggedEmail = userEmail || localStorage.getItem("lifelink_user_email") || '';
 
-    // 1. Fetch unread messages thread count
-    fetch("/api/messages/threads")
-      .then(res => res.json())
-      .then(threadsList => {
-        if (!Array.isArray(threadsList)) return;
-        
-        let count = 0;
-        threadsList.forEach((t: any) => {
-          const lastMsg = t.messages && t.messages.length > 0 ? t.messages[t.messages.length - 1] : null;
-          if (lastMsg && (lastMsg.sender === 'user' || lastMsg.sender === 'patient')) {
-            const lastMsgId = lastMsg.id || lastMsg.timestamp || '';
-            const lastReadId = localStorage.getItem('chat_last_read_' + t.id) || '';
-            if (lastMsgId !== lastReadId) {
-              count++;
-            }
-          }
-        });
-        setUnreadCount(count);
-      })
-      .catch(err => console.warn("Failed to fetch threads for badges", err));
-
-    // 2. Fetch unreplied alerts count
+    // Fetch unreplied alerts count
     fetch("/api/logs")
       .then(res => res.json())
       .then(logsList => {
@@ -273,10 +255,8 @@ export default function StaffApp({
       appointments: translateApp('Appointment Matrix Control'),
       patients: translateApp('Patient Directory records'),
       schedule: translateApp('Clinician Schedule & Availability'),
-      communication: translateApp('Secure Encrypted Communications'),
       notifications: translateApp('System Notifications Inbox'),
       send_notifications: translateApp('Patient Broadcast Sender'),
-      analytics: translateApp('Clinical Data Analytics & Reports'),
       settings: translateApp('Profile & Account Settings')
     };
     return titles[staffTab];
@@ -338,6 +318,7 @@ export default function StaffApp({
         unreadCount={unreadCount}
         alertCount={alertCount}
         userName={userName}
+        department={staffAccount?.department || localStorage.getItem("lifelink_user_department") || 'General Medicine'}
         onLogout={handleLogout}
         language={language}
         mobileMenuOpen={mobileMenuOpen}
@@ -355,6 +336,8 @@ export default function StaffApp({
           onLogout={handleLogout}
           userName={userName}
           userRole={userRole}
+          userDepartment={isDoctorUser ? undefined : dashboardDepartment}
+          userSubTitle={staffAccount ? `${staffAccount.department} · ${staffAccount.hospital}` : (localStorage.getItem("lifelink_user_department") ? `${localStorage.getItem("lifelink_user_department")} · ${localStorage.getItem("lifelink_user_clinic") || "PantaiCare"}` : "")}
           onSetTab={setStaffTab}
           alertCount={alertCount}
           onRefreshBadges={fetchBadgeCounts}
@@ -364,14 +347,18 @@ export default function StaffApp({
         {/* Dynamic Views Slot */}
         <main className="flex-1 overflow-y-auto p-8 bg-slate-50">
           <div className="max-w-[1450px] mx-auto min-h-full">
-            {staffTab === 'dashboard' && <StaffDashboard onCallPatient={handleCallPatientGlobal} />}
+            {staffTab === 'dashboard' && (
+              <StaffDashboard 
+                onCallPatient={handleCallPatientGlobal} 
+                selectedDepartment={dashboardDepartment}
+                onDepartmentChange={setDashboardDepartment}
+              />
+            )}
             {staffTab === 'appointments' && <AppointmentsSection />}
             {staffTab === 'patients' && <PatientsSection />}
             {staffTab === 'schedule' && <ScheduleManager doctorName={userName} />}
-            {staffTab === 'communication' && <CommunicationSection />}
             {staffTab === 'notifications' && <StaffNotificationsInbox alertCount={alertCount} onRefreshBadges={fetchBadgeCounts} />}
             {staffTab === 'send_notifications' && <NotificationsSection />}
-            {staffTab === 'analytics' && <DataAnalyticsSection />}
             {staffTab === 'settings' && <StaffSettings language={language} setLanguage={setLanguage} />}
           </div>
         </main>

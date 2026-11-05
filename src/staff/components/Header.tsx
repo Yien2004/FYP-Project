@@ -22,6 +22,8 @@ interface HeaderProps {
   onLogout?: () => void;
   userName?: string;
   userRole?: string;
+  userDepartment?: string;
+  userSubTitle?: string;
   onSetTab?: (tab: any) => void;
   alertCount?: number;
   onRefreshBadges?: () => void;
@@ -37,6 +39,8 @@ export default function Header({
   onLogout,
   userName = 'Staff Member',
   userRole = 'Clinician',
+  userDepartment,
+  userSubTitle,
   onSetTab,
   alertCount = 0,
   onRefreshBadges,
@@ -57,7 +61,14 @@ export default function Header({
         
         {/* Title Block */}
         <div className="flex flex-col">
-          <h2 className="text-xl font-bold text-neutral-900 tracking-tight">{title}</h2>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h2 className="text-xl font-bold text-neutral-900 tracking-tight">{title}</h2>
+            {userDepartment && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-mono">
+                Department: {userDepartment}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -100,19 +111,24 @@ export default function Header({
             <Settings className="w-5 h-5" />
           </button>
 
-          {/* User profile chip */}
+          {/* Doctor Name on Top Right */}
           <div 
             onClick={() => onSetTab?.('settings')}
-            className="flex items-center gap-2.5 pl-2.5 border-l border-neutral-200/80 cursor-pointer"
-            title="Account Profile"
+            className="flex items-center gap-2.5 pl-3 border-l border-neutral-200/80 cursor-pointer"
+            title="Clinician Profile"
           >
-            <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center font-extrabold text-xs shadow-xs">
-              {userName ? userName.replace("Dr. ", "").trim().charAt(0).toUpperCase() : (portal === 'admin' ? 'A' : 'S')}
+            <div className="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center font-extrabold text-xs shadow-xs">
+              {userName ? userName.replace(/^(dr\.|dato' dr\.)\s*/i, "").trim().charAt(0).toUpperCase() : 'D'}
             </div>
-            <div className="hidden md:block text-left">
-              <span className="text-xs font-bold text-neutral-800 block leading-tight truncate max-w-[150px]">
-                {userName || (portal === 'admin' ? 'System Admin' : 'Staff Member')}
+            <div className="hidden sm:block text-left">
+              <span className="text-xs font-bold text-neutral-800 block leading-tight">
+                {userName || (portal === 'admin' ? 'Administrator' : 'Dr. Ainol Shareha')}
               </span>
+              {portal !== 'admin' && userRole && (
+                <span className="text-[10px] text-neutral-400 block font-medium leading-none mt-0.5">
+                  {userRole}
+                </span>
+              )}
             </div>
           </div>
         </div>

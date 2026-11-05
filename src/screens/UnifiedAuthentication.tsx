@@ -11,7 +11,6 @@ import {
   UserPlus,
   ShieldCheck,
   CheckCircle,
-  Sparkles,
   HeartPulse,
   Building2,
   User,
@@ -27,12 +26,30 @@ interface UnifiedAuthenticationProps {
 type AuthMode = "login" | "register" | "forgot" | "reset";
 
 export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, initialMode = "login" }: UnifiedAuthenticationProps) {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [resetToken, setResetToken] = useState<string | null>(null);
-  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const searchParams = new URLSearchParams(window.location.search);
+    let token = searchParams.get("token");
+    if (!token && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      token = hashParams.get("access_token") || hashParams.get("token");
+    }
+    return token || null;
+  });
+
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (typeof window !== "undefined") {
+      const search = window.location.search || "";
+      const hash = window.location.hash || "";
+      if (search.includes("token=") || hash.includes("access_token=") || hash.includes("type=recovery")) {
+        return "reset";
+      }
+    }
+    return initialMode;
+  });
 
   useEffect(() => {
-    if (initialMode) {
+    if (initialMode && !window.location.search.includes("token=") && !window.location.hash.includes("type=recovery")) {
       setMode(initialMode);
     }
   }, [initialMode]);
@@ -59,10 +76,16 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
   const [errorMessage, setErrorMessage]   = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Intercept reset token on mount
+  // Intercept reset token on mount (both URL query ?token= and Supabase Auth hash #access_token=)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
+    const searchParams = new URLSearchParams(window.location.search);
+    let token = searchParams.get("token");
+
+    if (!token && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      token = hashParams.get("access_token") || hashParams.get("token");
+    }
+
     if (token) {
       setResetToken(token);
       setMode("reset");
@@ -83,10 +106,10 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
     setIsSubmitting(true);
 
     try {
-      const res  = await fetch("/api/auth/login", {
-        method:  "POST",
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
 
@@ -98,7 +121,7 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
 
       const role: string = data.user?.role ?? "Patient";
       const name: string = data.user?.name ?? email.split("@")[0];
-      if (role === "Patient" && data.accessToken) {
+      if (data.accessToken) {
         localStorage.setItem("carepoint_access_token", data.accessToken);
       }
       onLoginSuccess(email, role, name);
@@ -107,13 +130,6 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const fillDemoCredentials = (demoEmail: string, demoPass: string, roleName: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setErrorMessage("");
-    setSuccessMessage(`Credentials populated for ${roleName}. Click 'Sign In' below to continue.`);
   };
 
   /* ══════════════════════════════════════════════════════
@@ -197,7 +213,7 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
         return;
       }
 
-      setSuccessMessage(data.message || "A password reset link has been generated!");
+      setSuccessMessage(data.message || "A password recovery email has been sent to your email address. Please check your inbox (and Spam/Junk folder) to complete your password reset.");
     } catch {
       setErrorMessage("Unable to reach the server. Please check your connection.");
     } finally {
@@ -265,24 +281,29 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
         <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-white/10 pointer-events-none" />
         <div className="absolute bottom-[-5rem] right-[-3rem] w-96 h-96 rounded-full bg-white/10 pointer-events-none" />
 
-        {/* Previous Logo and Name Only */}
+        {/* PantaiCare Logo & Branding */}
         <div className="relative z-10 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shadow-lg">
             <Activity className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white font-extrabold text-xl tracking-tight">
-            PenangHealth
-          </span>
+          <div>
+            <span className="text-white font-extrabold text-xl tracking-tight block leading-tight">
+              PantaiCare
+            </span>
+            <span className="text-[10px] text-teal-100 font-medium block leading-none">
+              Smart Outpatient Portal
+            </span>
+          </div>
         </div>
 
         {/* Centre content */}
         <div className="relative z-10 space-y-6">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
-            Penang Centralized<br />
-            <span className="text-sky-100">Smart Healthcare Gate</span>
+            PantaiCare Smart<br />
+            <span className="text-sky-100">Outpatient Portal</span>
           </h2>
           <p className="text-sky-50/90 text-xs sm:text-sm leading-relaxed max-w-sm font-medium">
-            One secure login for patients, doctors, nurses and administrators across Penang's healthcare facilities.
+            One secure login for patients, doctors, nurses and clinical specialists across PantaiCare network.
           </p>
 
           {/* Feature bullets */}
@@ -309,11 +330,14 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
         <div className="w-full max-w-md">
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md">
+          <div className="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-md">
               <Activity className="w-4.5 h-4.5 text-white" />
             </div>
-            <span className="font-extrabold text-slate-800 text-lg">PenangHealth</span>
+            <div>
+              <span className="font-extrabold text-slate-800 text-lg leading-tight block">PantaiCare</span>
+              <span className="text-[10px] text-slate-500 font-medium block">Smart Outpatient Portal</span>
+            </div>
           </div>
 
           {/* Back button to return to public gate */}
@@ -477,71 +501,6 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
               >
                 New patient? Create a free outpatient account
               </button>
-
-              {/* Optional Examiner / Demo Credentials Accordion */}
-              <div className="mt-5 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-                  className="flex items-center justify-between w-full py-1 text-[11px] font-bold tracking-wider text-slate-500 hover:text-slate-700 uppercase cursor-pointer"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-                    Examiner Test Credentials ({showDemoAccounts ? "Hide" : "Show"})
-                  </span>
-                  <span className="text-[10px] text-sky-600 font-semibold normal-case">
-                    {showDemoAccounts ? "Close" : "Click to view"}
-                  </span>
-                </button>
-
-                {showDemoAccounts && (
-                  <div className="mt-2.5 space-y-2">
-                    <p className="text-[10px] text-slate-400">
-                      Shortcut for examiners to test role dashboards without manually typing credentials.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fillDemoCredentials("patient.ahmad.3618@gmail.com", "Password123!", "Patient Ahmad")}
-                        disabled={isSubmitting}
-                        className="p-2.5 bg-white hover:bg-sky-50/60 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition group cursor-pointer shadow-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-800 group-hover:text-sky-700">Patient</span>
-                          <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">Ahmad</span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 block truncate mt-0.5">Outpatient Portal</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => fillDemoCredentials("pantaipenang@gmail.com", "12345678", "Clinic / Hospital Staff")}
-                        disabled={isSubmitting}
-                        className="p-2.5 bg-white hover:bg-sky-50/60 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition group cursor-pointer shadow-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-800 group-hover:text-sky-700">Clinic / Hospital</span>
-                          <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">Pantai</span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 block truncate mt-0.5">Clinic Operations Portal</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => fillDemoCredentials("admin@gmail.com", "12345678", "Admin HQ")}
-                        disabled={isSubmitting}
-                        className="p-2.5 bg-white hover:bg-sky-50/60 border border-slate-200 hover:border-sky-300 rounded-xl text-left transition group cursor-pointer shadow-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-800 group-hover:text-sky-700">Admin</span>
-                          <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">HQ Admin</span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 block truncate mt-0.5">System Administration</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
             </form>
           )}
 
@@ -582,24 +541,6 @@ export default function UnifiedAuthentication({ onLoginSuccess, onNavigateBack, 
                 />
               </div>
 
-              {/* Account Type */}
-              <div>
-                <label htmlFor="reg-role" className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Account Type
-                </label>
-                <select
-                  id="reg-role"
-                  value={registerRole}
-                  onChange={(e) => setRegisterRole(e.target.value as "Patient" | "Clinic / Hospital")}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-xs text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition shadow-xs font-semibold"
-                >
-                  <option value="Patient">Patient (Public Healthcare Account)</option>
-                  <option value="Clinic / Hospital">Clinic / Hospital Staff</option>
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1.5 px-1">
-                  Clinic and hospital staff registrations are securely verified by Penang healthcare administration.
-                </p>
-              </div>
 
               {/* Password */}
               <div>

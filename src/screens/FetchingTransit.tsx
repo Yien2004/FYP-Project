@@ -27,22 +27,11 @@ interface FetchingTransitProps {
 
 export function getClinicTravelTime(clinicName: string): number {
   const name = clinicName.toLowerCase();
-  if (name.includes("pantai")) return 14;
-  if (name.includes("pulau pinang")) return 18;
-  if (name.includes("seberang jaya")) return 25;
-  if (name.includes("jalan perak")) return 10;
-  if (name.includes("bayan baru")) return 12;
-  if (name.includes("bukit mertajam")) return 28;
-  if (name.includes("lam wah ee")) return 15;
-  if (name.includes("gleneagles")) return 16;
-  if (name.includes("island")) return 11;
-  if (name.includes("adventist")) return 13;
-  if (name.includes("loh guan lye")) return 12;
-  if (name.includes("kpj")) return 22;
-  if (name.includes("o2")) return 9;
-  if (name.includes("singapore")) return 15;
-  if (name.includes("perdana")) return 8;
-  return 15;
+  if (name.includes("main hospital") || name.includes("bayan lepas")) return 14;
+  if (name.includes("premier") || name.includes("bayan baru")) return 8;
+  if (name.includes("heart") || name.includes("georgetown")) return 16;
+  if (name.includes("specialist") || name.includes("ayer itam")) return 12;
+  return 14;
 }
 
 function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
@@ -129,7 +118,7 @@ export default function FetchingTransit({ appointments, onSetScreen, onUpdateApp
   // Selected clinic destination (supports both booked appointments and direct clinic selection)
   const [selectedClinicName, setSelectedClinicName] = useState<string>(() => {
     if (eligibleBookings.length > 0) return eligibleBookings[0].clinic;
-    return mockClinics[0]?.name || "Hospital Pulau Pinang";
+    return mockClinics[0]?.name || "Pantai Hospital Penang (Main Hospital)";
   });
 
   // User coordinates state

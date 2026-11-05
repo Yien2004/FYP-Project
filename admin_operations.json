@@ -1,0 +1,206 @@
+{
+  "holidays": [],
+  "departments": [
+    {
+      "id": 1,
+      "facility_id": 1,
+      "name": "Emergency A&E",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 2,
+      "facility_id": 1,
+      "name": "General Surgery",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 3,
+      "facility_id": 1,
+      "name": "Internal Medicine",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 4,
+      "facility_id": 1,
+      "name": "Respiratory Medicine",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 5,
+      "facility_id": 2,
+      "name": "Cardiology",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 6,
+      "facility_id": 2,
+      "name": "Health Screening & Wellness",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 7,
+      "facility_id": 3,
+      "name": "Gastroenterology & Hepatology",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 8,
+      "facility_id": 3,
+      "name": "Dermatology",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 9,
+      "facility_id": 4,
+      "name": "Orthopaedic Surgery",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": 10,
+      "facility_id": 4,
+      "name": "Ear, Nose & Throat (Otorhinolaryngology)",
+      "status": "ACTIVE",
+      "created_at": "2026-01-01"
+    },
+    {
+      "id": "dept-1793115854678",
+      "facility_id": 1,
+      "name": "Pediatric Cardiology",
+      "description": "Specialist children heart clinic",
+      "status": "ACTIVE",
+      "requested_by": "admin",
+      "created_at": "2026-10-27T15:44:14.678Z"
+    }
+  ],
+  "nominatedDoctors": [
+    {
+      "id": "doc-1793169176936-brc3",
+      "email": "dr_tanweisheng@pantaipenang.com",
+      "fullName": "Tan Wei Sheng",
+      "department": "Urology",
+      "roomNumber": "Consultation Room 301",
+      "mmcNumber": "MMC-77754",
+      "employmentType": "RESIDENT",
+      "role": "doctor",
+      "facility_id": 1,
+      "status": "ACTIVE",
+      "created_at": "2026-10-28T06:32:56.937Z"
+    },
+    {
+      "id": "doc-1793115854829-b2vr",
+      "email": "dr_lead_heart@pantaipenang.com",
+      "fullName": "Dr. Lead Heart Specialist",
+      "department": "Pediatric Cardiology",
+      "roomNumber": "Suite 405",
+      "mmcNumber": "MMC-77665",
+      "employmentType": "RESIDENT",
+      "role": "doctor",
+      "facility_id": 1,
+      "status": "ACTIVE",
+      "created_at": "2026-10-27T15:44:14.829Z"
+    },
+    {
+      "id": "doc-1793115854658-fws4",
+      "email": "dr_test_direct@pantaipenang.com",
+      "fullName": "Dr. Test Direct Specialist",
+      "department": "Internal Medicine",
+      "roomNumber": "Suite 999",
+      "mmcNumber": "MMC-99881",
+      "employmentType": "RESIDENT",
+      "role": "doctor",
+      "facility_id": 1,
+      "status": "ACTIVE",
+      "created_at": "2026-10-27T15:44:14.659Z"
+    },
+    {
+      "id": "doc-pending-01",
+      "email": "dr_siti_pediatric@pantaipenang.com",
+      "fullName": "Dr. Siti Aminah Binti Yusof",
+      "department": "General Paediatrics",
+      "roomNumber": "Consultation Suite 402",
+      "mmcNumber": "MMC-78921",
+      "employmentType": "RESIDENT",
+      "role": "doctor",
+      "facility_id": 1,
+      "status": "ACTIVE",
+      "nominated_by": "dr_ainol_internal@pantaipenang.com",
+      "created_at": "2026-10-27T12:44:13.691Z"
+    }
+  ],
+  "inquiries": [
+    {
+      "id": "inq-init-01",
+      "patient_id": "pt-user-01",
+      "patient_name": "patient",
+      "patient_email": "user@gmail.com",
+      "facility_id": 1,
+      "department": "Internal Medicine",
+      "doctor_id": null,
+      "doctor_name": "General Clinic Desk",
+      "subject": "Post-checkup blood test result timeline",
+      "message": "Hello clinic team, may I know when the comprehensive metabolic panel results will be uploaded to my portal?",
+      "status": "OPEN",
+      "created_at": "2026-10-27T13:44:13.691Z"
+    }
+  ],
+  "weeklyRosters": [
+    {
+      "doctor_id": "php-doc-2",
+      "day_of_week": 1,
+      "is_active": true,
+      "start_time": "08:00",
+      "end_time": "17:00",
+      "max_patients": 24
+    },
+    {
+      "doctor_id": "php-doc-2",
+      "day_of_week": 2,
+      "is_active": true,
+      "start_time": "08:00",
+      "end_time": "17:00",
+      "max_patients": 24
+    },
+    {
+      "doctor_id": "php-doc-2",
+      "day_of_week": 3,
+      "is_active": true,
+      "start_time": "08:00",
+      "end_time": "17:00",
+      "max_patients": 24
+    },
+    {
+      "doctor_id": "php-doc-2",
+      "day_of_week": 4,
+      "is_active": true,
+      "start_time": "08:00",
+      "end_time": "17:00",
+      "max_patients": 24
+    },
+    {
+      "doctor_id": "php-doc-2",
+      "day_of_week": 5,
+      "is_active": true,
+      "start_time": "08:00",
+      "end_time": "17:00",
+      "max_patients": 24
+    },
+    {
+      "doctor_id": "php-doc-2",
+      "day_of_week": 6,
+      "is_active": false,
+      "start_time": "09:00",
+      "end_time": "13:00",
+      "max_patients": 12
+    }
+  ],
+  "customSessions": []
+}

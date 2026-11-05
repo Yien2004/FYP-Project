@@ -472,7 +472,7 @@ export default function CommunicationSection() {
       const adminThread: ChatThread = {
         id: adminThreadId,
         senderName: 'System Administrator',
-        lastMessage: lastAdminMsg ? lastAdminMsg.text : "Direct channel to the PenangHealth Global IT and Operations admin team.",
+        lastMessage: lastAdminMsg ? lastAdminMsg.text : "Direct channel to the PantaiCare Global IT and Operations admin team.",
         time: lastAdminMsg ? lastAdminMsg.timestamp : "N/A",
         unread: false,
         messages: cleanedAdminMessages.length > 0 ? cleanedAdminMessages : [
@@ -480,7 +480,7 @@ export default function CommunicationSection() {
             id: 'welcome-admin',
             sender: 'patient',
             senderName: 'System Administrator',
-            text: `Welcome to System Administrator Support. This is a direct, secure channel to the PenangHealth Global IT and Operations administration team.\n\nUse this channel to report technical issues or request operational support. How can we help?`,
+            text: `Welcome to System Administrator Support. This is a direct, secure channel to the PantaiCare Global IT and Operations administration team.\n\nUse this channel to report technical issues or request operational support. How can we help?`,
             timestamp: 'Just Now'
           }
         ]
@@ -786,9 +786,6 @@ export default function CommunicationSection() {
         <div className="lg:col-span-2 border-r border-neutral-200/80 flex flex-col h-full items-center justify-center text-center text-neutral-500 p-8">
           <MessageSquare className="w-12 h-12 text-red-500 animate-pulse mb-3" />
           <h3 className="font-extrabold text-sm text-neutral-900">No Chat Channel Selected</h3>
-          <p className="text-xs text-neutral-450 max-w-xs mt-1 leading-relaxed">
-            Choose a patient thread from the left index list to establish a secure, encrypted messaging tunnel.
-          </p>
         </div>
 
         {/* Column 4: Context Bar Placeholder */}
@@ -973,7 +970,7 @@ export default function CommunicationSection() {
               Admin Support Desk
             </h4>
             <p className="text-[11px] text-neutral-500 leading-relaxed font-sans">
-              This channel connects you directly to PenangHealth System Administrators for technical support, roster adjustments, and diagnostics.
+              This channel connects you directly to PantaiCare System Administrators for technical support, roster adjustments, and diagnostics.
             </p>
           </div>
         ) : activeThread.clinicalContext ? (

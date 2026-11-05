@@ -27,6 +27,7 @@ export interface Hospital {
   description: string;
   services: string[];
   gradient: string;
+  doctorCount?: number;
 }
 
 interface HospitalsPageProps {
@@ -35,236 +36,97 @@ interface HospitalsPageProps {
   onNavigateDoctors: (params?: string) => void;
 }
 
-// ─── Private Accredited Hospitals & Clinics ───────────────────────────────────
+// ─── PantaiCare Accredited Hospitals & Clinics (4 Official Facilities) ───────────
 
 export const privateHospitals: Hospital[] = [
   {
-    id: 'pantai',
-    name: 'Pantai Hospital Penang',
-    type: 'Private Tertiary Hospital',
-    tag: 'JCI Accredited Specialist',
-    address: '82 Jalan Tengah, 10450 Bayan Lepas, Penang',
+    id: 'ph-penang',
+    name: 'Pantai Hospital Penang (Main Hospital)',
+    type: 'Tertiary Multi-Specialty Hospital',
+    tag: 'Bayan Lepas (Main Hospital)',
+    address: '82, Jalan Tengah, Bandar Bayan Baru, 11950 Bayan Lepas, Pulau Pinang',
     phone: '04-643 3888',
-    hours: 'Open 24 hours, 7 days a week',
+    hours: 'Open 24 hours, 7 days a week (Tertiary Inpatient & 24/7 A&E)',
     description:
-      'A leading private tertiary hospital in Penang offering world-class specialist care in cardiology, orthopedics, neurology, and oncology with modern surgical suites and international-standard facilities.',
+      'The flagship tertiary medical center of the PantaiCare network in Penang, providing comprehensive 24/7 inpatient, emergency, and advanced surgical care across 18 specialized departments.',
     services: [
-      'Cardiology & Interventional Cardiology',
-      'Orthopedic & Sports Surgery',
-      'Oncology & Chemotherapy',
-      'Obstetrics & Gynaecology',
-      'Neurosurgery',
-      'Ophthalmology',
-      'ENT & Sinus Surgery',
+      'Cardiology & Interventional Cath Lab',
+      'Cardiothoracic Surgery',
+      'General & Laparoscopic Surgery',
+      'Neurology & Acute Stroke Unit',
+      'Clinical Oncology & Radiotherapy',
+      'Orthopedic Surgery & Trauma',
       '24/7 Accident & Emergency',
     ],
-    gradient: 'from-sky-500 to-blue-600',
+    gradient: 'from-teal-600 to-cyan-700',
+    doctorCount: 88,
   },
   {
-    id: 'gleneagles',
-    name: 'Gleneagles Hospital Penang',
-    type: 'Private Specialist Centre',
-    tag: 'Premier Tertiary Care',
-    address: '1 Jalan Pangkor, 10050 Georgetown, Penang',
-    phone: '04-222 9111',
-    hours: 'Open 24 hours, 7 days a week',
+    id: 'pantai-specialist',
+    name: 'Pantai Specialist Centre',
+    type: 'Outpatient Specialist Centre',
+    tag: 'Ayer Itam Branch',
+    address: '588, Jalan Air Itam, 11500 Ayer Itam, Pulau Pinang',
+    phone: '04-828 5588',
+    hours: 'Mon–Sat: 8:00 AM – 8:00 PM | Sun: Closed',
     description:
-      'An internationally-accredited private hospital offering advanced cardiac catheterization, comprehensive neurovascular stroke care, and premier multi-disciplinary specialist treatments.',
+      'Center of excellence for orthopedic trauma, sports medicine, post-operative rehabilitation, ear-nose-throat (ENT), and ophthalmology.',
     services: [
-      'Interventional Cardiology',
-      'Neurology & Acute Stroke Unit',
-      'General & Laparoscopic Surgery',
-      'Pediatrics & Neonatal Intensive Care',
-      'Oncology & Radiation Therapy',
-      'Orthopedic Reconstruction',
-      'Health Screening & Wellness',
+      'Orthopedic Surgery & Arthroplasty',
+      'Sports Medicine & Arthroscopy',
+      'Physical Rehabilitation Medicine',
+      'Ear, Nose & Throat (ENT)',
+      'Ophthalmology & Cataract Eye Care',
     ],
-    gradient: 'from-blue-600 to-indigo-600',
-  },
-  {
-    id: 'island',
-    name: 'Island Hospital',
-    type: 'Private Tertiary Centre',
-    tag: 'Centre of Excellence',
-    address: '308 Macalister Road, 10450 Georgetown, Penang',
-    phone: '04-228 8222',
-    hours: 'Open 24 hours, 7 days a week',
-    description:
-      'A renowned Penang private medical centre with an outstanding track record in gastroenterology, hepatology, heart surgery, and pediatrics, equipped with state-of-the-art diagnostic imaging.',
-    services: [
-      'Gastroenterology & Hepatology',
-      'Pediatrics & Child Health',
-      'Cardiovascular Surgery',
-      'Urology & Kidney Stone Management',
-      'Endocrinology & Diabetes Centre',
-      'Spine & Joint Surgery',
-    ],
-    gradient: 'from-sky-600 to-cyan-600',
-  },
-  {
-    id: 'loh',
-    name: 'Loh Guan Lye Specialists Centre',
-    type: 'Private Specialist Centre',
-    tag: 'Cancer & Surgery Hub',
-    address: '19 & 21 Logan Road, 10400 Georgetown, Penang',
-    phone: '04-238 8888',
-    hours: 'Open 24 hours, 7 days a week',
-    description:
-      'Established in 1975, Loh Guan Lye is a comprehensive private healthcare institution recognized for its advanced cancer centre, fertility treatments, ENT, and pediatric specialist care.',
-    services: [
-      'Comprehensive Cancer Centre',
-      'ENT & Cochlear Implant',
-      'Obstetrics, Gynaecology & IVF',
-      'Cardiology & Echocardiography',
-      'Orthopedics & Arthroscopy',
-      'Radiology (PET-CT & MRI)',
-    ],
-    gradient: 'from-blue-500 to-sky-600',
-  },
-  {
-    id: 'lwe',
-    name: 'Hospital Lam Wah Ee',
-    type: 'Not-for-Profit Private Hospital',
-    tag: 'Community Trust Care',
-    address: '141 Jalan Tan Sri Teh Ewe Lim, 11600 Georgetown, Penang',
-    phone: '04-652 2888',
-    hours: 'Open 24 hours, 7 days a week',
-    description:
-      'One of Penang most trusted non-profit private hospitals, known for its high-quality general surgery, urology, renal dialysis, and accessible specialist outpatient care for the community.',
-    services: [
-      'General Surgery & Laparoscopy',
-      'Urology & Renal Care',
-      'Internal Medicine & Respiratory',
-      'Gastroenterology & Endoscopy',
-      'Orthopedics & Joint Replacement',
-      'Haemodialysis Unit',
-    ],
-    gradient: 'from-sky-500 to-teal-600',
-  },
-  {
-    id: 'kpj',
-    name: 'KPJ Penang Specialist Hospital',
-    type: 'Private Specialist Hospital',
-    tag: 'Multi-Disciplinary Hub',
-    address: '570 Jalan Perda Barat, 14000 Bukit Mertajam, Penang',
-    phone: '04-548 6688',
-    hours: 'Open 24 hours, 7 days a week',
-    description:
-      'A premier private specialist hospital located in Seberang Perai, offering modern inpatient amenities, catheterization laboratory, orthopedic suites, and prompt outpatient specialty consultations.',
-    services: [
-      'Cardiology & Catheterization',
-      'Orthopedic & Traumatology',
-      'General Surgery',
-      'Pediatrics & Neonatology',
-      'Obstetrics & Gynaecology',
-      '24/7 Outpatient & Emergency',
-    ],
-    gradient: 'from-blue-600 to-sky-500',
-  },
-  {
-    id: 'bagan',
-    name: 'Bagan Specialist Centre',
-    type: 'Private Specialist Hospital',
-    tag: 'Mainland Healthcare',
-    address: 'Jalan Bagan 1, 13400 Butterworth, Penang',
-    phone: '04-340 5000',
-    hours: 'Open 24 hours, 7 days a week',
-    description:
-      'A purpose-built tertiary private hospital serving the northern region with comprehensive critical care, surgical specialties, health screenings, and rehabilitation.',
-    services: [
-      'Internal Medicine',
-      'Orthopedics & Spine Care',
-      'General Surgery',
-      'Cardiology',
-      'Pediatric Care',
-      'Health Screening & Radiology',
-    ],
-    gradient: 'from-sky-500 to-indigo-500',
-  },
-  {
-    id: 'mount',
-    name: 'Mount Miriam Cancer Hospital',
-    type: 'Private Specialist Hospital',
-    tag: 'Dedicated Oncology Care',
-    address: '23 Jalan Bulan, Fettes Park, 11200 Tanjung Tokong, Penang',
-    phone: '04-890 7000',
-    hours: 'Mon–Fri: 8:00 AM – 5:00 PM | Sat: 8:00 AM – 1:00 PM',
-    description:
-      'A specialized not-for-profit private cancer hospital with high-precision linear accelerators, clinical oncology, palliative care, and advanced cancer diagnostic technologies.',
-    services: [
-      'Radiation Oncology (Linac)',
-      'Medical Oncology & Chemotherapy',
-      'Palliative & Supportive Medicine',
-      'PET-CT Diagnostic Imaging',
-      'Oncology Pharmacy',
-    ],
-    gradient: 'from-sky-600 to-blue-700',
+    gradient: 'from-blue-600 to-indigo-700',
+    doctorCount: 24,
   },
 ];
 
 export const privateClinics: Hospital[] = [
   {
-    id: 'o2',
-    name: 'O2 Klinik Georgetown',
-    type: 'Private Specialist Clinic',
-    tag: 'Primary & Aesthetics',
-    address: '35 Jalan Burma, 10050 Georgetown, Penang',
-    phone: '04-228 8822',
-    hours: 'Mon–Sat: 8:30 AM – 9:00 PM | Sun: 9:00 AM – 5:00 PM',
+    id: 'pantai-pavilion',
+    name: 'Pantai Heart & Wellness Pavilion',
+    type: 'Cardiovascular & Wellness Pavilion',
+    tag: 'Georgetown Branch',
+    address: '128, Jalan Burma, 10050 Georgetown, Pulau Pinang',
+    phone: '04-226 7888',
+    hours: 'Mon–Fri: 8:30 AM – 5:30 PM | Sat: 8:30 AM – 1:00 PM',
     description:
-      'A modern private outpatient clinic chain offering general medical consultations, preventive health screenings, dermatology, minor surgical procedures, and routine wellness checkups.',
+      'Specialized cardiovascular, metabolic health, and preventive wellness pavilion situated in central Georgetown, providing comprehensive non-invasive cardiac diagnostics and executive health screenings.',
     services: [
-      'General Medical Practice',
-      'Health Screening Packages',
-      'Dermatology & Skin Consultations',
-      'Vaccinations & Travel Medicine',
-      'Chronic Disease Management',
-      'Minor Surgery & Wound Dressing',
-    ],
-    gradient: 'from-sky-400 to-blue-500',
-  },
-  {
-    id: 'sg',
-    name: 'Klinik Singapore',
-    type: 'Private Clinic',
-    tag: 'Family Practice',
-    address: '468 Jalan Penang, 10000 Georgetown, Penang',
-    phone: '04-263 3388',
-    hours: 'Mon–Fri: 8:30 AM – 6:00 PM | Sat: 8:30 AM – 1:00 PM',
-    description:
-      'A well-established Georgetown private practice serving families and professionals with prompt outpatient consultations, health screenings, and chronic illness monitoring.',
-    services: [
-      'Family Medicine',
-      'Acute Illness Consultation',
-      'Adult & Child Immunizations',
-      'Minor Wound Care',
-      'Medical Checkup Reports',
-      'Prescription Renewals',
-    ],
-    gradient: 'from-blue-400 to-sky-500',
-  },
-  {
-    id: 'pp',
-    name: 'Poliklinik Perdana',
-    type: 'Private Clinic',
-    tag: 'Occupational Health',
-    address: 'Penang (Bayan Lepas & Butterworth Branches)',
-    phone: '04-644 1122',
-    hours: 'Mon–Fri: 8:00 AM – 6:00 PM | Sat: 8:00 AM – 1:00 PM',
-    description:
-      'A multi-branch private clinic network specializing in occupational health screenings, corporate health panels, pre-employment checkups, and general outpatient treatment.',
-    services: [
-      'Occupational Health Screenings',
-      'Corporate Medical Panels',
-      'General Outpatient Practice',
-      'Industrial Health Clearance',
-      'Executive Wellness Checks',
+      'Cardiology & Echocardiography',
+      'Endocrinology & Diabetes Care',
+      'Internal Medicine & Hypertension',
+      'Executive Health Screening Packages',
     ],
     gradient: 'from-sky-500 to-blue-600',
+    doctorCount: 24,
+  },
+  {
+    id: 'pantai-premier',
+    name: 'Pantai Premier Clinic & Day Surgery',
+    type: 'Ambulatory & Day Surgery Centre',
+    tag: 'Bayan Baru Branch',
+    address: '1-1-15, Tingkat Mahsuri, 11950 Bayan Baru, Pulau Pinang',
+    phone: '04-641 2288',
+    hours: 'Mon–Sat: 8:00 AM – 9:00 PM | Sun: 9:00 AM – 1:00 PM',
+    description:
+      'Ambulatory surgical and outpatient specialist hub providing rapid GI endoscopies, minor surgeries, dermatology, dental surgery, and family medicine.',
+    services: [
+      'Gastroenterology & Endoscopy',
+      'Upper GI & Colorectal Surgery',
+      'Dermatology & Skin Consultations',
+      'Plastic & Reconstructive Surgery',
+      'Dental Surgery & Dentistry',
+      'General Practice & Family Medicine',
+    ],
+    gradient: 'from-teal-500 to-emerald-600',
+    doctorCount: 24,
   },
 ];
 
-const allHospitals = [...privateHospitals, ...privateClinics];
+export const allHospitals: Hospital[] = [...privateHospitals, ...privateClinics];
 
 // ─── Helper: type badge colour ────────────────────────────────────────────────
 
@@ -366,7 +228,7 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, onClick }) => {
 // ─── CategorySection ──────────────────────────────────────────────────────────
 
 interface CategorySectionProps {
-  label: string;
+  label?: string;
   title: string;
   hospitals: Hospital[];
   colsClass: string;
@@ -388,9 +250,11 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   return (
     <section>
       <div className="mb-4">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-sky-700 font-mono">
-          {label}
-        </span>
+        {label && (
+          <span className="text-[10px] font-bold uppercase tracking-widest text-sky-700 font-mono">
+            {label}
+          </span>
+        )}
         <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">{title}</h2>
       </div>
       <div className={`grid grid-cols-1 ${colsClass} gap-5`}>
@@ -536,22 +400,6 @@ const DetailView: React.FC<DetailViewProps> = ({ hospital, onBack, onNavigateDoc
               </div>
             </div>
 
-            {/* Direct CTA card */}
-            <div className="rounded-3xl bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm text-white">
-              <div>
-                <h3 className="text-white font-extrabold text-sm">Consult Specialist Doctors</h3>
-                <p className="text-sky-100 text-xs mt-0.5">
-                  Browse doctors credentialed at {hospital.name}.
-                </p>
-              </div>
-              <button
-                onClick={() => onNavigateDoctors(`hospital=${encodeURIComponent(hospital.name)}`)}
-                className="shrink-0 flex items-center gap-2 bg-white text-sky-700 font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-xs hover:bg-sky-50 transition cursor-pointer"
-              >
-                <span>Find Doctors</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
 
           </div>
         </div>
@@ -613,7 +461,7 @@ const HospitalsPage: React.FC<HospitalsPageProps> = ({
           <div className="flex items-center gap-4">
             <button
               onClick={onNavigateBack}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-sky-600 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-teal-600 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
@@ -622,29 +470,11 @@ const HospitalsPage: React.FC<HospitalsPageProps> = ({
             <div className="h-4 w-[1px] bg-slate-200" />
 
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-xs">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-xs">
                 <Activity className="w-4 h-4 text-white" />
               </div>
-              <span className="font-extrabold text-slate-900 text-sm">PenangHealth</span>
+              <span className="font-extrabold text-slate-900 text-sm">PantaiCare</span>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Directly accessible Find Doctors action */}
-            <button
-              onClick={() => onNavigateDoctors()}
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3.5 py-1.5 rounded-xl transition cursor-pointer"
-            >
-              <Stethoscope className="w-3.5 h-3.5 text-sky-600" />
-              <span>Find Doctors</span>
-            </button>
-
-            <button
-              onClick={onNavigateLogin}
-              className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs cursor-pointer"
-            >
-              Sign In
-            </button>
           </div>
         </div>
       </header>
@@ -659,9 +489,6 @@ const HospitalsPage: React.FC<HospitalsPageProps> = ({
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Penang Hospitals &amp; Clinics
           </h1>
-          <p className="text-slate-500 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-            Browse private tertiary hospitals and accredited specialist clinics across Penang Island and the Mainland.
-          </p>
         </div>
 
         {/* Search */}
@@ -702,7 +529,6 @@ const HospitalsPage: React.FC<HospitalsPageProps> = ({
         {filtered.length > 0 && (
           <div className="space-y-10">
             <CategorySection
-              label="Private Specialist Centres"
               title="Accredited Private Hospitals"
               hospitals={privateHospitals}
               colsClass="sm:grid-cols-2"
@@ -710,7 +536,6 @@ const HospitalsPage: React.FC<HospitalsPageProps> = ({
               filtered={filtered}
             />
             <CategorySection
-              label="Outpatient & Primary Care"
               title="Private Clinics & Ambulatory Care"
               hospitals={privateClinics}
               colsClass="sm:grid-cols-3"
@@ -720,30 +545,7 @@ const HospitalsPage: React.FC<HospitalsPageProps> = ({
           </div>
         )}
 
-        {/* CTA Banner */}
-        {filtered.length > 0 && (
-          <div className="rounded-3xl bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm overflow-hidden relative text-white">
-            {/* decorative */}
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full pointer-events-none" />
-            <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-white/10 rounded-full pointer-events-none" />
 
-            <div className="relative text-center md:text-left z-10 space-y-1">
-              <h2 className="text-white text-lg font-extrabold">Looking for a specialist doctor?</h2>
-              <p className="text-sky-100 text-xs leading-relaxed max-w-md">
-                Browse credentialed doctors and medical specialists across all accredited Penang hospitals.
-              </p>
-            </div>
-
-            <button
-              onClick={() => onNavigateDoctors()}
-              className="relative z-10 shrink-0 flex items-center gap-2 bg-white text-sky-700 font-extrabold text-xs px-6 py-3 rounded-xl shadow-xs hover:bg-sky-50 transition cursor-pointer"
-            >
-              <Stethoscope className="w-4 h-4 text-sky-600" />
-              <span>Find Doctors</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

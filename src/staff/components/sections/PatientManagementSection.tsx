@@ -16,6 +16,8 @@ import {
   UserCheck
 } from 'lucide-react';
 
+import { getStaffAccountByEmail, getFacilityIdByHospital } from '../../../data/staffAccounts';
+
 interface PatientUser {
   id: string;
   email: string;
@@ -45,7 +47,15 @@ interface FullPatientProfile {
   emergencyContactPhone?: string;
 }
 
-export default function PatientManagementSection() {
+interface PatientManagementSectionProps {
+  isSuperAdmin?: boolean;
+}
+
+export default function PatientManagementSection({ isSuperAdmin = false }: PatientManagementSectionProps) {
+  const loggedEmail = localStorage.getItem('lifelink_user_email') || '';
+  const adminAccount = React.useMemo(() => getStaffAccountByEmail(loggedEmail), [loggedEmail]);
+  const defaultFacId = adminAccount?.facility_id || 1;
+
   const [patients, setPatients] = useState<PatientUser[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Active' | 'Suspended'>('ALL');
@@ -66,18 +76,48 @@ export default function PatientManagementSection() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const fetchPatients = () => {
+  const fetchPatients = async () => {
     setLoading(true);
-    fetch("/api/admin/users")
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          const patientList = data.filter((u: any) => u.role === 'Patient');
-          setPatients(patientList);
+    try {
+      const [usersRes, aptsRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/appointments")
+      ]);
+      const usersData = await usersRes.json();
+      const aptsData = await aptsRes.json();
+
+      if (Array.isArray(usersData)) {
+        let patientList = usersData.filter((u: any) => u.role === 'Patient');
+        if (!isSuperAdmin && Array.isArray(aptsData)) {
+          // Include all patients who have booked at least one appointment at this branch
+          patientList = patientList.filter((p: any) => {
+            const pEmail = (p.email || '').toLowerCase().trim();
+            const pId = String(p.id || '');
+            const pName = (p.fullName || '').toLowerCase().trim();
+
+            return aptsData.some((a: any) => {
+              const facId = a.facility_id ? Number(a.facility_id) : getFacilityIdByHospital(a.clinic || a.hospital);
+              if (facId !== defaultFacId) return false;
+
+              const aptEmail = (a.patientEmail || '').toLowerCase().trim();
+              const aptPatientId = String(a.patientId || '');
+              const aptName = (a.patientName || '').toLowerCase().trim();
+
+              const matchEmail = aptEmail && (aptEmail === pEmail || aptEmail === pId);
+              const matchId = aptPatientId && (aptPatientId === pId || aptPatientId === pEmail);
+              const matchName = aptName && pName && aptName === pName;
+
+              return matchEmail || matchId || matchName;
+            });
+          });
         }
-      })
-      .catch(err => console.error("Failed to load patients list", err))
-      .finally(() => setLoading(false));
+        setPatients(patientList);
+      }
+    } catch (err) {
+      console.error("Failed to load patients list", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -303,13 +343,15 @@ export default function PatientManagementSection() {
                         >
                           <Key className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteAccount(p.id)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                          title="Terminate Account"
-                        >
-                          <UserX className="w-3.5 h-3.5" />
-                        </button>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => handleDeleteAccount(p.id)}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                            title="Terminate Account"
+                          >
+                            <UserX className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -332,14 +374,9 @@ export default function PatientManagementSection() {
               <div className="space-y-6">
                 
                 {/* Header Info */}
-                <div className="border-b border-neutral-100 pb-4 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center font-bold text-white text-lg">
-                    {detailedProfile.fullName.substring(0,2).toUpperCase()}
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-base text-neutral-900 leading-tight">{detailedProfile.fullName}</h4>
-                    <span className="text-[10px] text-neutral-500 font-mono mt-0.5 block">{detailedProfile.email}</span>
-                  </div>
+                <div className="border-b border-neutral-100 pb-4">
+                  <h4 className="font-extrabold text-base text-neutral-900 leading-tight">{detailedProfile.fullName}</h4>
+                  <span className="text-[10px] text-neutral-500 font-mono mt-0.5 block">{detailedProfile.email}</span>
                 </div>
 
                 {/* Identity Cards */}
@@ -364,16 +401,16 @@ export default function PatientManagementSection() {
 
                 {/* Biometrics & History */}
                 <div className="space-y-3.5">
-                  <h5 className="text-[10px] uppercase font-bold text-teal-650 tracking-widest pl-0.5">Clinical Profile & Biometrics</h5>
+                  <h5 className="text-[10px] uppercase font-bold text-neutral-450 tracking-widest pl-0.5">Clinical Profile & Biometrics</h5>
 
                   <div className="bg-neutral-50/50 rounded-xl border border-neutral-200/60 p-4 space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-neutral-500 font-semibold">Blood Group</span>
-                      <span className="font-extrabold text-neutral-900 bg-teal-50 px-2.5 py-0.5 rounded border border-teal-100">{detailedProfile.bloodType || 'O+'}</span>
+                      <span className="font-extrabold text-neutral-900 bg-neutral-100 px-2.5 py-0.5 rounded border border-neutral-200">{detailedProfile.bloodType || 'Not Specified'}</span>
                     </div>
 
                     <div className="space-y-1">
-                      <span className="text-[10px] text-neutral-450 font-bold uppercase tracking-wider block">Allergies (Verified)</span>
+                      <span className="text-[10px] text-neutral-450 font-bold uppercase tracking-wider block">Allergies</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {detailedProfile.allergies && detailedProfile.allergies.length > 0 ? (
                           detailedProfile.allergies.map((a, i) => (
@@ -406,11 +443,11 @@ export default function PatientManagementSection() {
                   <div className="bg-neutral-50 rounded-xl p-3.5 border border-neutral-150 text-xs">
                     <div className="flex justify-between py-1">
                       <span className="text-neutral-500 font-medium">Contact Name</span>
-                      <span className="font-bold text-neutral-900">{detailedProfile.emergencyContactName || 'Razali Bin Ahmad'}</span>
+                      <span className="font-bold text-neutral-900">{detailedProfile.emergencyContactName || 'Not Specified'}</span>
                     </div>
                     <div className="flex justify-between py-1">
                       <span className="text-neutral-500 font-medium">Contact Phone</span>
-                      <span className="font-bold text-neutral-900 font-mono">{detailedProfile.emergencyContactPhone || '+60 12-987 6543 (Father)'}</span>
+                      <span className="font-bold text-neutral-900 font-mono">{detailedProfile.emergencyContactPhone || 'Not Specified'}</span>
                     </div>
                   </div>
                 </div>

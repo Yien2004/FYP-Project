@@ -10,24 +10,34 @@ import {
   CheckCircle,
   Clock,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  Building2
 } from 'lucide-react';
+import { getStaffAccountByEmail, PANTAI_FACILITIES, getHospitalByFacilityId, RBAC_STAFF_ACCOUNTS } from '../../../data/staffAccounts';
 
 interface StaffUser {
   id: string;
   email: string;
   fullName: string;
-  role: 'Doctor' | 'Nurse' | 'Admin';
+  role: 'Doctor' | 'Nurse' | 'Admin' | 'Front Desk';
   approved: boolean;
   status: 'Active' | 'Suspended';
   createdAt: string;
+  facility_id?: number;
 }
 
-export default function StaffManagementSection() {
+interface StaffManagementSectionProps {
+  isSuperAdmin?: boolean;
+}
+
+export default function StaffManagementSection({ isSuperAdmin = false }: StaffManagementSectionProps) {
+  const loggedEmail = localStorage.getItem('lifelink_user_email') || '';
+  const adminAccount = React.useMemo(() => getStaffAccountByEmail(loggedEmail), [loggedEmail]);
+  const defaultFacId = adminAccount?.facility_id || 1;
+  const [selectedFacilityId, setSelectedFacilityId] = useState<number | 'ALL'>(isSuperAdmin ? 'ALL' : defaultFacId);
+
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'ALL' | 'Doctor' | 'Nurse'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Active' | 'Suspended' | 'Pending'>('ALL');
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<any[]>([]);
 
@@ -44,7 +54,7 @@ export default function StaffManagementSection() {
   const [selectedUser, setSelectedUser] = useState<StaffUser | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editRole, setEditRole] = useState<'Doctor' | 'Nurse'>('Doctor');
+  const [editRole, setEditRole] = useState<'Doctor' | 'Nurse' | 'Admin' | 'Front Desk'>('Doctor');
   const [editStatus, setEditStatus] = useState<'Active' | 'Suspended'>('Active');
   const [editApproved, setEditApproved] = useState(true);
 
@@ -58,9 +68,111 @@ export default function StaffManagementSection() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          // Filter only staff roles (Doctor, Nurse)
-          const staff = data.filter((u: any) => u.role === 'Doctor' || u.role === 'Nurse');
-          setUsers(staff);
+          const legacyEmails = [
+            "pantaicentre_admin@gmail.com", "pantaiclinic_admin@gmail.com", "pantaipavilion_admin@gmail.com", "pantaipenang_admin@gmail.com",
+            "pantaicentre_ent@gmail.com", "pantaicentre_ortho@gmail.com", "pantaiclinic_derma@gmail.com", "pantaiclinic_gastro@gmail.com",
+            "pantaipavilion_cardio@gmail.com", "pantaipavilion_wellness@gmail.com", "pantaipenang_surgery@gmail.com", "pantaipenang_internal@gmail.com",
+            "pantaipenang_ae@gmail.com", "pantaipenang_respiratory@gmail.com", "pantaihospital@gmail.com", "pantaihospitalpenang@gmail.com",
+            "pantaipremier@gmail.com", "pantaiheart@gmail.com", "pantaispecialist@gmail.com",
+            "pantaispecialistcentre@gmail.com", "pantaipremierclinic@gmail.com", "pantaiheartwellness@gmail.com"
+          ];
+
+          const activeFacId = isSuperAdmin ? selectedFacilityId : defaultFacId;
+
+          // 1. Index users from Supabase Auth
+          const supabaseStaffMap = new Map<string, any>();
+          data.forEach((u: any) => {
+            const emailLower = (u.email || '').toLowerCase().trim();
+            if (legacyEmails.includes(emailLower)) return;
+            if (emailLower === "staff@gmail.com" || emailLower === "12345@gmail.com" || emailLower === "dr_neoh@pantaipenang.com") return;
+            
+            const roleLower = (u.role || '').toLowerCase();
+            const isDoctorOrNurse = roleLower === 'doctor' || roleLower === 'nurse';
+            const isFrontDesk = roleLower === 'staff' || roleLower === 'front desk' || roleLower === 'frontdesk' || emailLower.includes('frontdesk') || emailLower.includes('counter');
+            const isAdminRole = roleLower === 'admin' || roleLower === 'super_admin';
+            
+            if (isSuperAdmin ? (isDoctorOrNurse || isFrontDesk || isAdminRole) : (isDoctorOrNurse || isFrontDesk)) {
+              supabaseStaffMap.set(emailLower, u);
+            }
+          });
+
+          // 2. Select RBAC accounts matching current facility
+          const candidateRbac = RBAC_STAFF_ACCOUNTS.filter(acc => {
+            const accEmail = acc.email.toLowerCase();
+            if (legacyEmails.includes(accEmail)) return false;
+            if (accEmail === "staff@gmail.com" || accEmail === "12345@gmail.com" || accEmail === "dr_neoh@pantaipenang.com") return false;
+            
+            const roleLower = acc.role.toLowerCase();
+            const isDoc = roleLower === 'doctor' || roleLower === 'nurse';
+            const isFrontDesk = roleLower === 'staff' || roleLower === 'front desk' || roleLower === 'frontdesk' || accEmail.includes('frontdesk') || accEmail.includes('counter');
+            const isAdmin = roleLower === 'admin' || roleLower === 'super_admin';
+
+            if (!isSuperAdmin) {
+              // Branch Admin sees clinicians + front desk belonging to this branch
+              return (isDoc || isFrontDesk) && acc.facility_id === defaultFacId;
+            } else {
+              // Super Admin sees clinicians + branch admins + front desk according to facility selector
+              const matchesFac = activeFacId === 'ALL' || acc.facility_id === activeFacId;
+              return matchesFac && (isDoc || isFrontDesk || isAdmin);
+            }
+          });
+
+          // 3. Build unified staff list
+          const combinedList: StaffUser[] = [];
+          const processedEmails = new Set<string>();
+
+          candidateRbac.forEach(acc => {
+            const accEmail = acc.email.toLowerCase();
+            processedEmails.add(accEmail);
+            const supUser = supabaseStaffMap.get(accEmail);
+
+            const isStaffFrontDesk = acc.role === 'staff' || acc.role === 'Staff' || acc.role === 'front desk' || acc.email.toLowerCase().includes('frontdesk') || acc.email.toLowerCase().includes('counter');
+            const isStaffAdmin = acc.role === 'admin' || acc.role === 'Admin' || acc.role === 'super_admin';
+            const roleFormatted: 'Admin' | 'Doctor' | 'Front Desk' = 
+              isStaffAdmin ? 'Admin' :
+              isStaffFrontDesk ? 'Front Desk' :
+              'Doctor';
+
+            combinedList.push({
+              id: supUser ? supUser.id : `rbac-${acc.email}`,
+              email: acc.email,
+              fullName: supUser ? supUser.fullName : acc.name,
+              role: roleFormatted,
+              approved: supUser ? supUser.approved : true,
+              status: supUser ? supUser.status : 'Active',
+              createdAt: supUser ? supUser.createdAt : new Date().toISOString(),
+              facility_id: acc.facility_id
+            });
+          });
+
+          // Include any newly onboarded staff users from Supabase not in initial RBAC
+          supabaseStaffMap.forEach((supUser, email) => {
+            if (!processedEmails.has(email)) {
+              const uAcc = getStaffAccountByEmail(email);
+              const userFacId = supUser.facility_id ? Number(supUser.facility_id) : (uAcc ? uAcc.facility_id : 1);
+              const matchesFac = isSuperAdmin ? (activeFacId === 'ALL' || userFacId === activeFacId) : userFacId === defaultFacId;
+              if (matchesFac) {
+                const supRoleLower = (supUser.role || '').toLowerCase();
+                const supRoleFormatted: 'Admin' | 'Doctor' | 'Front Desk' = 
+                  (supRoleLower === 'admin' || supRoleLower === 'super_admin') ? 'Admin' :
+                  (supRoleLower === 'staff' || supRoleLower.includes('frontdesk') || supRoleLower === 'front desk' || supRoleLower.includes('counter')) ? 'Front Desk' :
+                  'Doctor';
+
+                combinedList.push({
+                  id: supUser.id,
+                  email: supUser.email,
+                  fullName: supUser.fullName,
+                  role: supRoleFormatted,
+                  approved: supUser.approved,
+                  status: supUser.status,
+                  createdAt: supUser.createdAt,
+                  facility_id: userFacId
+                });
+              }
+            }
+          });
+
+          setUsers(combinedList);
         }
       })
       .catch(err => console.error("Failed to load staff users", err))
@@ -69,7 +181,7 @@ export default function StaffManagementSection() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [selectedFacilityId]);
 
   const handleApprove = async (id: string) => {
     if (!window.confirm("Approve this staff registration?")) return;
@@ -200,17 +312,8 @@ export default function StaffManagementSection() {
   };
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          u.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
-    
-    let matchesStatus = true;
-    if (statusFilter === 'Active') matchesStatus = u.approved && u.status === 'Active';
-    else if (statusFilter === 'Suspended') matchesStatus = u.approved && u.status === 'Suspended';
-    else if (statusFilter === 'Pending') matchesStatus = !u.approved;
-
-    return matchesSearch && matchesRole && matchesStatus;
+    return u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           u.email.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   const sortedUsers = React.useMemo(() => {
@@ -224,6 +327,12 @@ export default function StaffManagementSection() {
 
   const bookingsCount = React.useMemo(() => {
     if (!selectedUser) return 0;
+    if (selectedUser.role === 'Front Desk') {
+      return appointments.filter(ap => {
+        const facId = ap.facility_id ? Number(ap.facility_id) : (selectedUser.facility_id || 1);
+        return facId === selectedUser.facility_id;
+      }).length;
+    }
     return appointments.filter(ap => 
       (ap.doctorName || '').toLowerCase().trim() === selectedUser.fullName.toLowerCase().trim()
     ).length;
@@ -245,36 +354,30 @@ export default function StaffManagementSection() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Role Filter */}
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as any)}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
-          >
-            <option value="ALL">All Roles</option>
-            <option value="Doctor">Doctors</option>
-            <option value="Nurse">Nurses</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-neutral-700 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="Active">Active Accounts</option>
-            <option value="Suspended">Suspended Accounts</option>
-            <option value="Pending">Pending Approval</option>
-          </select>
-
-          <button 
-            onClick={fetchUsers} 
-            className="h-9 px-4 bg-neutral-900 text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer ml-auto md:ml-0"
-          >
-            Refresh Data
-          </button>
+        <div className="flex items-center gap-3">
+          {isSuperAdmin ? (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-amber-700 whitespace-nowrap flex items-center gap-1 font-mono">
+                <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                <span>Facility:</span>
+              </label>
+              <select
+                value={selectedFacilityId}
+                onChange={(e) => setSelectedFacilityId(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-neutral-900 font-bold outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 h-9 cursor-pointer"
+              >
+                <option value="ALL">All Facilities (Group-Wide)</option>
+                {PANTAI_FACILITIES.map(f => (
+                  <option key={f.id} value={f.id}>{f.shortTag} ({f.location})</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-neutral-50 border border-neutral-200 px-3 py-1.5 rounded-xl text-xs font-bold text-neutral-700 h-9">
+              <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              <span className="truncate max-w-[200px]">{adminAccount?.hospital || "Branch Staff"}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -283,7 +386,6 @@ export default function StaffManagementSection() {
         <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-base text-neutral-900">Clinician & Staff Registry</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Manage permissions, verification tokens, password dispatching, and block listings.</p>
           </div>
           <span className="text-xs bg-slate-100 font-extrabold text-neutral-700 px-3 py-1 rounded-xl">
             {sortedUsers.length} Members
@@ -304,7 +406,7 @@ export default function StaffManagementSection() {
               <thead>
                 <tr className="bg-neutral-50 border-b border-neutral-200/60 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
                   <th className="py-4.5 px-6">Staff Member</th>
-                  <th className="py-4.5 px-6">Clinical Role</th>
+                  <th className="py-4.5 px-6">Account Role</th>
                   <th className="py-4.5 px-6">Verification Status</th>
                   <th className="py-4.5 px-6">Active Status</th>
                   <th className="py-4.5 px-6 text-right">Actions</th>
@@ -316,7 +418,9 @@ export default function StaffManagementSection() {
                     ? 'bg-neutral-900 border border-neutral-800 text-white' 
                     : u.role === 'Doctor'
                       ? 'bg-teal-50 border border-teal-200/60 text-teal-800'
-                      : 'bg-sky-50 border border-sky-200/60 text-sky-800';
+                      : u.role === 'Front Desk'
+                        ? 'bg-purple-50 border border-purple-200/60 text-purple-800'
+                        : 'bg-sky-50 border border-sky-200/60 text-sky-800';
 
                   return (
                     <tr key={u.id} className="hover:bg-neutral-50/50 transition-colors">
@@ -418,7 +522,6 @@ export default function StaffManagementSection() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs">
           <form onSubmit={handleSaveEdit} className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-2xl max-w-md w-full mx-4 space-y-4">
             <h4 className="font-extrabold text-base text-neutral-900">Edit Staff Account</h4>
-            <p className="text-xs text-neutral-500">Modify credentials and active system clearances for clinical staff member.</p>
             
             <div className="space-y-3.5 pt-2">
               <div>
@@ -444,14 +547,15 @@ export default function StaffManagementSection() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1">Clinical Role</label>
+                  <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1">Account Role</label>
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as any)}
                     className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-800 outline-none focus:bg-white focus:ring-1 focus:ring-teal-400 h-9 cursor-pointer"
                   >
                     <option value="Doctor">Doctor</option>
-                    <option value="Nurse">Nurse</option>
+                    <option value="Front Desk">Front Desk</option>
+                    {isSuperAdmin && <option value="Admin">Admin</option>}
                   </select>
                 </div>
 
@@ -470,30 +574,11 @@ export default function StaffManagementSection() {
 
               <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3.5 space-y-2 text-xs">
                 <div className="flex items-center justify-between text-neutral-600">
-                  <span className="font-semibold">Total Consults Handled:</span>
+                  <span className="font-semibold">{selectedUser.role === 'Front Desk' ? 'Facility Intake Handled:' : 'Total Consults Handled:'}</span>
                   <span className="font-bold text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-200/60 shadow-2xs">
                     {bookingsCount} Bookings
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-neutral-600">
-                  <span className="font-semibold">Supabase Password:</span>
-                  <span className="font-mono text-[10px] text-teal-800 bg-white px-2 py-0.5 rounded border border-neutral-200/60 shadow-2xs">
-                    [Argon2id/Bcrypt Secured]
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-neutral-600">
-                  <span className="font-semibold">Authentication UID:</span>
-                  <span className="font-mono text-[9px] text-neutral-500 bg-white px-2 py-0.5 rounded border border-neutral-200/60 shadow-2xs">
-                    {selectedUser.id}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-amber-50/45 border border-amber-200/60 rounded-xl p-3.5 flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-neutral-500 leading-relaxed font-medium">
-                  <strong>Warning:</strong> Suspending an account will immediately block this user from logging into the clinician dashboards. Password decryption is prevented by Supabase Auth security; use the reset dispatch key if they forgot it.
-                </p>
               </div>
             </div>
 

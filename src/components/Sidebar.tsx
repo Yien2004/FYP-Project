@@ -8,6 +8,7 @@ import {
   LogOut, 
   Home, 
   MessageSquare, 
+  Mail,
   Activity 
 } from "lucide-react";
 import { AppNotification, PatientProfile } from "../types";
@@ -26,8 +27,8 @@ const translations: Record<string, Record<string, string>> = {
     "Home": "Home",
     "Book Appointment": "Book Appointment",
     "AI Consultation": "Health Assistant",
-    "My Appointments": "My Appointments",
-    "Clinic Locator": "Clinic & Hospital Finder",
+    "Appointment History": "Appointment History",
+    "Clinic Locator": "Hospital Finder",
     "Messages": "Messages",
     "Profile": "Profile",
     "Sign Out": "Sign Out",
@@ -37,8 +38,8 @@ const translations: Record<string, Record<string, string>> = {
     "Home": "Utama",
     "Book Appointment": "Tempah Temujanji",
     "AI Consultation": "Pembantu Kesihatan",
-    "My Appointments": "Temujanji Saya",
-    "Clinic Locator": "Pencari Klinik & Hospital",
+    "Appointment History": "Sejarah Temujanji",
+    "Clinic Locator": "Pencari Hospital",
     "Messages": "Mesej",
     "Profile": "Profil",
     "Sign Out": "Log Keluar",
@@ -59,9 +60,9 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
       title: "Appointments & Facilities",
       items: [
         { id: "dashboard", label: "Home", icon: <Home className="w-4.5 h-4.5" /> },
-        { id: "clinic-search", label: "Clinic & Hospital Finder", icon: <MapPin className="w-4.5 h-4.5" /> },
+        { id: "clinic-search", label: "Hospital Finder", icon: <MapPin className="w-4.5 h-4.5" /> },
         { id: "schedule-appointment", label: "Book Appointment", icon: <Calendar className="w-4.5 h-4.5" /> },
-        { id: "appointments-history", label: "My Appointments", icon: <FolderHeart className="w-4.5 h-4.5" /> },
+        { id: "appointments-history", label: "Appointment History", icon: <FolderHeart className="w-4.5 h-4.5" /> },
       ]
     },
     {
@@ -73,29 +74,25 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
     {
       title: "Account",
       items: [
-        { id: "communication", label: "Messages", icon: <MessageSquare className="w-4.5 h-4.5" />, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined },
         { id: "user-settings", label: "Profile", icon: <Sliders className="w-4.5 h-4.5" /> },
       ]
     }
   ];
 
-  let nationalityDisplay = patientProfile.nationality || "Malaysian";
-  if (nationalityDisplay === "Malaysia Client" || nationalityDisplay === "Malaysian Patient" || nationalityDisplay === "MY DATA_OK") {
-    nationalityDisplay = "Malaysian";
-  }
-
   return (
     <aside id="portal-sidebar" className="w-64 bg-white border-r border-slate-200 text-slate-700 font-sans flex flex-col justify-between py-6 shrink-0 relative shadow-xs">
       
       <div className="space-y-5">
-        {/* Brand Banner - Previous Logo and Name Only */}
+        {/* Brand Banner - PantaiCare Smart Outpatient Portal */}
         <div className="px-6 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 shrink-0">
-            <Activity className="w-4.5 h-4.5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 shrink-0">
+            <Activity className="w-5 h-5 text-white" />
           </div>
-          <span className="font-extrabold text-slate-900 text-lg tracking-tight block">
-            Penang<span className="text-sky-600">Health</span>
-          </span>
+          <div>
+            <span className="font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
+              Pantai<span className="text-teal-600">Care</span>
+            </span>
+          </div>
         </div>
 
         {/* Navigation list grouped by clinical sections */}
@@ -110,7 +107,13 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
                 return (
                   <button
                     key={item.id}
-                    onClick={() => onSetScreen(item.id)}
+                    onClick={() => {
+                      if (item.id === "schedule-appointment") {
+                        localStorage.removeItem("pantai_booking_initial_step");
+                        localStorage.removeItem("pantai_booking_preselected_clinic");
+                      }
+                      onSetScreen(item.id);
+                    }}
                     className={`w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center justify-between transition-all group cursor-pointer ${
                       isActive 
                         ? 'bg-sky-600 text-white shadow-md shadow-sky-600/15' 
@@ -123,12 +126,6 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
                       </span>
                       <span>{t(item.label)}</span>
                     </div>
-
-                    {item.badge !== undefined && (
-                      <span className="bg-rose-600 text-white rounded-full px-1.5 py-0.5 text-[9px] font-black font-mono">
-                        {item.badge}
-                      </span>
-                    )}
                   </button>
                 );
               })}

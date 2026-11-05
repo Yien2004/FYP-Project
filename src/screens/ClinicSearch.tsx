@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, MapPin, Navigation, Loader2 } from "lucide-react";
+import { Search, MapPin, Navigation, Loader2, X } from "lucide-react";
 import { Clinic } from "../types";
 import { mockClinics } from "../mockData";
 import * as L from "leaflet";
@@ -138,14 +138,9 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
   // Category states matching appointment selection (Private facilities only)
   const [categoryFilter, setCategoryFilter] = useState<"All" | "Hospitals" | "Clinics">("All");
 
-  // Coordinates state for mapping
+  // Coordinates state for mapping (Penang Island focus)
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([5.4164, 100.3301]); // Penang Town center default
-
-  // Live Navigation Animation States
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [carLocation, setCarLocation] = useState<[number, number] | null>(null);
-  const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([5.3600, 100.2950]); // Penang Island default
 
   // OSRM Routing States
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
@@ -173,13 +168,20 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     }
   };
 
-  const isPublicFacility = (name: string) =>
-    name.includes("Klinik Kesihatan") ||
-    name.includes("Hospital Pulau Pinang") ||
-    name.includes("Hospital Seberang Jaya") ||
-    name.includes("Hospital Bukit Mertajam");
+  // Helper to calculate Haversine distance and sort branches nearest to furthest
+  const sortClinicsByDistance = (list: Clinic[], userCoords: [number, number] | null): Clinic[] => {
+    const refCoords = userCoords || [5.4164, 100.3301];
+    return [...list].map(c => {
+      const km = getHaversineDistance(refCoords, [c.lat, c.lng]);
+      return {
+        ...c,
+        distance: `${km.toFixed(1)} km`,
+        rawDistance: km
+      } as Clinic & { rawDistance: number };
+    }).sort((a, b) => ((a as any).rawDistance || 0) - ((b as any).rawDistance || 0));
+  };
 
-  // Load facilities from backend API on mount (Private facilities only)
+  // Load PantaiCare facilities from backend API on mount
   useEffect(() => {
     fetch("/api/facilities")
       .then((res) => {
@@ -187,29 +189,30 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
         return res.json();
       })
       .then((data: Clinic[]) => {
-        // Filter to Penang private clinics only
-        const penangClinics = data.filter(c => 
-          c.lat > 5.0 && c.lat < 5.8 && c.lng > 100.0 && c.lng < 100.8 && !isPublicFacility(c.name)
-        );
+        // Filter strictly to PantaiCare exclusive branches
+        const pantaiClinics = data.filter(c => c.name.toLowerCase().includes("pantai"));
+        const baseList = pantaiClinics.length > 0 ? pantaiClinics : data;
+        const sorted = sortClinicsByDistance(baseList, userLocation);
 
-        setClinics(penangClinics);
-        setFilteredClinics(penangClinics);
+        setClinics(sorted);
+        setFilteredClinics(sorted);
         
-        setSelectedClinic(null);
-        setMapCenter([5.4164, 100.3301]);
+        if (sorted.length > 0) {
+          setMapCenter([sorted[0].lat, sorted[0].lng]);
+        }
         setIsLoading(false);
       })
       .catch((err) => {
         console.warn("Facilities API failed, using fallback mock data:", err);
-        // Fallback to local mock clinics filtered to private Penang facilities
-        const penangMocks = mockClinics.filter(c => 
-          c.lat > 5.0 && c.lat < 5.8 && c.lng > 100.0 && c.lng < 100.8 && !isPublicFacility(c.name)
-        );
-        const fallbackList = penangMocks.length > 0 ? penangMocks : mockClinics.filter(c => !isPublicFacility(c.name));
-        setClinics(fallbackList);
-        setFilteredClinics(fallbackList);
-        setSelectedClinic(null);
-        setMapCenter([5.4164, 100.3301]);
+        const pantaiMocks = mockClinics.filter(c => c.name.toLowerCase().includes("pantai"));
+        const fallbackList = pantaiMocks.length > 0 ? pantaiMocks : mockClinics;
+        const sorted = sortClinicsByDistance(fallbackList, userLocation);
+
+        setClinics(sorted);
+        setFilteredClinics(sorted);
+        if (sorted.length > 0) {
+          setMapCenter([sorted[0].lat, sorted[0].lng]);
+        }
         setIsLoading(false);
       });
   }, []);
@@ -297,7 +300,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
   // Keep map view in sync with mapCenter state
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (map && mapCenter && !isNavigating) {
+    if (map && mapCenter) {
       map.setView(mapCenter, map.getZoom(), { animate: true });
     }
   }, [mapCenter]);
@@ -314,34 +317,6 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
         .addTo(map)
         .bindPopup('<div class="text-xs font-bold font-sans text-slate-800">Your Current Location</div>');
       markersRef.current.push(userMarker);
-    }
-
-    // Add Car/Ambulance Location Marker if actively navigating
-    if (carLocation) {
-      const carMarker = L.marker(carLocation, {
-        icon: L.divIcon({
-          className: 'navigation-car-icon',
-          html: `
-            <div style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 32px;
-              height: 32px;
-              background-color: #3b82f6;
-              border: 2px solid #ffffff;
-              border-radius: 50%;
-              box-shadow: 0 4px 10px rgba(59, 130, 246, 0.5);
-              font-size: 16px;
-            ">
-              🚑
-            </div>
-          `,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
-        })
-      }).addTo(map);
-      markersRef.current.push(carMarker);
     }
 
     // Add Clinic Markers
@@ -363,6 +338,15 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
 
       markersRef.current.push(marker);
     });
+
+    if (markersRef.current.length > 1 && !selectedClinic) {
+      try {
+        const group = L.featureGroup(markersRef.current);
+        map.fitBounds(group.getBounds().pad(0.1));
+      } catch (e) {
+        // ignore
+      }
+    }
   };
 
   // Helper function to draw the real road route on the map
@@ -392,13 +376,10 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
 
     routeLayersRef.current.push(shadowLine, routeLine);
 
-    // Only pan bounds on initial selection/draw, do not bounce bounds during active animation
-    if (!isNavigating) {
-      const start: [number, number] = userLocation || [5.4164, 100.3301];
-      const end: [number, number] = selectedClinic ? [selectedClinic.lat, selectedClinic.lng] : start;
-      const bounds = L.latLngBounds([start, end]);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
+    const start: [number, number] = userLocation || [5.4164, 100.3301];
+    const end: [number, number] = selectedClinic ? [selectedClinic.lat, selectedClinic.lng] : start;
+    const bounds = L.latLngBounds([start, end]);
+    map.fitBounds(bounds, { padding: [50, 50] });
   };
 
   // Keep markers and route in sync with state changes
@@ -413,14 +394,11 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
         routeLayersRef.current = [];
       }
     }
-  }, [filteredClinics, selectedClinic, userLocation, carLocation, routePath, showRouteLine]);
+  }, [filteredClinics, selectedClinic, userLocation, routePath, showRouteLine]);
 
-  // Clean up animation interval and layers on clinic change or unmount
+  // Clean up route layers on clinic change or unmount
   useEffect(() => {
     return () => {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current);
-      }
       const map = mapInstanceRef.current;
       if (map) {
         routeLayersRef.current.forEach(layer => layer.remove());
@@ -437,7 +415,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     };
   }, []);
 
-  // Unified Filtering logic for Search + Categories (Private facilities only)
+  // Unified Filtering logic for Search + Categories (PantaiCare branches only)
   const applyFilter = (category: "All" | "Hospitals" | "Clinics", searchVal: string) => {
     let result = clinics;
 
@@ -445,14 +423,13 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     if (category === "Hospitals") {
       result = result.filter(c => 
         c.name.toLowerCase().includes("hospital") || 
-        c.name.toLowerCase().includes("centre") || 
-        c.name.toLowerCase().includes("center")
+        c.name.toLowerCase().includes("pavilion")
       );
     } else if (category === "Clinics") {
       result = result.filter(c => 
-        c.name.toLowerCase().includes("klinik") || 
         c.name.toLowerCase().includes("clinic") || 
-        c.name.toLowerCase().includes("poliklinik")
+        c.name.toLowerCase().includes("centre") ||
+        c.name.toLowerCase().includes("center")
       );
     }
 
@@ -465,11 +442,9 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
       );
     }
 
-    setFilteredClinics(result);
-    if (result.length > 0) {
-      setSelectedClinic(result[0]);
-      setMapCenter([result[0].lat, result[0].lng]);
-    } else {
+    const sortedResult = sortClinicsByDistance(result, userLocation);
+    setFilteredClinics(sortedResult);
+    if (selectedClinic && !sortedResult.some(c => c.id === selectedClinic.id)) {
       setSelectedClinic(null);
     }
   };
@@ -480,11 +455,6 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
   };
 
   const handleSelectClinic = (clinic: Clinic) => {
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current);
-    }
-    setIsNavigating(false);
-    setCarLocation(null);
     setShowRouteLine(false);
     setSelectedClinic(clinic);
     setMapCenter([clinic.lat, clinic.lng]);
@@ -508,25 +478,24 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     const id = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        // Verify if coordinates are inside Penang boundaries
-        if (latitude > 5.1 && latitude < 5.6 && longitude > 100.1 && longitude < 100.6) {
-          setUserLocation([latitude, longitude]);
-          setMapCenter([latitude, longitude]);
+        let activeCoords: [number, number];
+
+        // Verify if coordinates are inside Peninsular Malaysia boundaries
+        if (latitude >= 1.0 && latitude <= 7.5 && longitude >= 99.0 && longitude <= 105.0) {
+          activeCoords = [latitude, longitude];
           setIsUsingSimulatedGps(false);
           initialRealCoordsRef.current = null;
         } else {
-          // If outside Penang (e.g. testing in KL), simulate central Penang island Georgetown coordinates
-          if (!initialRealCoordsRef.current) {
-            initialRealCoordsRef.current = [latitude, longitude];
-          }
-          const deltaLat = latitude - initialRealCoordsRef.current[0];
-          const deltaLng = longitude - initialRealCoordsRef.current[1];
-          const simulatedLat = 5.4116 + deltaLat;
-          const simulatedLng = 100.3245 + deltaLng;
-          setUserLocation([simulatedLat, simulatedLng]);
-          setMapCenter([simulatedLat, simulatedLng]);
-          setIsUsingSimulatedGps(true);
+          activeCoords = [latitude, longitude];
+          setIsUsingSimulatedGps(false);
         }
+
+        setUserLocation(activeCoords);
+        setMapCenter(activeCoords);
+
+        // Auto-sort PantaiCare branches from nearest to furthest based on live distance
+        setClinics(prev => sortClinicsByDistance(prev, activeCoords));
+        setFilteredClinics(prev => sortClinicsByDistance(prev, activeCoords));
       },
       (error) => {
         console.error("GPS tracking failed:", error);
@@ -540,55 +509,10 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
     setIsTrackingGps(true);
   };
 
-  const handleStartNavigation = () => {
-    if (!selectedClinic || routePath.length === 0) return;
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current);
-    }
-
-    setIsNavigating(true);
-    
-    let step = 0;
-    // Total steps scales with path length to keep speeds smooth and consistent
-    const totalSteps = Math.min(150, routePath.length * 3); 
-
-    setCarLocation(routePath[0]);
-
-    animationIntervalRef.current = setInterval(() => {
-      step += 1;
-      if (step > totalSteps) {
-        clearInterval(animationIntervalRef.current!);
-        setIsNavigating(false);
-        setCarLocation(null);
-        alert(`You have arrived at ${selectedClinic.name}!`);
-        return;
-      }
-
-      // Linear interpolation along coordinates of the OSRM route path
-      const progress = step / totalSteps;
-      const exactIndex = progress * (routePath.length - 1);
-      const segmentIndex = Math.floor(exactIndex);
-      const segmentProgress = exactIndex - segmentIndex;
-
-      if (segmentIndex >= routePath.length - 1) {
-        setCarLocation(routePath[routePath.length - 1]);
-      } else {
-        const c1 = routePath[segmentIndex];
-        const c2 = routePath[segmentIndex + 1];
-        const nextLat = c1[0] + (c2[0] - c1[0]) * segmentProgress;
-        const nextLng = c1[1] + (c2[1] - c1[1]) * segmentProgress;
-        setCarLocation([nextLat, nextLng]);
-      }
-    }, 50); // 50ms interval -> very smooth animation!
-  };
-
   return (
     <div id="clinic-search-view" className="py-6 space-y-8 max-w-7xl mx-auto font-sans">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">Intelligent Clinic Search & Live Map</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Locate physical healthcare branches in Penang with live GPS positioning and OSM tile maps.
-        </p>
+        <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">Hospital Finder</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
@@ -624,7 +548,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
             </div>
 
             <form onSubmit={handleSearch} className="space-y-3">
-              <label className="block text-xs font-bold text-slate-700">Filter branches by Zip, Name or Locality</label>
+              <label className="block text-xs font-bold text-slate-700">Filter Name</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4.5 h-4.5" />
@@ -635,7 +559,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                       setZipInput(e.target.value);
                       applyFilter(categoryFilter, e.target.value);
                     }}
-                    placeholder="e.g. 10450, Bayan Lepas, Georgetown..."
+                    placeholder="example: Bayan Lepas"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-500 font-bold"
                   />
                 </div>
@@ -650,60 +574,49 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
           </div>
 
           {/* Dedicated Route Navigation Panel - COMPLETELY OUT OF THE MAP */}
+          {/* Dedicated Route Navigation Panel - Light Theme */}
           {selectedClinic && (
-            <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/85 border border-sky-500/35 p-5 rounded-3xl text-white shadow-[0_0_25px_rgba(56,189,248,0.15)] animate-fade-in font-sans space-y-4">
+            <div className="bg-white border border-slate-200 p-5 rounded-3xl text-slate-800 shadow-sm animate-fade-in font-sans space-y-4">
               
-              {/* Header: Status & Mode */}
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400"></span>
-                  </span>
-                  <span className="font-extrabold uppercase text-[10px] text-sky-400 tracking-wider">
-                    {isNavigating ? "Simulated Emergency Dispatch" : "Live Routing System"}
-                  </span>
+              {/* Header with Branch Name and Close (X) button */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="font-extrabold text-slate-900 text-sm leading-tight">
+                    {selectedClinic.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 leading-normal">{selectedClinic.address}</p>
                 </div>
-                <span className="text-[9px] bg-sky-950 text-sky-450 border border-sky-850 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
-                  Driving Mode
-                </span>
-              </div>
-
-              {/* Destination Info */}
-              <div className="space-y-1">
-                <span className="text-[8px] text-slate-500 block uppercase font-mono tracking-wider">Destination Branch</span>
-                <h4 className="font-black text-slate-100 text-sm leading-tight">
-                  {selectedClinic.name}
-                </h4>
-                <p className="text-[10px] text-slate-400 leading-normal">{selectedClinic.address}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClinic(null);
+                    setShowRouteLine(false);
+                  }}
+                  className="text-slate-400 hover:text-slate-700 transition p-1.5 cursor-pointer rounded-xl hover:bg-slate-100 flex items-center justify-center shrink-0"
+                  title="Hide Route Details"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Distance & Time Box */}
-              <div className="grid grid-cols-2 gap-3 bg-slate-900/50 p-3 rounded-2xl border border-slate-800/60">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
                 <div>
-                  <span className="text-[8px] text-slate-500 block uppercase font-mono tracking-wider">Drive Distance</span>
-                  <span className="font-mono text-sm font-extrabold text-sky-400">
+                  <span className="text-[9px] text-slate-400 block uppercase font-mono font-bold tracking-wider">Distance</span>
+                  <span className="font-mono text-sm font-extrabold text-sky-600">
                     {routeDistance !== null ? `${routeDistance.toFixed(2)} km` : "Calculating..."}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[8px] text-slate-500 block uppercase font-mono tracking-wider">Est. Duration</span>
-                  <span className="font-mono text-sm font-extrabold text-cyan-400">
+                  <span className="text-[9px] text-slate-400 block uppercase font-mono font-bold tracking-wider">Time</span>
+                  <span className="font-mono text-sm font-extrabold text-teal-600">
                     {routeDuration !== null ? `${routeDuration} mins` : "Calculating..."}
                   </span>
                 </div>
               </div>
 
-              {/* Route Summary & Actions */}
-              <div className="pt-3 border-t border-slate-800/80 space-y-3.5">
-                <div className="bg-slate-950/40 px-3 py-2 rounded-xl border border-slate-850/60 flex items-start gap-2 text-[10px]">
-                  <span className="text-sky-400 shrink-0">🛣️</span>
-                  <div className="leading-snug">
-                    <span className="text-slate-500 block uppercase font-mono text-[8px] tracking-wider">Recommended Route</span>
-                    {formatRoutePath(routeName)}
-                  </div>
-                </div>
-
+              {/* Actions */}
+              <div className="pt-2 border-t border-slate-100">
                 <div className="flex gap-2 w-full">
                   {!showRouteLine ? (
                     <>
@@ -724,46 +637,33 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                         <Navigation className="w-3 h-3" /> Show Route
                       </button>
                       <button 
-                        onClick={() => onSetScreen("schedule-appointment")}
-                        className="flex-1 border border-slate-800 hover:border-slate-700 text-slate-350 text-[11px] py-2.5 rounded-xl transition cursor-pointer text-center"
+                        onClick={() => {
+                          localStorage.setItem("pantai_booking_preselected_clinic", selectedClinic.name);
+                          localStorage.setItem("pantai_booking_initial_step", "2");
+                          onSetScreen("schedule-appointment");
+                        }}
+                        className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold py-2.5 rounded-xl transition cursor-pointer text-center shadow shadow-teal-500/10"
                       >
-                        Book Hospital/Clinic
+                        Book Appointment
                       </button>
                     </>
                   ) : (
                     <>
                       <button 
-                        onClick={() => {
-                          handleStartNavigation();
-                          scrollToMap();
-                        }}
-                        disabled={isNavigating}
-                        className={`flex-1 text-white text-[11px] font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                          isNavigating
-                            ? "bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed"
-                            : "bg-sky-600 hover:bg-sky-500 shadow shadow-sky-500/10"
-                        }`}
-                      >
-                        <Navigation className={`w-3 h-3 ${isNavigating ? "animate-spin" : ""}`} />
-                        {isNavigating ? "Navigating..." : "Start Navigation"}
-                      </button>
-                      <button 
                         onClick={() => setShowRouteLine(false)}
-                        disabled={isNavigating}
-                        className={`flex-1 border border-rose-950 hover:border-rose-900 text-rose-350 text-[11px] py-2.5 rounded-xl transition cursor-pointer text-center ${
-                          isNavigating ? "opacity-50 cursor-not-allowed" : ""
-                        }`}
+                        className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-bold py-2.5 rounded-xl transition cursor-pointer text-center"
                       >
                         Hide Route
                       </button>
                       <button 
-                        onClick={() => onSetScreen("schedule-appointment")}
-                        className={`flex-1 border border-slate-800 hover:border-slate-700 text-slate-350 text-[11px] py-2.5 rounded-xl transition cursor-pointer text-center ${
-                          isNavigating ? "opacity-50 cursor-not-allowed" : ""
-                        }`}
-                        disabled={isNavigating}
+                        onClick={() => {
+                          localStorage.setItem("pantai_booking_preselected_clinic", selectedClinic.name);
+                          localStorage.setItem("pantai_booking_initial_step", "2");
+                          onSetScreen("schedule-appointment");
+                        }}
+                        className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold py-2.5 rounded-xl transition cursor-pointer text-center shadow shadow-teal-500/10"
                       >
-                        Book Hospital/Clinic
+                        Book Appointment
                       </button>
                     </>
                   )}
@@ -777,7 +677,7 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
             {isLoading ? (
               <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-3">
                 <Loader2 className="w-6 h-6 animate-spin text-teal-650" />
-                Loading Penang healthcare clinics...
+                Loading PantaiCare healthcare branches...
               </div>
             ) : filteredClinics.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-500 text-xs">
@@ -794,12 +694,6 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                       isSelected ? 'border-teal-650 shadow-md ring-1 ring-teal-500/10' : 'border-slate-150'
                     }`}
                   >
-                    {cl.featured && (
-                      <span className="absolute top-3 right-3 bg-teal-50 text-teal-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
-                        FEATURED EXPRESS
-                      </span>
-                    )}
-
                     <div className="space-y-1 flex-1">
                       <h3 className="font-extrabold text-slate-900 text-xs leading-snug">{cl.name}</h3>
                       <p className="text-[11px] text-slate-500 leading-normal max-w-xs">{cl.address}</p>
@@ -808,16 +702,18 @@ export default function ClinicSearch({ onSetScreen }: ClinicSearchProps) {
                         <span className="bg-slate-50 px-2 py-0.5 rounded leading-none text-teal-700 font-bold font-mono">
                           {cl.distance}
                         </span>
-                        <span>{cl.hours}</span>
                       </div>
 
                       {/* Book appointment action directly inside left side card */}
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          localStorage.setItem("pantai_booking_preselected_clinic", cl.name);
+                          localStorage.setItem("pantai_booking_initial_step", "2");
                           onSetScreen("schedule-appointment");
                         }}
-                        className="mt-3.5 w-full bg-teal-650 hover:bg-teal-700 text-white font-extrabold text-[10px] py-2 px-3 rounded-xl transition shadow shadow-teal-500/10 cursor-pointer text-center block"
+                        className="mt-3 w-full bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow cursor-pointer text-center block"
                       >
                         Book Appointment
                       </button>

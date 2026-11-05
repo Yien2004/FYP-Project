@@ -168,10 +168,11 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-2">Primary Blood Type</label>
                 <select 
-                  value={formData.bloodType}
+                  value={formData.bloodType || ""}
                   onChange={(e) => setFormData({ ...formData, bloodType: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
                 >
+                  <option value="">Select Blood Type</option>
                   <option value="O+">O Positive (O+)</option>
                   <option value="O-">O Negative (O-)</option>
                   <option value="A+">A Positive (A+)</option>
@@ -184,10 +185,11 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-2">Gender</label>
                 <select 
-                  value={formData.gender || "Male"}
+                  value={formData.gender || ""}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
                 >
+                  <option value="">Select Gender</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
@@ -198,11 +200,10 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
                 <label className="block text-xs font-bold text-slate-700 mb-2">Nationality</label>
                 <input 
                   type="text" 
-                  value={formData.nationality || "Malaysian"}
+                  value={formData.nationality || ""}
                   onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
                   placeholder="e.g. Malaysian"
-                  required
                 />
               </div>
 
@@ -213,8 +214,7 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
                   value={formData.emergencyContactName || ""}
                   onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
-                  placeholder="e.g. Razali Bin Ahmad"
-                  required
+                  placeholder="e.g. Next of Kin Name"
                 />
               </div>
 
@@ -225,8 +225,7 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
                   value={formData.emergencyContactPhone || ""}
                   onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
-                  placeholder="e.g. +60 12-987 6543 (Father)"
-                  required
+                  placeholder="e.g. +60 12-345 6789 (Relation)"
                 />
               </div>
             </div>
@@ -349,10 +348,11 @@ export default function PatientRegistration({ currentProfile, onUpdateProfile, o
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-2">Primary Insurance Provider</label>
                 <select 
-                  value={formData.insuranceProvider}
+                  value={formData.insuranceProvider || ""}
                   onChange={(e) => setFormData({ ...formData, insuranceProvider: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500 font-medium font-mono"
                 >
+                  <option value="">Select Insurance Provider</option>
                   <option value="Allianz Health Malaysia">Allianz Health Malaysia</option>
                   <option value="Great Eastern Assurance">Great Eastern Assurance</option>
                   <option value="Etiqa Takaful">Etiqa Takaful</option>

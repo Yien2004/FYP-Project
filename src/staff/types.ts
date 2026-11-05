@@ -41,7 +41,7 @@ export interface Appointment {
   dateTime: string;
   specialty: string;
   doctorName: string;
-  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected' | 'Done' | 'Missing';
+  status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Approved' | 'Pending' | 'Rescheduled' | 'Rejected' | 'Done' | 'Missing' | 'Checked In' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | string;
   remarks: string;
   checked?: boolean;
   clinic?: string;
@@ -50,6 +50,8 @@ export interface Appointment {
   timeSlot?: string;
   shareHistory?: boolean;
   requestRide?: boolean;
+  roomNumber?: string;
+  estimatedCallTime?: string;
 }
 
 export interface SystemLog {
@@ -114,11 +116,12 @@ export interface UserAccount {
   id: string;
   name: string;
   email: string;
-  role: 'Doctor' | 'Patient' | 'Nurse' | 'Admin';
+  role: 'Super Admin' | 'Doctor' | 'Patient' | 'Nurse' | 'Admin';
   status: 'Active' | 'Suspended';
 }
 
 export type PortalType = 'staff' | 'admin';
 
-export type StaffTab = 'dashboard' | 'appointments' | 'patients' | 'schedule' | 'communication' | 'notifications' | 'send_notifications' | 'settings' | 'analytics';
-export type AdminTab = 'dashboard' | 'staff' | 'patients' | 'appointments' | 'chats' | 'reports' | 'problems' | 'notifications' | 'settings';
+export type StaffTab = 'dashboard' | 'appointments' | 'patients' | 'schedule' | 'notifications' | 'send_notifications' | 'settings';
+export type AdminTab = 'dashboard' | 'staff' | 'patients' | 'appointments' | 'notifications' | 'settings' | 'approvals' | 'holidays' | 'rosters';
+

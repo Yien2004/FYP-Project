@@ -22,39 +22,20 @@ interface ChatChannel {
 }
 
 function getDefaultWelcomeMessage(channel: ChatChannel): Message[] {
-  if (channel.id === 'admin-support') {
-    return [
-      {
-        id: `welcome-${channel.id}`,
-        sender: "doctor",
-        senderName: "System Administrator",
-        content: `Welcome to System Administrator Support. This is a direct, secure channel to the PenangHealth Global IT and Operations administration team.
-
-Please use this channel to:
-- Report software technical issues
-- Request account verification assistance
-- Inquire about data privacy and HIPAA details
-- Send direct support requests to the system operator
-
-Our support desk is monitored 24/7. How can we assist you today?`,
-        timestamp: "Just now"
-      }
-    ];
-  }
+  const hospitalName = channel.hospital || channel.name;
   return [
     {
       id: `welcome-${channel.id}`,
       sender: "doctor",
-      senderName: `Nurse ${channel.hospital?.includes("Klinik") ? "Aishah" : "Mei Ling"}`,
-      content: `Hello Ahmad! Thank you for scheduling your appointment at ${channel.hospital}. I am your dedicated duty nurse for general triage and facility check-in questions.
+      senderName: `Nurse Desk (${hospitalName})`,
+      content: `Welcome to ${hospitalName} Outpatient Care Desk. I am on duty to assist you with registration inquiries, arrival guidance, and clinic consultations.
 
-Please feel free to ask about:
-- Pre-consultation instructions (e.g. fasting requirements)
-- Registration procedure & documents to bring
-- Directions to the clinic or parking options
-- General scheduling inquiries
+Feel free to ask about:
+• Outpatient registration documents (MyKad / passport, insurance guarantee letter)
+• Clinic operating hours, visitor parking, and lobby drop-off points
+• Direct medical questions or specialist scheduling
 
-How can I help you today?`,
+How can we assist you today?`,
       timestamp: "Just now"
     }
   ];
@@ -410,68 +391,61 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
     }));
   };
 
-  // Dynamic inbox channels list - ONLY show booked facility support channels & active admin chat
+  // Exclusive PantaiCare channels - 4 Penang Island facilities
   const channels = useMemo<ChatChannel[]>(() => {
-    const list: ChatChannel[] = [];
-
-    // Scan messages for admin support prefix
-    const adminMsgs = messages.filter(m => m.content.startsWith("[admin-support]:"));
-    const hasAdminMsgs = adminMsgs.length > 0;
-    let isAdminClosed = false;
-    if (hasAdminMsgs) {
-      const latest = adminMsgs[adminMsgs.length - 1];
-      if (latest.content.includes("Chat closed by Administrator.")) {
-        isAdminClosed = true;
-      }
-    }
-
-    if (hasAdminMsgs && !isAdminClosed) {
-      list.push({
-        id: 'admin-support',
-        name: 'System Administrator Support',
-        subtitle: 'Global Operations & Admin Desk',
-        avatarInitials: 'AD',
+    return [
+      {
+        id: 'ph-penang-nurse',
+        name: 'Pantai Hospital Penang (Main Hospital) - Outpatient Care',
+        subtitle: 'Duty Nurse & Registration Desk (Bayan Lepas)',
+        avatarInitials: 'PHP',
         type: 'staff',
-        hospital: 'PenangHealth Headquarters'
-      });
-    }
-
-    // Find unique clinic names from booked appointments
-    const bookedClinics = Array.from(
-      new Set(
-        appointments
-          .map(apt => apt.clinic)
-          .filter((c): c is string => !!c)
-      )
-    );
-
-    bookedClinics.forEach(clinic => {
-      const channelId = `staff-${clinic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
-      if (!list.some(item => item.id === channelId)) {
-        list.push({
-          id: channelId,
-          name: `${clinic} - Duty Nurse & Triage`,
-          subtitle: "Facility General Support & Triage Desk",
-          avatarInitials: clinic.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
-          type: 'staff',
-          hospital: clinic
-        });
+        hospital: 'Pantai Hospital Penang (Main Hospital)'
+      },
+      {
+        id: 'pantai-pavilion-nurse',
+        name: 'Pantai Heart & Wellness Pavilion - Outpatient Care',
+        subtitle: 'Duty Nurse & Screening Desk (Georgetown)',
+        avatarInitials: 'PHWP',
+        type: 'staff',
+        hospital: 'Pantai Heart & Wellness Pavilion'
+      },
+      {
+        id: 'pantai-premier-nurse',
+        name: 'Pantai Premier Clinic & Day Surgery - Outpatient Care',
+        subtitle: 'Duty Nurse & Day Surgery Reception (Bayan Baru)',
+        avatarInitials: 'PPCDS',
+        type: 'staff',
+        hospital: 'Pantai Premier Clinic & Day Surgery'
+      },
+      {
+        id: 'pantai-specialist-nurse',
+        name: 'Pantai Specialist Centre - Outpatient Care',
+        subtitle: 'Duty Nurse & Specialist Desk (Ayer Itam)',
+        avatarInitials: 'PSC',
+        type: 'staff',
+        hospital: 'Pantai Specialist Centre'
       }
-    });
+    ];
+  }, []);
 
-    return list;
-  }, [appointments, messages]);
+  const [hospitalFilter, setHospitalFilter] = useState("all");
 
-  // Set default active inbox ID to first channel
+  const filteredChannels = useMemo(() => {
+    if (hospitalFilter === "all") return channels;
+    return channels.filter(ch => ch.hospital === hospitalFilter);
+  }, [channels, hospitalFilter]);
+
+  // Set default active inbox ID to first filtered channel
   useEffect(() => {
-    if (channels.length > 0) {
-      if (!activeInboxId || !channels.some(c => c.id === activeInboxId)) {
-        setActiveInboxId(channels[0].id);
+    if (filteredChannels.length > 0) {
+      if (!activeInboxId || !filteredChannels.some(c => c.id === activeInboxId)) {
+        setActiveInboxId(filteredChannels[0].id);
       }
     } else {
       setActiveInboxId("");
     }
-  }, [channels, activeInboxId]);
+  }, [filteredChannels, activeInboxId]);
 
   // Active channel
   const activeChannel = useMemo(() => {
@@ -489,14 +463,13 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
 
     // Next, distribute messages from the prop into their respective channels
     messages.forEach(m => {
-      const match = m.content.match(/^\[(staff-[a-z0-9-]+|admin-support)\]:\s*([\s\S]*)$/);
+      const match = m.content.match(/^\[(pantai-[a-z0-9-]+|staff-[a-z0-9-]+|admin-support)\]:\s*([\s\S]*)$/);
       const cleanContent = match ? match[2] : m.content;
       
       // Determine the channel ID
       let channelId = match ? match[1] : "";
-      if (!channelId && channels.length > 0) {
-        // Fallback for legacy messages or reports without prefix
-        channelId = channels[0].id;
+      if (!channelId || channelId.startsWith("staff-") || channelId === "admin-support" || !initialChats[channelId]) {
+        channelId = channels[0]?.id || "pantai-nurse-desk";
       }
 
       if (channelId && initialChats[channelId]) {
@@ -562,8 +535,9 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
     e.preventDefault();
     if (!textInput.trim() || isWordLimitExceeded || isRateLimitExceeded) return;
 
+    const query = textInput.trim();
     // Prefix the content with the channel/clinic ID
-    const prefixedContent = `[${activeInboxId}]: ${textInput.trim()}`;
+    const prefixedContent = `[${activeInboxId}]: ${query}`;
 
     const newMsg: Message = {
       id: "msg-" + Date.now(),
@@ -577,6 +551,32 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
 
     onSendMessage(newMsg);
     setTextInput("");
+
+    // Duty Nurse / Triage Desk auto-guidance for pre-consultation inquiries
+    const qLower = query.toLowerCase();
+    let replyText = "";
+    if (qLower.includes("fast") || qLower.includes("puasa") || qLower.includes("空腹") || qLower.includes("blood") || qLower.includes("sugar")) {
+      replyText = "For fasting blood sugar, cholesterol, or abdominal ultrasound scans, please observe an 8–10 hour water-only fast (plain water is permitted). Routine blood pressure medications can usually be taken with water.";
+    } else if (qLower.includes("doc") || qLower.includes("bring") || qLower.includes("mykad") || qLower.includes("ic") || qLower.includes("document") || qLower.includes("file") || qLower.includes("letter") || qLower.includes("携带") || qLower.includes("文件")) {
+      replyText = "Please bring your original MyKad / Passport, insurance guarantee letter (GL) or medical card, and any previous diagnostic scans, laboratory reports, or referral letters.";
+    } else if (qLower.includes("park") || qLower.includes("car") || qLower.includes("drop") || qLower.includes("location") || qLower.includes("lobby") || qLower.includes("车") || qLower.includes("停")) {
+      replyText = "Visitor parking is available at the Multi-Storey Car Park next to Pantai Hospital Penang Main Lobby. Patient drop-off and wheelchair assistance are located at Entrance A (Outpatient Care Wing).";
+    }
+
+    if (replyText) {
+      const channelTarget = activeInboxId;
+      setTimeout(() => {
+        const currentCh = channels.find(c => c.id === channelTarget);
+        const nurseMsg: Message = {
+          id: "nurse-reply-" + Date.now(),
+          sender: "doctor",
+          senderName: currentCh ? `Duty Nurse (${currentCh.hospital})` : "Nurse Aishah (Duty Nurse Desk)",
+          content: `[${channelTarget}]: ${replyText}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        };
+        onSendMessage(nurseMsg);
+      }, 700);
+    }
   };
 
   const handleAttachReport = () => {
@@ -602,46 +602,72 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
   return (
     <div id="communication-view" className="py-6 space-y-8 max-w-7xl mx-auto font-sans">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">Secure Provider Messaging</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Direct secure messaging pipeline protected under HIPAA and Malaysia MOH digital confidentiality standards.
-        </p>
+        <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">PantaiCare Patient Messaging Center</h1>
+        <p className="text-xs text-slate-500 mt-1">Live patient-staff consultation channels and direct communication with front counter.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch h-[560px]">
         
         {/* Left Side: Inbox List */}
         <div className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl p-4 flex flex-col justify-between overflow-y-auto font-sans shadow-xs">
-          <div className="space-y-4">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block px-2.5">Active Providers & Staff</span>
+          <div className="space-y-3">
+            {/* Filter by Hospital Dropdown */}
+            <div className="space-y-1 px-1">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                Filter by Hospital
+              </label>
+              <select
+                value={hospitalFilter}
+                onChange={(e) => setHospitalFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500 cursor-pointer"
+              >
+                <option value="all">All 4 Penang Facilities ({channels.length})</option>
+                <option value="Pantai Hospital Penang (Main Hospital)">Pantai Hospital Penang (Main Hospital)</option>
+                <option value="Pantai Heart & Wellness Pavilion">Pantai Heart & Wellness Pavilion</option>
+                <option value="Pantai Premier Clinic & Day Surgery">Pantai Premier Clinic & Day Surgery</option>
+                <option value="Pantai Specialist Centre">Pantai Specialist Centre</option>
+              </select>
+            </div>
+
+            <div className="pt-1">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold block px-1">
+                Active Providers & Staff ({filteredChannels.length})
+              </span>
+            </div>
             
             <div className="space-y-1.5 font-sans">
-              {channels.map((ch) => {
-                const isActive = ch.id === activeInboxId;
-                return (
-                  <div 
-                    key={ch.id}
-                    onClick={() => setActiveInboxId(ch.id)}
-                    className={`p-3 rounded-2xl flex gap-3 items-center justify-between cursor-pointer transition ${
-                      isActive ? 'bg-sky-50 border border-sky-200 text-sky-950 font-bold shadow-xs' : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex gap-2.5 items-center">
-                      {ch.image ? (
-                        <img src={ch.image} alt={ch.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-bold text-white text-xs shrink-0 font-mono shadow-xs">
-                          {ch.avatarInitials}
+              {filteredChannels.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl">
+                  No messaging channels found for this hospital.
+                </div>
+              ) : (
+                filteredChannels.map((ch) => {
+                  const isActive = ch.id === activeInboxId;
+                  return (
+                    <div 
+                      key={ch.id}
+                      onClick={() => setActiveInboxId(ch.id)}
+                      className={`p-3 rounded-2xl flex gap-3 items-center justify-between cursor-pointer transition ${
+                        isActive ? 'bg-sky-50 border border-sky-200 text-sky-950 font-bold shadow-xs' : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex gap-2.5 items-center">
+                        {ch.image ? (
+                          <img src={ch.image} alt={ch.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-bold text-white text-xs shrink-0 font-mono shadow-xs">
+                            {ch.avatarInitials}
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-xs font-extrabold text-slate-900 block leading-tight">{ch.name}</span>
+                          <span className="text-[10px] text-slate-500 font-medium block mt-1 leading-normal">{ch.subtitle}</span>
                         </div>
-                      )}
-                      <div>
-                        <span className="text-xs font-extrabold text-slate-900 block leading-tight">{ch.name}</span>
-                        <span className="text-[10px] text-slate-500 font-medium block mt-1 leading-normal">{ch.subtitle}</span>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -671,20 +697,17 @@ export default function Communication({ messages, onSendMessage, onSetScreen, ap
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-extrabold text-sm text-slate-900 leading-tight">{activeChannel.name}</span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Verified
-                    </span>
                   </div>
-                  <span className="text-[11px] text-sky-700 font-semibold block mt-0.5">
-                    Facility Support &amp; Outpatient Triage Desk
-                  </span>
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <button 
-                  onClick={() => onSetScreen("schedule-appointment")}
+                  onClick={() => {
+                    localStorage.setItem("pantai_booking_preselected_clinic", "Pantai Hospital Penang (Main Hospital)");
+                    localStorage.setItem("pantai_booking_initial_step", "2");
+                    onSetScreen("schedule-appointment");
+                  }}
                   className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
                 >
                   Book Appointment

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { 
   Heart, 
   MapPin, 
@@ -29,6 +30,7 @@ interface DashboardProps {
   onSetScreen: (screen: string) => void;
   onPostponedStatus: (id: string, newDate: string) => void;
   onCancelAppointment?: (id: string) => void;
+  onResubmitBooking?: (apt: Appointment) => void;
 }
 
 function MockQRCode() {
@@ -41,21 +43,10 @@ function MockQRCode() {
   );
 }const getClinicTravelTime = (clinicName: string): number => {
   const name = clinicName.toLowerCase();
-  if (name.includes("pantai")) return 14;
-  if (name.includes("pulau pinang")) return 18;
-  if (name.includes("seberang jaya")) return 25;
-  if (name.includes("jalan perak")) return 10;
-  if (name.includes("bayan baru")) return 12;
-  if (name.includes("bukit mertajam")) return 28;
-  if (name.includes("lam wah ee")) return 15;
-  if (name.includes("gleneagles")) return 16;
-  if (name.includes("island")) return 11;
-  if (name.includes("adventist")) return 13;
-  if (name.includes("loh guan lye")) return 12;
-  if (name.includes("kpj")) return 22;
-  if (name.includes("o2")) return 9;
-  if (name.includes("singapore")) return 15;
-  if (name.includes("perdana")) return 8;
+  if (name.includes("main hospital") || name.includes("bayan lepas")) return 14;
+  if (name.includes("premier") || name.includes("bayan baru")) return 8;
+  if (name.includes("heart") || name.includes("georgetown")) return 16;
+  if (name.includes("specialist") || name.includes("ayer itam")) return 12;
   return 15; // default fallback
 };
 
@@ -65,23 +56,9 @@ export default function Dashboard({
   vitals, 
   onSetScreen, 
   onPostponedStatus,
-  onCancelAppointment 
+  onCancelAppointment,
+  onResubmitBooking 
 }: DashboardProps) {
-  // Find next upcoming appointment
-  const nextUpcoming = useMemo(() => {
-    return appointments.find(a => ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status)) || null;
-  }, [appointments]);
-
-  // List of upcoming appointments
-  const upcomingList = useMemo(() => {
-    return appointments.filter(a => ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status));
-  }, [appointments]);
-
-  // List of completed/cancelled appointments
-  const completedList = useMemo(() => {
-    return appointments.filter(a => ["Completed", "Cancelled", "Done", "Missing"].includes(a.status));
-  }, [appointments]);
-
   const todayStr = useMemo(() => {
     const d = new Date();
     const year = d.getFullYear();
@@ -89,6 +66,30 @@ export default function Dashboard({
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }, []);
+
+  // Find next upcoming appointment (only today or future)
+  const nextUpcoming = useMemo(() => {
+    return appointments.find(a => 
+      (!a.date || a.date >= todayStr) && 
+      ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status)
+    ) || null;
+  }, [appointments, todayStr]);
+
+  // List of upcoming appointments (only today or future)
+  const upcomingList = useMemo(() => {
+    return appointments.filter(a => 
+      (!a.date || a.date >= todayStr) && 
+      ["Upcoming", "Approved", "Pending", "Rescheduled"].includes(a.status)
+    );
+  }, [appointments, todayStr]);
+
+  // List of completed/cancelled appointments: includes all completed/cancelled, OR any past date appointments
+  const completedList = useMemo(() => {
+    return appointments.filter(a => {
+      const isPast = a.date ? a.date < todayStr : false;
+      return isPast || ["Completed", "Cancelled", "Done", "COMPLETED", "CANCELLED", "Missing"].includes(a.status);
+    });
+  }, [appointments, todayStr]);
 
   const getAptDateTime = (apt: Appointment) => {
     if (!apt.date || !apt.timeSlot) return null;
@@ -140,6 +141,29 @@ export default function Dashboard({
   // Selected completed visit for viewing doctor notes, department, medication details
   const [selectedVisitModal, setSelectedVisitModal] = useState<Appointment | null>(null);
 
+  // Helper to parse clinical notes
+  const parseVisitDetails = (apt: Appointment | null) => {
+    if (!apt) return { diagnosis: "", notes: "", prescription: "" };
+    const rawNotes = apt.clinicalNotes || "";
+    const diagMatch = rawNotes.match(/\[Diagnosis\]:\s*([\s\S]*?)(?=\s*\[Notes\]:|\s*\[Rx\]:|$)/i);
+    const notesMatch = rawNotes.match(/\[Notes\]:\s*([\s\S]*?)(?=\s*\[Rx\]:|$)/i);
+    const rxMatch = rawNotes.match(/\[Rx\]:\s*([\s\S]*)$/i);
+
+    const diagnosis = (apt.diagnosis || (diagMatch ? diagMatch[1].trim() : "")).trim();
+    const prescription = (apt.prescription || (rxMatch ? rxMatch[1].trim() : "")).trim();
+    let notes = notesMatch 
+      ? notesMatch[1].trim() 
+      : rawNotes.replace(/\[Diagnosis\]:[^\n]*\n?/gi, '').replace(/\[Notes\]:[^\n]*\n?/gi, '').replace(/\[Rx\]:[^\n]*\n?/gi, '').trim();
+
+    if (!notes && !diagnosis && !prescription && rawNotes) {
+      notes = rawNotes.trim();
+    }
+
+    return { diagnosis, notes, prescription };
+  };
+
+  const parsedVisit = parseVisitDetails(selectedVisitModal);
+
   // Dynamic selector options for Queue Tracker - ONLY show booked clinics with upcoming appointments
   const queueClinics = useMemo(() => {
     return Array.from(
@@ -151,6 +175,48 @@ export default function Dashboard({
       )
     );
   }, [appointments]);
+
+  const canRescheduleOrCancel = (apt: any) => {
+    const normStatus = (apt.status || '').toLowerCase();
+    if (['checked in', 'checked_in', 'calling', 'in_consultation', 'in consultation', 'completed', 'done', 'cancelled', 'rejected'].includes(normStatus)) {
+      return false;
+    }
+    if (!['upcoming', 'approved', 'pending', 'rescheduled'].includes(normStatus)) {
+      return false;
+    }
+    if (!apt.date) return false;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      if (apt.date < today) return false;
+      if (apt.date > today) return true;
+
+      if (!apt.timeSlot) return true;
+      let endHour = 23;
+      let endMinute = 59;
+      const match24 = apt.timeSlot.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+      if (match24) {
+        endHour = parseInt(match24[3], 10);
+        endMinute = parseInt(match24[4], 10);
+      } else {
+        const match12 = apt.timeSlot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (match12) {
+          let h = parseInt(match12[1], 10);
+          const m = parseInt(match12[2], 10);
+          const ampm = match12[3].toUpperCase();
+          if (ampm === 'PM' && h < 12) h += 12;
+          if (ampm === 'AM' && h === 12) h = 0;
+          endHour = h;
+          endMinute = m;
+        }
+      }
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      return currentHour < endHour || (currentHour === endHour && currentMinute < endMinute);
+    } catch {
+      return true;
+    }
+  };
 
   const [selectedQueueClinic, setSelectedQueueClinic] = useState("");
 
@@ -277,7 +343,7 @@ export default function Dashboard({
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`🤖 AI APPOINTMENT REMINDER SENT!\n\n${data.reminder?.title || 'Appointment Reminder'}\n\n${data.reminder?.body || 'Check your Notifications tab to view the generated reminder.'}`);
+        alert(`APPOINTMENT REMINDER SENT!\n\n${data.reminder?.title || 'Appointment Reminder'}\n\n${data.reminder?.body || 'Check your Notifications tab to view the generated reminder.'}`);
       } else {
         alert(`Could not trigger AI reminder: ${data.message || 'Unknown error'}`);
       }
@@ -368,7 +434,7 @@ export default function Dashboard({
         <div className="space-y-2 relative z-10">
 
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
-            Selamat Datang, {patientProfile.fullName.split(" ")[0]}
+            Welcome, {patientProfile.fullName.split(" ")[0]}
           </h1>
           <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
             {nextUpcoming ? (
@@ -377,41 +443,17 @@ export default function Dashboard({
               </span>
             ) : (
               <span>
-                <strong className="text-slate-900">Health Tip:</strong> Maintain a balanced lifestyle with regular hydration, adequate sleep, and daily physical activity. Schedule routine checkups to keep your vital statistics in optimal range.
+                <strong className="text-slate-900">Health Tip:</strong> Maintain a balanced lifestyle with regular hydration, adequate sleep, and daily physical activity. Schedule routine checkups at PantaiCare to keep your vital statistics in optimal range.
               </span>
             )}
           </p>
-
-          {nextUpcoming && (
-            <div className="flex flex-wrap items-center gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => onSetScreen("clinic-search")}
-                className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer active:scale-95"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>Nearby Clinics & Hospitals</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSetScreen("ai-consultation")}
-                className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs px-3.5 py-1.5 rounded-xl transition border border-slate-200 cursor-pointer active:scale-95 shadow-xs"
-              >
-                <span>🤖</span>
-                <span>Consult Health Assistant</span>
-              </button>
-            </div>
-          )}
         </div>
         <div className="absolute right-0 bottom-0 opacity-10 translate-y-4 translate-x-4 pointer-events-none text-sky-600">
           <HeartHandshake className="w-48 h-48 text-sky-500" />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left Column: Upcoming Bookings, Live Queue Tracker, and Past Visit History */}
-        <div className="lg:col-span-8 space-y-8">
+      <div className="space-y-8">
           
           {/* 2. UPCOMING BOOKINGS */}
           <div className="space-y-4">
@@ -440,39 +482,51 @@ export default function Dashboard({
                   >
                     <div className="space-y-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-extrabold text-slate-900 text-sm">{apt.doctorName}</span>
                           <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-bold px-2 py-0.5 rounded-full">
                             {apt.type}
+                          </span>
+                          <span className="bg-teal-50 text-teal-800 border border-teal-200 text-xs font-mono font-black px-2.5 py-0.5 rounded-lg shadow-2xs">
+                            {apt.queueNumber ? (apt.queueNumber.startsWith('#') ? apt.queueNumber : `#${apt.queueNumber}`) : '#Q-101'}
                           </span>
                         </div>
                         <span className="text-[10px] text-slate-400 font-mono block mt-0.5">{apt.specialty}</span>
                         <span className="text-xs text-slate-700 font-bold block mt-1.5">{apt.clinic}</span>
                       </div>
 
-                      <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium font-sans">
+                      <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 font-medium font-sans">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5 text-blue-600" /> {apt.date}
                         </span>
                         <span className="flex items-center gap-1 font-mono">
                           <Clock className="w-3.5 h-3.5 text-blue-600" /> {apt.timeSlot}
                         </span>
+                        <span className="text-teal-700 font-bold font-mono text-[11px] bg-teal-50/60 px-2 py-0.5 rounded border border-teal-100">
+                          Queue: {apt.queueNumber ? (apt.queueNumber.startsWith('#') ? apt.queueNumber : `#${apt.queueNumber}`) : '#Q-101'}
+                        </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2.5 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
-                      <button 
-                        onClick={() => onSetScreen("communication")}
-                        className="flex-1 sm:flex-none border border-slate-200 hover:border-blue-500 hover:text-blue-700 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
-                      >
-                        Message Staff
-                      </button>
-                      <button 
-                        onClick={() => handleCancelClick(apt.id)}
-                        className="flex-1 sm:flex-none bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-4 py-2.5 rounded-xl border border-rose-200 transition flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
+                      {canRescheduleOrCancel(apt) && onResubmitBooking && (
+                        <button 
+                          type="button"
+                          onClick={() => onResubmitBooking(apt)}
+                          className="flex-1 sm:flex-none bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold px-3.5 py-2.5 rounded-xl border border-sky-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-sky-600" />
+                          <span>Reschedule</span>
+                        </button>
+                      )}
+                      {canRescheduleOrCancel(apt) && (
+                        <button 
+                          onClick={() => handleCancelClick(apt.id)}
+                          className="flex-1 sm:flex-none bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-4 py-2.5 rounded-xl border border-rose-200 transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -500,12 +554,14 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-center bg-sky-50 border border-sky-200 px-3 py-1 rounded-full shrink-0">
-                  <span className={`w-2 h-2 ${queueStatus.active ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'} rounded-full`}></span>
-                  <span className="text-[10px] text-sky-800 font-bold uppercase tracking-wider font-mono">
-                    {queueStatus.active ? "Live Counter" : "Standby Status"}
-                  </span>
-                </div>
+                {queueStatus.active && (
+                  <div className="flex items-center gap-2 self-start sm:self-center bg-sky-50 border border-sky-200 px-3 py-1 rounded-full shrink-0">
+                    <span className="w-2 h-2 bg-emerald-500 animate-ping rounded-full"></span>
+                    <span className="text-[10px] text-sky-800 font-bold uppercase tracking-wider font-mono">
+                      Live Counter
+                    </span>
+                  </div>
+                )}
               </div>
 
               {queueStatus.active ? (
@@ -728,13 +784,13 @@ export default function Dashboard({
           </div>
 
           {/* Active Medication Reminders Card */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <Pill className="w-5 h-5 text-blue-600" />
-              <span className="font-extrabold text-sm tracking-tight">Active Medication Reminders</span>
-            </div>
+          {patientProfile.prescriptions && patientProfile.prescriptions.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 animate-fade-in">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
+                <Pill className="w-5 h-5 text-blue-600" />
+                <span className="font-extrabold text-sm tracking-tight">Active Medication Reminders</span>
+              </div>
 
-            {patientProfile.prescriptions && patientProfile.prescriptions.length > 0 ? (
               <div className="space-y-3">
                 {patientProfile.prescriptions.map((rx) => (
                   <div key={rx.id} className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl flex items-start gap-3.5 hover:border-blue-500 hover:bg-blue-50/10 transition-all duration-150">
@@ -768,62 +824,12 @@ export default function Dashboard({
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-center space-y-2 text-xs">
-                <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">No Active Medications</span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  No active medication reminders. Your clinical prescriptions will be displayed here once uploaded by clinic staff.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Health Passport Box & Digital Medical Certificate (MC) Module */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* 5. HEALTH PASSPORT BOX */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-slate-900">
-              <User className="w-5 h-5 text-blue-600" />
-              <span className="font-extrabold text-sm tracking-tight">Health Passport Ledger</span>
             </div>
-
-            <div className="grid grid-cols-1 gap-3 text-xs">
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Blood Type</span>
-                <span className="text-sm font-extrabold text-slate-800 block mt-1">{patientProfile.bloodType || "O+"}</span>
-              </div>
-
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Known Allergies</span>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {patientProfile.allergies && patientProfile.allergies.length > 0 ? (
-                    patientProfile.allergies.map(a => (
-                      <span key={a} className="bg-red-50 text-red-700 border border-red-100 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        {a}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-slate-500 font-medium">No known medical allergies.</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Emergency Contact</span>
-                <span className="text-xs font-extrabold text-slate-800 block mt-1">{patientProfile.emergencyContactName || "Razali Bin Ahmad"}</span>
-                <span className="text-[10px] text-slate-500 font-mono block mt-0.5">{patientProfile.emergencyContactPhone || "+60 12-987 6543 (Father)"}</span>
-              </div>
-            </div>
-          </div>
-
+          )}
         </div>
-
-      </div>
 
       {/* Consultation Encounter Details / Doctor Visit Results Modal */}
-      {selectedVisitModal && (
+      {selectedVisitModal && createPortal(
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
           onClick={() => setSelectedVisitModal(null)}
@@ -902,6 +908,21 @@ export default function Dashboard({
                 </div>
               )}
 
+              {/* Clinical Diagnosis */}
+              {parsedVisit.diagnosis && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-1.5">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block font-mono flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-rose-600" />
+                    Clinical Diagnosis
+                  </span>
+                  <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-2.5">
+                    <p className="text-slate-900 font-extrabold text-xs">
+                      {parsedVisit.diagnosis}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Doctor Clinical Notes */}
               <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-1.5">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block font-mono flex items-center gap-1.5">
@@ -909,19 +930,30 @@ export default function Dashboard({
                   Doctor Clinical Notes
                 </span>
                 <p className="text-slate-800 text-xs leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  {selectedVisitModal.clinicalNotes || "General outpatient examination completed with normal baseline status."}
+                  {parsedVisit.notes || "General outpatient examination completed with normal baseline status."}
                 </p>
               </div>
 
               {/* Prescribed Medication */}
-              <div className="bg-sky-50/60 border border-sky-100 rounded-2xl p-3.5 space-y-1.5">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-sky-800 block font-mono flex items-center gap-1.5">
-                  <Pill className="w-3.5 h-3.5 text-sky-600" />
-                  Prescribed Medication & Directions
+              <div className="bg-teal-50/60 border border-teal-100 rounded-2xl p-3.5 space-y-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-teal-800 block font-mono flex items-center gap-1.5">
+                  <Pill className="w-3.5 h-3.5 text-teal-600" />
+                  Prescribed Medication
                 </span>
-                <p className="text-sky-950 font-semibold text-xs leading-relaxed bg-white p-2.5 rounded-xl border border-sky-100 select-all font-mono">
-                  {selectedVisitModal.prescription || "No prescription required for this consultation."}
-                </p>
+                {parsedVisit.prescription ? (
+                  <div className="bg-white border border-teal-100 rounded-xl p-2.5 space-y-1.5">
+                    {parsedVisit.prescription.split(/[,;\n]+/).map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-xs font-semibold text-teal-950 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0 mt-1.5" />
+                        <span>{item.trim()}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-xs leading-relaxed bg-white p-2.5 rounded-xl border border-teal-100 italic">
+                    No prescription required for this consultation.
+                  </p>
+                )}
               </div>
 
             </div>
@@ -946,7 +978,8 @@ export default function Dashboard({
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

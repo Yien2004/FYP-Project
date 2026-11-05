@@ -1,0 +1,17 @@
+[
+  {
+    "id": "bc-1793280769159-oa31r",
+    "sender_id": "dr_ainol_internal@pantaipenang.com",
+    "facility_id": 1,
+    "broadcast_type": "GENERAL_ADVISORY",
+    "target_scope": "SPECIFIC_PATIENT",
+    "scope_description": "Specific Patient: patient",
+    "target_doctor_name": "Dr. Ainol Shareha",
+    "impacted_date": "",
+    "target_patient_id": "patient@gmail.com",
+    "title": "testing",
+    "message": "testing",
+    "recipient_count": 1,
+    "created_at": "2026-10-29T13:32:49.159Z"
+  }
+]
