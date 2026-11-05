@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://fyp-project-069w.onrender.com/api/$1"
+    }
+  ]
+}
