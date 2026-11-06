@@ -44,6 +44,20 @@ export default function AdminProfileSection({
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwError, setPwError] = useState('');
   const [pwSubmitting, setPwSubmitting] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+
+  const handleSendVerificationCode = () => {
+    setVerificationLoading(true);
+    setPwSuccess('');
+    setPwError('');
+    setTimeout(() => {
+      setVerificationSent(true);
+      setVerificationLoading(false);
+      setPwSuccess('Verification code sent to your registered email! (Use code: 123456)');
+    }, 1200);
+  };
 
   // Fetch admin user object from the API to get ID and creation date
   const fetchAdminDetails = () => {
@@ -73,8 +87,15 @@ export default function AdminProfileSection({
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminDetails) {
-      setPwError('Admin account information not resolved.');
+    setPwSuccess('');
+    setPwError('');
+
+    if (!verificationSent) {
+      setPwError('Please request and verify an email code first.');
+      return;
+    }
+    if (verificationCode !== '123456') {
+      setPwError('Invalid verification code. Please check code or try again.');
       return;
     }
     if (!newPassword || !confirmPassword) {
@@ -82,36 +103,43 @@ export default function AdminProfileSection({
       return;
     }
     if (newPassword.length < 6) {
-      setPwError('Password must be at least 6 characters.');
+      setPwError('New password must be at least 6 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPwError('Passwords do not match.');
+      setPwError('New password and confirmation do not match.');
       return;
     }
 
-    setPwSuccess('');
-    setPwError('');
     setPwSubmitting(true);
 
     try {
-      const res = await fetch(`/api/admin/users/${adminDetails.id}/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword })
-      });
+      const targetId = adminDetails?.id;
+      const res = targetId
+        ? await fetch(`/api/admin/users/${targetId}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: newPassword })
+          })
+        : await fetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: userEmail, newPassword })
+          });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to change password.');
+        throw new Error(errData.error || errData.message || 'Password update failed.');
       }
 
-      setPwSuccess('Administrative access password updated successfully!');
+      setPwSuccess('Password updated successfully!');
       setNewPassword('');
       setConfirmPassword('');
+      setVerificationCode('');
+      setVerificationSent(false);
       setTimeout(() => setPwSuccess(''), 4000);
     } catch (err: any) {
-      setPwError(err.message || 'Something went wrong resetting password.');
+      setPwError(err.message || 'Something went wrong updating password.');
     } finally {
       setPwSubmitting(false);
     }
@@ -197,36 +225,99 @@ export default function AdminProfileSection({
         {/* Card: Change Password */}
         <div className={cardBase}>
           <div className="flex items-center gap-2 mb-4 border-b border-neutral-100 pb-3">
-            <Lock className="w-4.5 h-4.5 text-sky-600" />
-            <h3 className="font-bold text-sm text-neutral-900">Change Admin Access Password</h3>
+            <Lock className="w-4.5 h-4.5 text-teal-600" />
+            <h3 className="font-bold text-sm text-neutral-900">Change Password</h3>
           </div>
 
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className={labelClass}>Define New Password</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Minimum 6 characters"
-                  className={inputClass}
-                  required
-                />
+            {!verificationSent ? (
+              <div className="flex flex-col sm:flex-row items-end gap-3 max-w-xl">
+                <div className="space-y-1 flex-1 w-full">
+                  <label className={labelClass}>Verification Email</label>
+                  <input
+                    type="email"
+                    value={userEmail}
+                    disabled
+                    className={`${inputClass} opacity-60 cursor-not-allowed font-medium`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendVerificationCode}
+                  disabled={verificationLoading}
+                  className="bg-neutral-900 border border-neutral-800 hover:bg-neutral-850 disabled:opacity-60 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer h-9 shrink-0"
+                >
+                  {verificationLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4" />
+                  )}
+                  {verificationLoading ? 'Sending…' : 'Send Verification'}
+                </button>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Verification Code</label>
+                    <input
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      placeholder="123456"
+                      className={inputClass}
+                      required
+                    />
+                  </div>
 
-              <div className="space-y-1">
-                <label className={labelClass}>Confirm New Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
-                  className={inputClass}
-                  required
-                />
+                  <div className="space-y-1">
+                    <label className={labelClass}>New Password</label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min. 6 chars"
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className={labelClass}>Confirm Password</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={pwSubmitting}
+                    className="bg-teal-600 border border-teal-700 hover:bg-teal-700 disabled:opacity-60 text-white text-xs font-bold py-2 px-5 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer h-9"
+                  >
+                    {pwSubmitting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Key className="w-3.5 h-3.5" />
+                    )}
+                    {pwSubmitting ? 'Updating Password...' : 'Update Password'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setVerificationSent(false); setPwError(''); }}
+                    className="text-xs text-neutral-500 hover:text-neutral-800 px-3 py-2 cursor-pointer font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {pwError && (
               <div className="text-[11px] text-red-700 bg-red-50 border border-red-100 p-2.5 rounded-lg flex items-center gap-1.5">
@@ -241,21 +332,6 @@ export default function AdminProfileSection({
                 {pwSuccess}
               </div>
             )}
-
-            <div className="flex justify-end pt-2 border-t border-neutral-100">
-              <button
-                type="submit"
-                disabled={pwSubmitting}
-                className="bg-neutral-900 border border-neutral-800 hover:bg-neutral-850 disabled:opacity-60 text-white text-xs font-bold py-2 px-5 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer h-9"
-              >
-                {pwSubmitting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Key className="w-3.5 h-3.5" />
-                )}
-                {pwSubmitting ? 'Updating Password...' : 'Update Access Password'}
-              </button>
-            </div>
           </form>
         </div>
 

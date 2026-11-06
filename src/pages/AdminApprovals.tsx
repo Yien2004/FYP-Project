@@ -250,7 +250,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Dr. Tan Wei Sheng"
                   value={docName}
                   onChange={(e) => setDocName(e.target.value)}
                   required
@@ -264,7 +263,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
                 </label>
                 <input
                   type="email"
-                  placeholder="e.g. dr_tan_weisheng@pantaipenang.com"
                   value={docEmail}
                   onChange={(e) => setDocEmail(e.target.value)}
                   required
@@ -313,7 +311,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Consultation Room 301"
                   value={docRoom}
                   onChange={(e) => setDocRoom(e.target.value)}
                   className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-2.5 text-xs text-neutral-900 font-semibold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
@@ -350,7 +347,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
               </label>
               <input
                 type="text"
-                placeholder="e.g. Paediatric Cardiology"
                 value={deptName}
                 onChange={(e) => setDeptName(e.target.value)}
                 required
@@ -383,7 +379,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Dr. Chong Chee Keong"
                     value={leadName}
                     onChange={(e) => setLeadName(e.target.value)}
                     required
@@ -397,7 +392,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
                   </label>
                   <input
                     type="email"
-                    placeholder="e.g. dr_chong_pedcardio@pantaipenang.com"
                     value={leadEmail}
                     onChange={(e) => setLeadEmail(e.target.value)}
                     required
@@ -427,7 +421,6 @@ export default function AdminApprovals({ onNavigateBack }: AdminApprovalsProps) 
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Consultation Room 301"
                     value={leadRoom}
                     onChange={(e) => setLeadRoom(e.target.value)}
                     className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-2.5 text-xs text-neutral-900 font-semibold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"

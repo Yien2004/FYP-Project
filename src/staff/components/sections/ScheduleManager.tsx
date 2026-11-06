@@ -49,6 +49,15 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
     }
   });
 
+  const [mcRecords, setMcRecords] = useState<Record<string, { name: string; size: string }>>(() => {
+    try {
+      const saved = localStorage.getItem("lifelink_leave_mc_files");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [globalBreak, setGlobalBreak] = useState<{ start: string; end: string }>({ start: "12:00 PM", end: "01:00 PM" });
   const [customBreaks, setCustomBreaks] = useState<{ [date: string]: { start: string; end: string } }>({});
 
@@ -151,11 +160,43 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
     const updated = [...blockedDates, newLeaveDate].sort();
     setBlockedDates(updated);
     const nextReasons = { ...leaveReasons, [newLeaveDate]: 'doctor_mc' as const };
+    
+    if (mcFile) {
+      const nextMc = { ...mcRecords, [newLeaveDate]: { name: mcFile.name, size: mcFile.size } };
+      setMcRecords(nextMc);
+      try {
+        localStorage.setItem("lifelink_leave_mc_files", JSON.stringify(nextMc));
+      } catch (e) {}
+    }
+
     setNewLeaveDate("");
     setMcFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    persistBlockedDates(updated, nextReasons);
+  };
+
+  const handleRemoveLeave = (dateToRemove: string) => {
+    const isConfirmed = window.confirm(
+      `Are you sure you want to remove this leave record for ${dateToRemove}?\n\nThis will unblock your schedule and re-open patient booking slots for this date.`
+    );
+    if (!isConfirmed) return;
+
+    const updated = blockedDates.filter(d => d !== dateToRemove);
+    setBlockedDates(updated);
+
+    const nextReasons = { ...leaveReasons };
+    delete nextReasons[dateToRemove];
+    setLeaveReasons(nextReasons);
+
+    const nextMc = { ...mcRecords };
+    delete nextMc[dateToRemove];
+    setMcRecords(nextMc);
+    try {
+      localStorage.setItem("lifelink_leave_mc_files", JSON.stringify(nextMc));
+    } catch (e) {}
+
     persistBlockedDates(updated, nextReasons);
   };
 
@@ -311,6 +352,105 @@ export default function ScheduleManager({ doctorName }: ScheduleManagerProps) {
           <Plus className="w-4 h-4" />
           <span>Block Selected Date</span>
         </button>
+      </div>
+
+      {/* Leave & MC History List */}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+        <div className="border-b border-neutral-100 pb-3 flex items-center justify-between">
+          <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-sky-600" />
+            Scheduled Leave &amp; MC History
+          </h3>
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+            {blockedDates.length} {blockedDates.length === 1 ? 'Record' : 'Records'}
+          </span>
+        </div>
+
+        {blockedDates.length === 0 ? (
+          <div className="py-8 text-center text-xs text-neutral-400 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
+            No scheduled leave records. You are currently on regular clinical duty.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {blockedDates.map((dateStr) => {
+              const isToday = dateStr === todayStr;
+              const isPast = dateStr < todayStr;
+              const fileInfo = mcRecords[dateStr];
+
+              let formattedDate = dateStr;
+              try {
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                  formattedDate = d.toLocaleDateString('en-MY', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                }
+              } catch (e) {}
+
+              return (
+                <div 
+                  key={dateStr}
+                  className="p-3.5 rounded-xl border border-neutral-200/90 bg-neutral-50/50 hover:bg-neutral-50 transition flex items-center justify-between gap-3 flex-wrap"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      isToday 
+                        ? 'bg-rose-100 text-rose-700' 
+                        : isPast 
+                          ? 'bg-neutral-200 text-neutral-600' 
+                          : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      <CalendarIcon className="w-4 h-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs text-slate-900">{formattedDate}</span>
+                        <span className="text-[10px] font-mono text-slate-500">({dateStr})</span>
+                        {isToday ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">
+                            Today (Off Duty)
+                          </span>
+                        ) : isPast ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-neutral-200 text-neutral-600">
+                            Past
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                            Upcoming Leave
+                          </span>
+                        )}
+                      </div>
+
+                      {fileInfo && (
+                        <p className="text-[11px] text-teal-700 flex items-center gap-1 mt-1 truncate">
+                          <FileText className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{fileInfo.name}</span>
+                          <span className="text-[10px] text-neutral-400">({fileInfo.size})</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Remove Button with confirmation prompt */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLeave(dateStr)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-neutral-200 hover:border-rose-200 shadow-2xs transition cursor-pointer shrink-0"
+                    title="Remove leave record"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
     </div>

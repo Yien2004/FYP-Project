@@ -1725,7 +1725,9 @@ app.get("/api/admin/users", async (_req, res) => {
           approved: meta.approved !== false,
           status: meta.status || 'Active', // 'Active' | 'Suspended'
           createdAt: u.created_at || new Date().toISOString(),
-          hospital: meta.hospital || ''
+          hospital: meta.hospital || '',
+          department: meta.department || '',
+          facility_id: meta.facility_id || null
         };
       });
     return res.json(mapped);
@@ -1828,7 +1830,7 @@ app.post("/api/admin/broadcast", async (req, res) => {
       ? (await db.getPatientProfiles().catch(() => [])).map((p: any) => p.email).filter(Boolean)
       : [specificPatientEmail || targetAudience.replace(/^.*Specific Patient:\s*/, '').trim()].filter(Boolean);
 
-    const newNotif = { id: `notif-admin-${Date.now()}`, title: `Broadcast: ${typePrefix}`, body: message, time: "Just now", category: "general" as const, read: false };
+    const newNotif = { id: `notif-admin-${Date.now()}`, title: `Broadcast: ${typePrefix}`, body: message, time: "Just now", timestamp: new Date().toISOString(), category: "general" as const, read: false };
     await Promise.all(targetEmails.map(async (email) => {
       const p = await db.getPatientProfileByEmail(email).catch(() => null);
       if (p) await db.updatePatientProfile(email, { notifications: [newNotif, ...(p.notifications || [])] }).catch(() => {});

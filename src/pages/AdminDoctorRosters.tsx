@@ -167,21 +167,37 @@ export default function AdminDoctorRosters({ onNavigateBack }: AdminDoctorRoster
                 nameLower.includes('admin')
               ) return false;
               // Scope to facility
-              const userFacId = u.facility_id ? Number(u.facility_id) : (getStaffAccountByEmail(u.email)?.facility_id || 1);
+              const staffDef = getStaffAccountByEmail(u.email);
+              const userFacId = u.facility_id ? Number(u.facility_id) : (staffDef?.facility_id || 1);
               if (facilityId !== 0 && userFacId !== Number(facilityId)) return false;
               return true;
             }).forEach((u: any) => {
               const cleanName = u.fullName.toLowerCase().replace(/^(dr\.|dato' dr\.|dr)\s*/i, '').trim();
               seenNames.add(cleanName);
+
+              const staffDef = getStaffAccountByEmail(u.email);
+              const dataDoc = allPantaiDoctors.find((d: any) => {
+                const c = d.name.toLowerCase().replace(/^(dr\.|dato' dr\.|dr)\s*/i, '').trim();
+                return c === cleanName || d.name.toLowerCase().trim() === u.fullName.toLowerCase().trim();
+              });
+
+              const resolvedDept = (u.department && u.department.trim()) 
+                || staffDef?.department 
+                || dataDoc?.department 
+                || dataDoc?.specialty 
+                || 'General Medicine';
+
+              const resolvedFacId = u.facility_id ? Number(u.facility_id) : (staffDef?.facility_id || (facilityId !== 0 ? facilityId : 1));
+
               merged.push({
                 id: u.id,
                 name: u.fullName,
                 email: u.email,
-                department: u.department || 'Internal Medicine',
-                employmentType: u.employmentType?.toUpperCase() === 'SESSIONAL' ? 'SESSIONAL' : 'RESIDENT',
-                roomNumber: u.roomNumber || u.room_number || 'Consultation Suite 301',
-                facilityId: u.facility_id || (facilityId !== 0 ? facilityId : 1),
-                avatarUrl: u.avatarUrl
+                department: resolvedDept,
+                employmentType: u.employmentType?.toUpperCase() === 'SESSIONAL' ? 'SESSIONAL' : (dataDoc?.status === 'Sessional' ? 'SESSIONAL' : 'RESIDENT'),
+                roomNumber: u.roomNumber || u.room_number || staffDef?.room_number || 'Consultation Suite 301',
+                facilityId: resolvedFacId,
+                avatarUrl: u.avatarUrl || dataDoc?.avatar || ''
               });
             });
           }
@@ -554,6 +570,21 @@ export default function AdminDoctorRosters({ onNavigateBack }: AdminDoctorRoster
     }
   };
 
+  // Dynamic departments list for filter dropdown
+  const allDropdownDepartments = React.useMemo(() => {
+    const set = new Set<string>(availableDepartments);
+    doctors.forEach(d => {
+      if (d.department) {
+        d.department.split(',').forEach(p => {
+          const trimmed = p.trim();
+          if (trimmed) set.add(trimmed);
+        });
+      }
+    });
+    set.add('Internal Medicine');
+    return Array.from(set).sort();
+  }, [availableDepartments, doctors]);
+
   // Filtered doctors
   const filteredDoctors = doctors.filter(doc => {
     if (searchQuery.trim()) {
@@ -564,7 +595,12 @@ export default function AdminDoctorRosters({ onNavigateBack }: AdminDoctorRoster
       if (!matchName && !matchDept && !matchRoom) return false;
     }
     if (departmentFilter !== 'ALL') {
-      if (!doc.department.toLowerCase().includes(departmentFilter.toLowerCase())) return false;
+      const target = departmentFilter.toLowerCase().trim();
+      const docDept = doc.department.toLowerCase().trim();
+      const subDepts = docDept.split(',').map(s => s.trim());
+      if (docDept !== target && !subDepts.includes(target) && !subDepts.some(s => s.includes(target) || target.includes(s))) {
+        return false;
+      }
     }
     if (employmentFilter !== 'ALL') {
       if (doc.employmentType !== employmentFilter) return false;
@@ -691,7 +727,7 @@ export default function AdminDoctorRosters({ onNavigateBack }: AdminDoctorRoster
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-2.5 py-1 text-xs text-neutral-800 font-semibold outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 h-8 cursor-pointer"
               >
                 <option value="ALL">All Specialties</option>
-                {availableDepartments.map(d => (
+                {allDropdownDepartments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>

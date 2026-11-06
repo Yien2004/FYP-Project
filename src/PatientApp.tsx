@@ -47,6 +47,16 @@ function getNotifSortTime(n: AppNotification): number {
     const t = new Date(n.timestamp).getTime();
     if (!isNaN(t) && t > 0) return t;
   }
+  // Extract 13-digit millisecond epoch if embedded in id (e.g. notif-173082..., notif-admin-173082...)
+  if (n.id) {
+    const idMatch = n.id.match(/(\d{13})/);
+    if (idMatch) {
+      const parsedIdTime = parseInt(idMatch[1], 10);
+      if (!isNaN(parsedIdTime) && parsedIdTime > 1600000000000 && parsedIdTime < 2500000000000) {
+        return parsedIdTime;
+      }
+    }
+  }
   const str = (n.time || '').trim().toLowerCase();
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -72,7 +82,13 @@ function getNotifSortTime(n: AppNotification): number {
     const ampm = timeMatch[3].toLowerCase();
     if (ampm === 'pm' && h < 12) h += 12;
     if (ampm === 'am' && h === 12) h = 0;
-    return todayStart + dayOffsetMs + (h * 3600 + m * 60) * 1000;
+    let computed = todayStart + dayOffsetMs + (h * 3600 + m * 60) * 1000;
+    // CRITICAL: Notifications represent past events. If computed is in the future relative to now,
+    // and no explicit day offset was provided, it happened yesterday (e.g. 10:25 pm evaluated at 1:20 am).
+    if (dayOffsetMs === 0 && computed > Date.now()) {
+      computed -= 24 * 3600 * 1000;
+    }
+    return computed;
   }
 
   return todayStart + dayOffsetMs;
@@ -147,7 +163,8 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
             body: n.body || n.message || "",
             time: n.time || (n.timestamp ? new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"),
             category: n.category || "general",
-            read: n.read
+            read: n.read,
+            timestamp: n.timestamp
           }));
       }
 
@@ -242,7 +259,8 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
                   body: text,
                   time: log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
                   category: "general",
-                  read: isRead
+                  read: isRead,
+                  timestamp: log.timestamp || new Date().toISOString()
                 });
               }
             });
@@ -304,11 +322,16 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         title: `💊 New Prescription: ${rx.drugName}`,
         body: `${rx.dosage} (${rx.frequency}) for ${rx.duration}. Prescribed by ${rx.prescribedBy || "Staff"}.`,
         time: "Just now",
+        timestamp: new Date().toISOString(),
         category: "medication" as const,
         read: false
       }));
 
-      setNotifications(prev => [...newNotifications, ...prev]);
+      setNotifications(prev => {
+        const combined = [...newNotifications, ...prev];
+        combined.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
+        return combined;
+      });
       setNotifiedRxIds(prev => [...prev, ...newRx.map(rx => rx.id)]);
     }
   }, [patientProfile.prescriptions]);
@@ -640,10 +663,15 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       title:    "Appointment Rescheduled",
       body:     `Your consultation with Dr. Jenkins has been shifted to ${newDate}.`,
       time:     "Just now",
+      timestamp: new Date().toISOString(),
       category: "general" as const,
       read:     false
     };
-    setNotifications(prev => [newAlert, ...prev]);
+    setNotifications(prev => {
+      const combined = [newAlert, ...prev];
+      combined.sort((a, b) => getNotifSortTime(b) - getNotifSortTime(a));
+      return combined;
+    });
   };
 
   // ── Vitals ────────────────────────────────────────────────────────────────

@@ -174,14 +174,39 @@ export default function PatientsSection() {
     return patientAppointments.find(a => a.id === selectedVisitAptId) || patientAppointments[0] || null;
   }, [patientAppointments, selectedVisitAptId]);
 
+  // Helper to parse clinical notes
+  const parseClinicalDetails = (apt: any) => {
+    if (!apt) return { diagnosis: "", notes: "", prescription: "" };
+    const rawNotes = apt.clinicalNotes || apt.clinical_notes || "";
+    const diagMatch = rawNotes.match(/\[Diagnosis\]:\s*([\s\S]*?)(?=\s*\[Notes\]:|\s*\[Rx\]:|$)/i);
+    const notesMatch = rawNotes.match(/\[Notes\]:\s*([\s\S]*?)(?=\s*\[Rx\]:|$)/i);
+    const rxMatch = rawNotes.match(/\[Rx\]:\s*([\s\S]*)$/i);
+
+    const diagnosis = (apt.diagnosis || (diagMatch ? diagMatch[1].trim() : "")).trim();
+    const prescription = (apt.prescription || (rxMatch ? rxMatch[1].trim() : "")).trim();
+    let notes = notesMatch 
+      ? notesMatch[1].trim() 
+      : rawNotes.replace(/\[Diagnosis\]:[^\n]*\n?/gi, '').replace(/\[Notes\]:[^\n]*\n?/gi, '').replace(/\[Rx\]:[^\n]*\n?/gi, '').trim();
+
+    if (!notes && !diagnosis && !prescription && rawNotes) {
+      notes = rawNotes.trim();
+    }
+    return { diagnosis, notes, prescription };
+  };
+
+  const parsedVisitDetails = useMemo(() => {
+    return parseClinicalDetails(selectedVisitApt);
+  }, [selectedVisitApt]);
+
   // Sync doctor notes textarea when selected visit changes
   useEffect(() => {
     if (selectedVisitApt) {
-      setDoctorNoteInput(selectedVisitApt.clinicalNotes || selectedVisitApt.clinical_notes || "");
+      const parsed = parseClinicalDetails(selectedVisitApt);
+      setDoctorNoteInput(parsed.notes);
     } else {
       setDoctorNoteInput("");
     }
-  }, [selectedVisitApt?.id]);
+  }, [selectedVisitApt?.id, selectedVisitApt?.clinicalNotes]);
 
   // Save clinical doctor notes for the selected encounter
   const handleSaveDoctorNotes = async (e: React.FormEvent) => {
@@ -198,16 +223,23 @@ export default function PatientsSection() {
     try {
       const targetApt = selectedVisitApt || patientAppointments[0];
       if (targetApt && targetApt.id) {
+        const { diagnosis, prescription } = parseClinicalDetails(targetApt);
+        const reconstructed = [
+          diagnosis ? `[Diagnosis]: ${diagnosis}` : "",
+          `[Notes]: ${doctorNoteInput.trim()}`,
+          prescription ? `[Rx]: ${prescription}` : ""
+        ].filter(Boolean).join("\n");
+
         await fetch(`/api/appointments/${targetApt.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            clinicalNotes: doctorNoteInput.trim()
+            clinicalNotes: reconstructed
           })
         });
 
         // Refresh appointments list in place immediately
-        setPatientAppointments(prev => prev.map(a => a.id === targetApt.id ? { ...a, clinicalNotes: doctorNoteInput.trim() } : a));
+        setPatientAppointments(prev => prev.map(a => a.id === targetApt.id ? { ...a, clinicalNotes: reconstructed } : a));
       }
 
       // Also record in system logs
@@ -439,7 +471,45 @@ export default function PatientsSection() {
   }
 
   const patientInitials = (activePatient.name || "PT").split(' ').map((n: string) => n[0]).join('').slice(0, 2);
-  const prescriptionsList: Prescription[] = activePatient.prescriptions || [];
+  const prescriptionsList = useMemo(() => {
+    const list: Prescription[] = [...(activePatient.prescriptions || [])];
+    
+    // Also extract prescription formulas from encounters if not already in patient.prescriptions
+    patientAppointments.forEach(apt => {
+      const { prescription } = parseClinicalDetails(apt);
+      const rxText = prescription || apt.prescription;
+      if (rxText && rxText.trim()) {
+        const parts = rxText.split(/,\s*(?=[A-Z])/);
+        parts.forEach((pStr: string, idx: number) => {
+          const clean = pStr.trim();
+          if (!clean) return;
+          const match = clean.match(/^(.+?)\s+(\d+[\s\w]+?)\s*\((.+?)\)$/);
+          const drugName = match ? match[1].trim() : clean;
+          const dosage = match ? match[2].trim() : "1 Tablet";
+          const frequency = match ? match[3].trim() : "Once Daily (QD)";
+          
+          const exists = list.some(existing => 
+            (existing.drugName || '').toLowerCase() === drugName.toLowerCase() && 
+            (existing.date === apt.date || !existing.date)
+          );
+          
+          if (!exists) {
+            list.push({
+              id: `rx-apt-${apt.id}-${idx}`,
+              drugName,
+              dosage,
+              frequency,
+              instructions: "Take after meals",
+              prescribedBy: apt.doctorName || "Attending Physician",
+              date: apt.date || new Date().toISOString().split("T")[0]
+            } as any);
+          }
+        });
+      }
+    });
+
+    return list;
+  }, [activePatient.prescriptions, patientAppointments]);
 
   return (
     <div className="space-y-6 font-sans text-neutral-800">
@@ -663,9 +733,16 @@ export default function PatientsSection() {
             <p className="text-xs text-slate-500 mt-0.5">Record examination remarks, diagnostic findings, or clinical follow-up instructions for this patient.</p>
           </div>
           {selectedVisitApt && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 font-mono text-[11px] font-bold">
-              <Calendar className="w-3.5 h-3.5 text-teal-600" />
-              <span>{selectedVisitApt.date} • {selectedVisitApt.timeSlot}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {parsedVisitDetails.diagnosis && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 text-[11px] font-bold">
+                  Diagnosis: {parsedVisitDetails.diagnosis}
+                </span>
+              )}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 font-mono text-[11px] font-bold">
+                <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                <span>{selectedVisitApt.date} • {selectedVisitApt.timeSlot || selectedVisitApt.time || "Scheduled Slot"}</span>
+              </div>
             </div>
           )}
         </div>

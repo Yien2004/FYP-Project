@@ -405,6 +405,45 @@ router.post("/complete-consultation", authenticateToken, async (req: Request, re
       prescription: prescription || ""
     });
 
+    // Auto-sync prescription to patient's active Medication Scheduler
+    if (prescription && prescription.trim()) {
+      try {
+        const patientEmail = apt.patientEmail || apt.patientId;
+        const patient = await db.getPatientProfileByEmail(patientEmail);
+        if (patient) {
+          const currentRx = Array.isArray(patient.prescriptions) ? patient.prescriptions : [];
+          const rxItems = prescription.split(/,\s*(?=[A-Z])/).map((itemStr: string, idx: number) => {
+            const clean = itemStr.trim();
+            const match = clean.match(/^(.+?)\s+(\d+[\s\w]+?)\s*\((.+?)\)$/);
+            return {
+              id: `rx-${Date.now()}-${idx}`,
+              drugName: match ? match[1].trim() : clean,
+              dosage: match ? match[2].trim() : "1 Tablet",
+              frequency: match ? match[3].trim() : "Once Daily (QD)",
+              instructions: "Take after meals",
+              prescribedBy: doctor.full_name || apt.doctorName || "Attending Physician",
+              date: apt.date || new Date().toISOString().split("T")[0]
+            };
+          });
+
+          const newMeds = rxItems.filter((newRx: any) =>
+            !currentRx.some((existing: any) =>
+              (existing.drugName || '').toLowerCase() === newRx.drugName.toLowerCase() &&
+              existing.date === newRx.date
+            )
+          );
+
+          if (newMeds.length > 0) {
+            await db.updatePatientProfile(patient.email, {
+              prescriptions: [...newMeds, ...currentRx]
+            });
+          }
+        }
+      } catch (err: any) {
+        console.warn("Failed to auto-sync prescription to patient scheduler:", err);
+      }
+    }
+
     await db.addSystemLog({
       timestamp: new Date().toISOString(),
       level: "INFO",
