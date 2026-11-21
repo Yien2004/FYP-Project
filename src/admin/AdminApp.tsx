@@ -234,7 +234,7 @@ export default function AdminApp({
           onMenuToggle={() => setMobileMenuOpen(prev => !prev)}
         />
 
-        <main className="flex-1 overflow-y-auto p-8 bg-neutral-50/60">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-neutral-50/60">
           <div className="max-w-[1450px] mx-auto min-h-full">
             {adminTab === 'dashboard' && <AdminDashboard isSuperAdmin={isSuperAdmin} />}
             {adminTab === 'approvals' && (

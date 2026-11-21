@@ -9,7 +9,8 @@ import {
   Home, 
   MessageSquare, 
   Mail,
-  Activity 
+  Activity,
+  X 
 } from "lucide-react";
 import { AppNotification, PatientProfile } from "../types";
 
@@ -20,6 +21,8 @@ interface SidebarProps {
   onLogout: () => void;
   patientProfile: PatientProfile;
   unreadMessagesCount?: number;
+  mobileMenuOpen?: boolean;
+  onCloseMobileMenu?: () => void;
 }
 
 const translations: Record<string, Record<string, string>> = {
@@ -47,7 +50,7 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-export default function Sidebar({ currentScreen, onSetScreen, notifications, onLogout, patientProfile, unreadMessagesCount = 0 }: SidebarProps) {
+export default function Sidebar({ currentScreen, onSetScreen, notifications, onLogout, patientProfile, unreadMessagesCount = 0, mobileMenuOpen = false, onCloseMobileMenu }: SidebarProps) {
   const patientName = patientProfile.fullName;
   const lang = patientProfile.language || "English";
 
@@ -80,72 +83,101 @@ export default function Sidebar({ currentScreen, onSetScreen, notifications, onL
   ];
 
   return (
-    <aside id="portal-sidebar" className="w-64 bg-white border-r border-slate-200 text-slate-700 font-sans flex flex-col justify-between py-6 shrink-0 relative shadow-xs">
-      
-      <div className="space-y-5">
-        {/* Brand Banner - PantaiCare Smart Outpatient Portal */}
-        <div className="px-6 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 shrink-0">
-            <Activity className="w-5 h-5 text-white" />
+    <>
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={onCloseMobileMenu}
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 lg:hidden transition-opacity"
+        />
+      )}
+
+      <aside 
+        id="portal-sidebar" 
+        className={`w-64 bg-white border-r border-slate-200 text-slate-700 font-sans flex flex-col justify-between py-6 shrink-0 z-50 shadow-xs
+          fixed lg:static inset-y-0 left-0 transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}
+      >
+        
+        <div className="space-y-5">
+          {/* Brand Banner - PantaiCare Smart Outpatient Portal */}
+          <div className="px-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-sky-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 shrink-0">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <span className="font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
+                  Pantai<span className="text-teal-600">Care</span>
+                </span>
+              </div>
+            </div>
+            {onCloseMobileMenu && (
+              <button 
+                type="button"
+                onClick={onCloseMobileMenu}
+                className="block lg:hidden p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                title="Close Menu"
+                aria-label="Close Menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
-          <div>
-            <span className="font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
-              Pantai<span className="text-teal-600">Care</span>
-            </span>
-          </div>
+
+          {/* Navigation list grouped by clinical sections */}
+          <nav className="space-y-4 px-3 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-thin">
+            {navSections.map((section, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <span className="text-[9px] uppercase font-extrabold text-slate-400 font-mono tracking-wider px-3 block mb-1">
+                  {section.title}
+                </span>
+                {section.items.map((item) => {
+                  const isActive = currentScreen === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        if (item.id === "schedule-appointment") {
+                          localStorage.removeItem("pantai_booking_initial_step");
+                          localStorage.removeItem("pantai_booking_preselected_clinic");
+                        }
+                        onSetScreen(item.id);
+                        onCloseMobileMenu?.();
+                      }}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center justify-between transition-all group cursor-pointer ${
+                        isActive 
+                          ? 'bg-sky-600 text-white shadow-md shadow-sky-600/15' 
+                          : 'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-sky-600'} transition-colors`}>
+                          {item.icon}
+                        </span>
+                        <span>{t(item.label)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
         </div>
 
-        {/* Navigation list grouped by clinical sections */}
-        <nav className="space-y-4 px-3 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-thin">
-          {navSections.map((section, sIdx) => (
-            <div key={sIdx} className="space-y-1">
-              <span className="text-[9px] uppercase font-extrabold text-slate-400 font-mono tracking-wider px-3 block mb-1">
-                {section.title}
-              </span>
-              {section.items.map((item) => {
-                const isActive = currentScreen === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (item.id === "schedule-appointment") {
-                        localStorage.removeItem("pantai_booking_initial_step");
-                        localStorage.removeItem("pantai_booking_preselected_clinic");
-                      }
-                      onSetScreen(item.id);
-                    }}
-                    className={`w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center justify-between transition-all group cursor-pointer ${
-                      isActive 
-                        ? 'bg-sky-600 text-white shadow-md shadow-sky-600/15' 
-                        : 'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-sky-600'} transition-colors`}>
-                        {item.icon}
-                      </span>
-                      <span>{t(item.label)}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-      </div>
-
-      {/* Logout footer block */}
-      <div className="px-4 space-y-2 pt-3 border-t border-slate-100">
-        <button 
-          onClick={onLogout}
-          className="w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer border border-transparent hover:border-rose-100"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>{t("Sign Out")}</span>
-        </button>
-
-
-      </div>
-    </aside>
+        {/* Logout footer block */}
+        <div className="px-4 space-y-2 pt-3 border-t border-slate-100">
+          <button 
+            onClick={() => {
+              onCloseMobileMenu?.();
+              onLogout();
+            }}
+            className="w-full py-2 px-3 rounded-xl text-xs font-bold leading-none flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer border border-transparent hover:border-rose-100"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>{t("Sign Out")}</span>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

@@ -1147,7 +1147,7 @@ export default function ScheduleAppointment({
         </div>
 
         {/* Steps indicator */}
-        <div className="grid grid-cols-5 gap-2 text-[9px] uppercase tracking-[0.16em] font-bold text-slate-500">
+        <div className="flex sm:grid sm:grid-cols-5 gap-2 text-[9px] uppercase tracking-[0.12em] font-bold text-slate-500 overflow-x-auto scrollbar-none pb-1">
           {currentStepLabel.map((label, index) => {
             const stepNumber = index + 1;
             const isActive = step === stepNumber;
@@ -1155,7 +1155,7 @@ export default function ScheduleAppointment({
             return (
               <div
                 key={label}
-                className={`rounded-2xl py-3 text-center font-sans tracking-widest transition-all duration-300 ${
+                className={`rounded-xl sm:rounded-2xl py-2 sm:py-3 px-2 sm:px-3 text-center font-sans tracking-wide sm:tracking-widest transition-all duration-300 min-w-[115px] sm:min-w-0 flex-1 shrink-0 ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                     : isComplete

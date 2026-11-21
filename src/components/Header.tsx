@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, Home, Bell, Settings, Activity } from "lucide-react";
+import { ShieldCheck, Home, Bell, Settings, Activity, Menu } from "lucide-react";
 import { AppNotification } from "../types";
 
 interface HeaderProps {
@@ -8,9 +8,10 @@ interface HeaderProps {
   notifications: AppNotification[];
   onSetScreen: (screen: string) => void;
   patientName: string;
+  onMenuToggle?: () => void;
 }
 
-export default function Header({ currentScreen, onNavigateHome, notifications, onSetScreen, patientName }: HeaderProps) {
+export default function Header({ currentScreen, onNavigateHome, notifications, onSetScreen, patientName, onMenuToggle }: HeaderProps) {
   const unreadNotificationsOfCategory = notifications.filter(n => !n.read);
 
   const screenDisplayNames: Record<string, string> = {
@@ -25,10 +26,22 @@ export default function Header({ currentScreen, onNavigateHome, notifications, o
   };
 
   return (
-    <header id="portal-header" className="sticky top-0 z-40 bg-white/95 border-b border-slate-200/90 px-6 sm:px-8 py-3.5 flex items-center justify-between backdrop-blur-md shadow-xs">
+    <header id="portal-header" className="sticky top-0 z-40 bg-white/95 border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between backdrop-blur-md shadow-xs">
       
       {/* Left: Brand mark & breadcrumb */}
-      <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+        {onMenuToggle && (
+          <button 
+            type="button"
+            onClick={onMenuToggle}
+            className="p-2 -ml-1 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition cursor-pointer lg:hidden shrink-0"
+            title="Open Navigation Menu"
+            aria-label="Open Navigation Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
         <button 
           onClick={onNavigateHome}
           className="p-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
@@ -38,10 +51,10 @@ export default function Header({ currentScreen, onNavigateHome, notifications, o
           <span className="hidden md:inline font-sans">Home</span>
         </button>
 
-        <div className="h-5 w-[1px] bg-slate-200 shrink-0"></div>
+        <div className="h-5 w-[1px] bg-slate-200 shrink-0 hidden sm:block"></div>
 
         <div className="min-w-0">
-          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight truncate">
+          <h2 className="text-xs sm:text-base font-extrabold text-slate-900 leading-tight truncate">
             {screenDisplayNames[currentScreen] || "Patient Care Space"}
           </h2>
         </div>

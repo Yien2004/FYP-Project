@@ -97,6 +97,7 @@ function getNotifSortTime(n: AppNotification): number {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PatientApp({ onLogout }: PatientAppProps) {
   const [currentScreen, setCurrentScreen] = useState<string>("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Local states: initialized cleanly for real accounts, falling back to mock data only for demo account
   const [patientProfile, setPatientProfile] = useState<PatientProfile>(() => {
@@ -787,6 +788,7 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       localStorage.removeItem("pantai_booking_preselected_specialty");
       localStorage.removeItem("carey_triage_specialty");
     }
+    setMobileMenuOpen(false);
     setCurrentScreen(screen);
   };
 
@@ -801,6 +803,8 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
         notifications={notifications}
         onLogout={handleLogout}
         patientProfile={patientProfile}
+        mobileMenuOpen={mobileMenuOpen}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
       />
 
       {/* Main content area */}
@@ -811,9 +815,10 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
           notifications={notifications}
           onSetScreen={handleSetScreen}
           patientName={patientProfile.fullName}
+          onMenuToggle={() => setMobileMenuOpen(prev => !prev)}
         />
 
-        <main className="flex-1 p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="animate-fade-in">
 
             {currentScreen === "dashboard" && (
