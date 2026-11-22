@@ -484,10 +484,10 @@ What symptoms or health questions would you like to discuss today?`,
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+      <div className="w-full">
         
-        {/* Left Part: Health Assistant Chat Conversation Window */}
-        <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl flex flex-col justify-between h-[550px] shadow-sm relative overflow-hidden">
+        {/* Health Assistant Chat Conversation Window */}
+        <div className="w-full bg-white border border-slate-200 rounded-3xl flex flex-col justify-between h-[550px] shadow-sm relative overflow-hidden">
           
           {/* Header banner stats */}
           <div className="bg-slate-50 border-b border-slate-150 p-4 flex items-center justify-between z-10 shrink-0">
@@ -732,60 +732,6 @@ What symptoms or health questions would you like to discuss today?`,
           </form>
 
         </div>
-
-        {/* Right Part: Profile Context summary widgets */}
-        <div className="lg:col-span-4 flex flex-col justify-between gap-6">
-              {/* Patient summary widget */}
-          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm space-y-3">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold block">Assessor Profile context</span>
-            
-            <div className="space-y-2 border-b border-slate-100 pb-3 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Full Name</span>
-                <span className="font-bold text-slate-800 text-right">{patientProfile.fullName || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">DOB (Age)</span>
-                <span className="font-bold text-slate-800 font-mono text-right">
-                  {patientProfile.dateOfBirth ? `${patientProfile.dateOfBirth} (${calculateAge(patientProfile.dateOfBirth)} Yrs)` : "N/A"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Gender</span>
-                <span className="font-bold text-slate-800 text-right">{patientProfile.gender || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">MyKad</span>
-                <span className="font-bold text-slate-800 font-mono text-right">{patientProfile.myKadOrPassport || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Phone</span>
-                <span className="font-bold text-slate-800 font-mono text-right">{patientProfile.phone || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Email</span>
-                <span className="font-bold text-slate-800 text-right truncate max-w-[160px]">{patientProfile.email}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold block">Active Allergens Alert</span>
-              <div className="flex flex-wrap gap-1.5">
-                {patientProfile.allergies && patientProfile.allergies.length > 0 ? (
-                  patientProfile.allergies.map(alg => (
-                    <span key={alg} className="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded border border-red-200 font-mono">
-                      {alg}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-slate-400 italic">No known allergies</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-        </div>
-
       </div>
     </div>
   );
