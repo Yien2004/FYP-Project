@@ -207,9 +207,11 @@ export default function UserSettings({
     return patientProfile.language || "English";
   });
 
+  const isEditingRef = React.useRef(false);
+
   // Synchronize form fields whenever patientProfile updates (e.g. from async backend load)
   useEffect(() => {
-    if (patientProfile) {
+    if (patientProfile && !isEditingRef.current) {
       setFullName(patientProfile.fullName || "");
       setMyKadOrPassport(patientProfile.myKadOrPassport || "");
       setDateOfBirth(patientProfile.dateOfBirth || "");
@@ -266,8 +268,12 @@ export default function UserSettings({
       .map(s => s.trim())
       .filter(Boolean);
 
+    isEditingRef.current = false;
+    const userEmail = patientProfile.email || localStorage.getItem("carepoint_user_email") || localStorage.getItem("lifelink_user_email") || "";
+
     const updatedProfile: PatientProfile = {
       ...patientProfile,
+      email: userEmail,
       fullName,
       myKadOrPassport,
       dateOfBirth,
@@ -358,6 +364,7 @@ export default function UserSettings({
   };
 
   const toggleCondition = (cond: string) => {
+    isEditingRef.current = true;
     if (cond === "None") {
       setChronicConditions(["None"]);
     } else {
@@ -402,7 +409,11 @@ export default function UserSettings({
       <div className="max-w-4xl space-y-6">
           
           {activeTab === "profile" && (
-            <form onSubmit={handleSaveProfile} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 animate-fade-in">
+            <form 
+              onSubmit={handleSaveProfile} 
+              onChange={() => { isEditingRef.current = true; }}
+              className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 animate-fade-in"
+            >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <User className="w-5 h-5 text-teal-650" />

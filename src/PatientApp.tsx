@@ -147,7 +147,13 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
       const pRes = await apiFetch(`/api/profile?email=${encodeURIComponent(email)}`);
       if (!pRes.ok) return;
       const profile = await pRes.json();
-      setPatientProfile(profile);
+      setPatientProfile(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(profile)) return prev;
+        try {
+          localStorage.setItem("carepoint_profile", JSON.stringify(profile));
+        } catch {}
+        return profile;
+      });
       
       let profileNotifs: AppNotification[] = [];
       if (profile.notifications && Array.isArray(profile.notifications)) {
@@ -352,12 +358,24 @@ export default function PatientApp({ onLogout }: PatientAppProps) {
   // ── Profile ───────────────────────────────────────────────────────────────
 
   const handleUpdateProfile = async (updated: PatientProfile) => {
-    setPatientProfile(updated);
+    const userEmail = updated.email || localStorage.getItem("carepoint_user_email") || localStorage.getItem("lifelink_user_email") || "";
+    const profileToSave = { ...updated, email: userEmail };
+    setPatientProfile(profileToSave);
     try {
-      await apiFetch("/api/profile", {
+      localStorage.setItem("carepoint_profile", JSON.stringify(profileToSave));
+    } catch {}
+    try {
+      const res = await apiFetch("/api/profile", {
         method: "POST",
-        body: JSON.stringify({ ...updated, email: updated.email })
+        body: JSON.stringify(profileToSave)
       });
+      if (res.ok) {
+        const saved = await res.json();
+        setPatientProfile(saved);
+        try {
+          localStorage.setItem("carepoint_profile", JSON.stringify(saved));
+        } catch {}
+      }
     } catch (err) {
       console.error("Failed to sync profile update", err);
     }
