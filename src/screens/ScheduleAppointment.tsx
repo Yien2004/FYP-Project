@@ -515,9 +515,9 @@ export default function ScheduleAppointment({
     const dDept = (doctorDept || "").toLowerCase().trim();
     const target = targetDept.toLowerCase().trim();
     if (dDept === target) return true;
-    const subDepts = dDept.split(',').map(s => s.trim());
+    const subDepts = dDept.split(',').map(s => s.trim().toLowerCase());
     if (subDepts.includes(target)) return true;
-    return dDept.includes(target) || target.includes(dDept);
+    return false;
   };
 
   // Extract all unique departments for selected hospital

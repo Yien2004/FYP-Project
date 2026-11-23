@@ -216,12 +216,12 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-9",
     "name": "Dr Chan Tha A Hing",
-    "department": "Internal Medicine, Respiratory Medicine",
-    "specialty": "Internal Medicine, Respiratory Medicine",
+    "department": "Respiratory Medicine",
+    "specialty": "Respiratory Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
     "avatar": "CT",
-    "title": "Resident Consultant - Internal Medicine, Respiratory Medicine",
+    "title": "Resident Consultant - Respiratory Medicine",
     "availability": "Mon–Fri: 9:00 AM – 5:00 PM"
   },
   {
@@ -1283,12 +1283,12 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "pha-doc-21",
     "name": "Dr Nor Adina Binti Ahmad Tajudin",
-    "department": "Internal Medicine, Respiratory Medicine",
-    "specialty": "Internal Medicine, Respiratory Medicine",
+    "department": "Respiratory Medicine",
+    "specialty": "Respiratory Medicine",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Resident",
     "avatar": "NA",
-    "title": "Resident Consultant - Internal Medicine, Respiratory Medicine",
+    "title": "Resident Consultant - Respiratory Medicine",
     "availability": "Mon–Fri: 9:00 AM – 5:00 PM"
   },
   {
@@ -1327,12 +1327,12 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "pha-doc-58",
     "name": "Dr Teoh Sze Kye",
-    "department": "Internal Medicine, Respiratory Medicine",
-    "specialty": "Internal Medicine, Respiratory Medicine",
+    "department": "Respiratory Medicine",
+    "specialty": "Respiratory Medicine",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Sessional",
     "avatar": "TS",
-    "title": "Sessional Consultant - Internal Medicine, Respiratory Medicine",
+    "title": "Sessional Consultant - Respiratory Medicine",
     "availability": "Tue, Thu: 2:00 PM – 5:00 PM"
   },
   {
