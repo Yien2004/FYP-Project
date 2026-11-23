@@ -161,7 +161,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-4",
     "name": "Dr Awangku Bakhrunnuddin Bin Pengiran Ahmad Tajuddin",
-    "department": "Cardiology, Internal Medicine",
+    "department": "Cardiology",
     "specialty": "Cardiology, Internal Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -227,7 +227,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-10",
     "name": "Dr Chee Wei Shen",
-    "department": "Cardiology, Electrophysiology, Internal Medicine",
+    "department": "Cardiology",
     "specialty": "Cardiology, Electrophysiology, Internal Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -260,7 +260,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-13",
     "name": "Dr Choo Chin Yin",
-    "department": "Orthopaedic - Arthroscopy & Sport Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopaedic - Arthroscopy & Sport Surgery",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -304,7 +304,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-17",
     "name": "Dr Farhat Aziz Khan",
-    "department": "Clinical Oncology, Oncology - Radiation",
+    "department": "Clinical Oncology",
     "specialty": "Clinical Oncology, Oncology - Radiation",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -326,7 +326,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-19",
     "name": "Dr Gee Teak Sheng",
-    "department": "Neurosurgery, Spine Surgery",
+    "department": "Neurosurgery",
     "specialty": "Neurosurgery, Spine Surgery",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -359,7 +359,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-22",
     "name": "Dr Hasanah Bt Ishak",
-    "department": "General Paediatrics, Paediatric Cardiology",
+    "department": "General Paediatrics",
     "specialty": "General Paediatrics, Paediatric Cardiology",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -381,7 +381,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-24",
     "name": "Dr. Jasvinder Kaur",
-    "department": "General Paediatrics, Paediatric Cardiology",
+    "department": "General Paediatrics",
     "specialty": "General Paediatrics, Paediatric Cardiology",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -403,7 +403,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-26",
     "name": "Dr Kan Choon Hong",
-    "department": "Neurosurgery, Spine Surgery",
+    "department": "Neurosurgery",
     "specialty": "Neurosurgery, Spine Surgery",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -425,7 +425,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-28",
     "name": "Dr. Kew Chen Hui",
-    "department": "Dermatology, Internal Medicine",
+    "department": "Dermatology",
     "specialty": "Dermatology, Internal Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -436,7 +436,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-29",
     "name": "Dr Khaw Chern Wern James",
-    "department": "General Surgery, Colorectal Surgery",
+    "department": "General Surgery",
     "specialty": "General Surgery, Colorectal Surgery",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -491,7 +491,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-34",
     "name": "Dr Lee Kian Guan",
-    "department": "Internal Medicine, Nephrology (Renal Medicine)",
+    "department": "Nephrology (Renal Medicine)",
     "specialty": "Internal Medicine, Nephrology (Renal Medicine)",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -568,7 +568,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-41",
     "name": "Dr Lim Lay Ang",
-    "department": "Internal Medicine, Endocrinology",
+    "department": "Endocrinology",
     "specialty": "Internal Medicine, Endocrinology",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -579,7 +579,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-42",
     "name": "Dr Lim Yueh Ni",
-    "department": "Clinical Oncology, Oncology - Radiation",
+    "department": "Clinical Oncology",
     "specialty": "Clinical Oncology, Oncology - Radiation",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -612,7 +612,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-45",
     "name": "Dr. (Mr.) Mah Kok Keong",
-    "department": "Orthopaedic Surgery, Hand, Upper Limb & Microsurgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopaedic Surgery, Hand, Upper Limb & Microsurgery",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -667,7 +667,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-50",
     "name": "Dr Noor Purdah binti Abdul Kadir",
-    "department": "Gastroenterology & Hepatology, Internal Medicine",
+    "department": "Gastroenterology & Hepatology",
     "specialty": "Gastroenterology & Hepatology, Internal Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -700,7 +700,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-53",
     "name": "Dr. Sanjeevan Radhakrishnan",
-    "department": "Orthopaedic Surgery, Orthopaedic Oncology & Reconstructive Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopaedic Surgery, Orthopaedic Oncology & Reconstructive Surgery",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -711,7 +711,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-54",
     "name": "Dr. Saravanan Krishinan",
-    "department": "Cardiology, Internal Medicine",
+    "department": "Cardiology",
     "specialty": "Cardiology, Internal Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -744,7 +744,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-57",
     "name": "Dr. Shahul Hamid Bin K A Ahmadsah",
-    "department": "Cardiology, Internal Medicine",
+    "department": "Cardiology",
     "specialty": "Cardiology, Internal Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -766,7 +766,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-59",
     "name": "Dr Shazril Imran Bin Shaukat",
-    "department": "Oncology, Radiotherapy",
+    "department": "Clinical Oncology",
     "specialty": "Oncology, Radiotherapy",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -799,7 +799,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-62",
     "name": "Dr Tan Ai Lian",
-    "department": "Clinical Oncology, Oncology - Radiation",
+    "department": "Clinical Oncology",
     "specialty": "Clinical Oncology, Oncology - Radiation",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -810,7 +810,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-63",
     "name": "Dr Tan Boon Seang",
-    "department": "Clinical Oncology, Oncology - Radiation",
+    "department": "Clinical Oncology",
     "specialty": "Clinical Oncology, Oncology - Radiation",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -865,7 +865,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-68",
     "name": "Dr Tan Swee Wei",
-    "department": "General Paediatrics, Paediatric Respiratory Medicine",
+    "department": "General Paediatrics",
     "specialty": "General Paediatrics, Paediatric Respiratory Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -898,7 +898,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-71",
     "name": "Dr. Thiam Chiann Ni",
-    "department": "Internal Medicine, Geriatric Medicine",
+    "department": "Geriatric Medicine",
     "specialty": "Internal Medicine, Geriatric Medicine",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -964,7 +964,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-77",
     "name": "Dr. Wong Chun Mun",
-    "department": "Internal Medicine, Nephrology (Renal Medicine)",
+    "department": "Nephrology (Renal Medicine)",
     "specialty": "Internal Medicine, Nephrology (Renal Medicine)",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Resident",
@@ -997,7 +997,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-80",
     "name": "Dr WONG YIM CHAN",
-    "department": "Psychiatry, Child & Adolescent Psychiatry",
+    "department": "Psychiatry",
     "specialty": "Psychiatry, Child & Adolescent Psychiatry",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -1041,7 +1041,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "php-doc-84",
     "name": "Dr Yeoh Whei Chuern",
-    "department": "Internal Medicine, Rheumatology",
+    "department": "Rheumatology",
     "specialty": "Internal Medicine, Rheumatology",
     "hospital": "Pantai Hospital Penang (Main Hospital)",
     "status": "Sessional",
@@ -1162,7 +1162,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-137",
     "name": "Dr. Juita Hassan",
-    "department": "Internal Medicine, Intensive Care Medicine",
+    "department": "Anaesthesiology & Critical Care",
     "specialty": "Internal Medicine, Intensive Care Medicine",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Resident",
@@ -1261,7 +1261,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "pha-doc-15",
     "name": "Dr Mah Doo Yee",
-    "department": "Internal Medicine, Nephrology (Renal Medicine)",
+    "department": "Nephrology (Renal Medicine)",
     "specialty": "Internal Medicine, Nephrology (Renal Medicine)",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Resident",
@@ -1272,7 +1272,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "pha-doc-20",
     "name": "Dr Ng Yoke Mui",
-    "department": "Internal Medicine, Endocrinology",
+    "department": "Endocrinology",
     "specialty": "Internal Medicine, Endocrinology",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Resident",
@@ -1305,7 +1305,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "pha-doc-50",
     "name": "Dr. Noor Azleen Ahmad Tarmizi",
-    "department": "Internal Medicine, Geriatric Medicine",
+    "department": "Geriatric Medicine",
     "specialty": "Internal Medicine, Geriatric Medicine",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Sessional",
@@ -1349,7 +1349,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "pha-doc-83",
     "name": "Dr Ong Chun Seong",
-    "department": "Internal Medicine, Nephrology (Renal Medicine)",
+    "department": "Nephrology (Renal Medicine)",
     "specialty": "Internal Medicine, Nephrology (Renal Medicine)",
     "hospital": "Pantai Heart & Wellness Pavilion",
     "status": "Visiting",
@@ -1360,7 +1360,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-27",
     "name": "Dr Catherine Lee Tong How",
-    "department": "Dentistry, Orthodontics",
+    "department": "Dentistry",
     "specialty": "Dentistry, Orthodontics",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Sessional",
@@ -1371,7 +1371,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-28",
     "name": "Dr. Chai Pei Fan",
-    "department": "General Pediatrics, Pediatric Gastroenterology",
+    "department": "General Paediatrics",
     "specialty": "General Pediatrics, Pediatric Gastroenterology",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Resident",
@@ -1426,7 +1426,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-79",
     "name": "Dr. Khong Su San",
-    "department": "Plastic Surgery",
+    "department": "Plastic & Reconstructive Surgery",
     "specialty": "Plastic Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Resident",
@@ -1437,7 +1437,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-83",
     "name": "Dato' Dr. Kuladeva Ratnam",
-    "department": "Plastic Surgery",
+    "department": "Plastic & Reconstructive Surgery",
     "specialty": "Plastic Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Sessional",
@@ -1448,7 +1448,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-84",
     "name": "Dr. Lalitha Pillay",
-    "department": "Pediatrics, Pediatric Dermatology",
+    "department": "General Paediatrics",
     "specialty": "Pediatrics, Pediatric Dermatology",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Sessional",
@@ -1459,7 +1459,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-88",
     "name": "Dr. Lau Peng Choong",
-    "department": "General Surgery, Upper GIT Surgery",
+    "department": "General Surgery",
     "specialty": "General Surgery, Upper GIT Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Resident",
@@ -1503,7 +1503,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-105",
     "name": "Dato' Dr. Luqman Bin Mazlan",
-    "department": "General Surgery, Colorectal Surgery",
+    "department": "General Surgery",
     "specialty": "General Surgery, Colorectal Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Sessional",
@@ -1536,7 +1536,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-114",
     "name": "Dato' Dr. Meheshinder Singh",
-    "department": "General Surgery, Colorectal Surgery",
+    "department": "General Surgery",
     "specialty": "General Surgery, Colorectal Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Resident",
@@ -1547,7 +1547,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-121",
     "name": "Datuk Dr. Mohd Noor Awang",
-    "department": "Dental Surgery, Oral & Maxillofacial Surgery",
+    "department": "Dentistry",
     "specialty": "Dental Surgery, Oral & Maxillofacial Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Sessional",
@@ -1558,7 +1558,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-129",
     "name": "Dr Navinakathiresu Muthukumarasamy",
-    "department": "General Surgery, Colorectal Surgery",
+    "department": "General Surgery",
     "specialty": "General Surgery, Colorectal Surgery",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Resident",
@@ -1602,7 +1602,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-149",
     "name": "Dr. Praveen Gill",
-    "department": "Dentistry, Orthodontics",
+    "department": "Dentistry",
     "specialty": "Dentistry, Orthodontics",
     "hospital": "Pantai Premier Clinic & Day Surgery",
     "status": "Sessional",
@@ -1657,7 +1657,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-38",
     "name": "Dr Collin Looi Seng Kim",
-    "department": "Orthopedic Surgery, Hand, Upper Limb & Microsurgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery, Hand, Upper Limb & Microsurgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1668,7 +1668,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-51",
     "name": "Dr. Gobinder Singh",
-    "department": "Orthopedic Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1723,7 +1723,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-81",
     "name": "Dr. Kok Choong Seng",
-    "department": "Orthopedic Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1756,7 +1756,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-108",
     "name": "Dato' Dr. Mahmood Merican",
-    "department": "Orthopedic Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Sessional",
@@ -1778,7 +1778,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-116",
     "name": "Dr. Mohamed Ashraff Mohd Ariff",
-    "department": "Orthopedic Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1789,7 +1789,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-117",
     "name": "Dr Mohamed Noortheen Ahamed Mustafa",
-    "department": "Orthopedic Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1800,7 +1800,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-120",
     "name": "Dr. Mohd Iskandar b Mohd Amin",
-    "department": "Orthopedic Surgery, Hand, Upper Limb & Microsurgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery, Hand, Upper Limb & Microsurgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1811,7 +1811,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-122",
     "name": "Dr. Mohd Noor Azam Mohd Ithnin",
-    "department": "Orthopedic Surgery, Pediatric Orthopedic",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery, Pediatric Orthopedic",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1822,7 +1822,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-131",
     "name": "Dr. Ng Bing Wui",
-    "department": "Orthopedic Surgery, Spine Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery, Spine Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1833,7 +1833,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-135",
     "name": "Dr. Nik Aizah Nabilla bt Faheem",
-    "department": "Orthopedic Surgery, Foot & Ankle",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery, Foot & Ankle",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1855,7 +1855,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-142",
     "name": "Dr. Paramaswaran Suppiah",
-    "department": "Orthopedic Surgery, Spine Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery, Spine Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
@@ -1866,7 +1866,7 @@ export const allPantaiDoctors: PantaiDoctor[] = [
   {
     "id": "phkl-doc-143",
     "name": "Dr. Pasupathy Sivapragasam",
-    "department": "Orthopedic Surgery",
+    "department": "Orthopaedic Surgery",
     "specialty": "Orthopedic Surgery",
     "hospital": "Pantai Specialist Centre",
     "status": "Resident",
